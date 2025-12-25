@@ -152,6 +152,53 @@ OSX Cleaner는 **Swift + Rust 하이브리드** 아키텍처를 채택합니다.
 
 ---
 
+## 빠른 시작
+
+### 설치
+
+```bash
+# 저장소 클론
+git clone https://github.com/kcenon/osx_cleaner.git
+cd osx_cleaner
+
+# 빌드 및 설치
+./scripts/install.sh
+```
+
+### 기본 사용법
+
+```bash
+# 디스크 사용량 분석
+osxcleaner analyze
+
+# 상세 분석
+osxcleaner analyze --verbose
+
+# 기본 안전 레벨(3)로 정리 (dry-run)
+osxcleaner clean --dry-run
+
+# 개발자 캐시 정리
+osxcleaner clean --developer-caches --safety-level 4
+
+# 설정 확인
+osxcleaner config show
+```
+
+### 수동 빌드
+
+```bash
+# 전체 빌드
+make all
+
+# 테스트 실행
+make test
+
+# 개발용 빌드
+make debug
+```
+
+---
+
 ## 시스템 요구사항
 
 ### 지원 플랫폼
@@ -167,6 +214,41 @@ OSX Cleaner는 **Swift + Rust 하이브리드** 아키텍처를 채택합니다.
 - **Swift**: 5.9+
 - **Rust**: 1.75+
 - **Xcode**: 15+
+
+---
+
+## 프로젝트 구조
+
+```
+osxcleaner/
+├── Package.swift               # Swift Package 정의
+├── Makefile                    # 통합 빌드 스크립트
+├── Sources/                    # Swift 소스
+│   ├── osxcleaner/             # CLI 애플리케이션
+│   │   ├── main.swift
+│   │   ├── Commands/           # CLI 명령어
+│   │   └── UI/                 # 진행률 표시
+│   └── OSXCleanerKit/          # Swift 라이브러리
+│       ├── Services/           # 비즈니스 로직
+│       ├── Config/             # 설정
+│       └── Logger/             # 로깅
+├── rust-core/                  # Rust 소스
+│   ├── Cargo.toml
+│   ├── cbindgen.toml           # FFI 헤더 생성
+│   └── src/
+│       ├── lib.rs              # FFI 진입점
+│       ├── safety/             # 안전 검증
+│       ├── scanner/            # 디렉토리 스캔
+│       ├── cleaner/            # 정리 실행
+│       └── fs/                 # 파일시스템 유틸
+├── include/                    # 생성된 C 헤더
+├── scripts/                    # 셸 스크립트
+│   ├── install.sh
+│   ├── uninstall.sh
+│   └── launchd/                # launchd 에이전트
+├── Tests/                      # 테스트 파일
+└── docs/                       # 문서
+```
 
 ---
 
