@@ -4,15 +4,22 @@ import Foundation
 public struct CleanResult {
     public let freedBytes: UInt64
     public let filesRemoved: Int
+    public let directoriesRemoved: Int
     public let errors: [CleanError]
 
     public var formattedFreedSpace: String {
         ByteCountFormatter.string(fromByteCount: Int64(freedBytes), countStyle: .file)
     }
 
-    public init(freedBytes: UInt64, filesRemoved: Int, errors: [CleanError] = []) {
+    public init(
+        freedBytes: UInt64,
+        filesRemoved: Int,
+        directoriesRemoved: Int = 0,
+        errors: [CleanError] = []
+    ) {
         self.freedBytes = freedBytes
         self.filesRemoved = filesRemoved
+        self.directoriesRemoved = directoriesRemoved
         self.errors = errors
     }
 }
@@ -29,11 +36,29 @@ public struct CleanError: Error {
 }
 
 /// Service for performing cleanup operations
+///
+/// This service uses the Rust core library for high-performance file cleanup
+/// with safety validation. Falls back to Swift implementation if Rust core
+/// is not available.
 public final class CleanerService {
     private let fileManager: FileManager
+    private let rustBridge: RustBridge
+    private var useRustCore: Bool = true
 
-    public init(fileManager: FileManager = .default) {
+    public init(
+        fileManager: FileManager = .default,
+        rustBridge: RustBridge = .shared
+    ) {
         self.fileManager = fileManager
+        self.rustBridge = rustBridge
+
+        // Try to initialize Rust core
+        do {
+            try rustBridge.initialize()
+        } catch {
+            AppLogger.shared.warning("Rust core unavailable, using Swift fallback: \(error)")
+            useRustCore = false
+        }
     }
 
     public func clean(with config: CleanerConfiguration) async throws -> CleanResult {
@@ -41,15 +66,23 @@ public final class CleanerService {
 
         var totalFreed: UInt64 = 0
         var filesRemoved = 0
+        var directoriesRemoved = 0
         var errors: [CleanError] = []
 
         let targets = collectTargets(from: config)
 
         for target in targets {
             do {
-                let result = try await cleanTarget(target, dryRun: config.dryRun)
+                let result: CleanResult
+                if useRustCore {
+                    result = try await cleanTargetWithRust(target, config: config)
+                } else {
+                    result = try await cleanTargetWithSwift(target, dryRun: config.dryRun)
+                }
                 totalFreed += result.freedBytes
                 filesRemoved += result.filesRemoved
+                directoriesRemoved += result.directoriesRemoved
+                errors.append(contentsOf: result.errors)
             } catch {
                 errors.append(CleanError(
                     path: target.path,
@@ -58,13 +91,59 @@ public final class CleanerService {
             }
         }
 
-        AppLogger.shared.success("Cleanup completed: \(filesRemoved) files, \(totalFreed) bytes freed")
+        AppLogger.shared.success("Cleanup completed: \(filesRemoved) files, \(directoriesRemoved) directories, \(totalFreed) bytes freed")
 
         return CleanResult(
             freedBytes: totalFreed,
             filesRemoved: filesRemoved,
+            directoriesRemoved: directoriesRemoved,
             errors: errors
         )
+    }
+
+    // MARK: - Rust Core Cleanup
+
+    private func cleanTargetWithRust(_ target: CleanTarget, config: CleanerConfiguration) async throws -> CleanResult {
+        guard fileManager.fileExists(atPath: target.path) else {
+            return CleanResult(freedBytes: 0, filesRemoved: 0)
+        }
+
+        let safetyLevel = SafetyLevel(rawValue: Int32(config.safetyLevel)) ?? .moderate
+
+        let rustResult = try rustBridge.cleanPath(
+            target.path,
+            safetyLevel: safetyLevel,
+            dryRun: config.dryRun
+        )
+
+        let errors = rustResult.errors.map { errorInfo in
+            CleanError(path: errorInfo.path, reason: errorInfo.reason)
+        }
+
+        return CleanResult(
+            freedBytes: rustResult.freedBytes,
+            filesRemoved: rustResult.filesRemoved,
+            directoriesRemoved: rustResult.directoriesRemoved,
+            errors: errors
+        )
+    }
+
+    // MARK: - Swift Fallback Cleanup
+
+    private func cleanTargetWithSwift(_ target: CleanTarget, dryRun: Bool) async throws -> CleanResult {
+        guard fileManager.fileExists(atPath: target.path) else {
+            return CleanResult(freedBytes: 0, filesRemoved: 0)
+        }
+
+        let size = try calculateSize(at: target.path)
+
+        if !dryRun {
+            try fileManager.removeItem(atPath: target.path)
+        }
+
+        AppLogger.shared.info("Cleaned: \(target.path) (\(size) bytes)")
+
+        return CleanResult(freedBytes: size, filesRemoved: 1)
     }
 
     private func collectTargets(from config: CleanerConfiguration) -> [CleanTarget] {
@@ -124,22 +203,6 @@ public final class CleanerService {
                 category: .browserCache
             )
         ]
-    }
-
-    private func cleanTarget(_ target: CleanTarget, dryRun: Bool) async throws -> CleanResult {
-        guard fileManager.fileExists(atPath: target.path) else {
-            return CleanResult(freedBytes: 0, filesRemoved: 0)
-        }
-
-        let size = try calculateSize(at: target.path)
-
-        if !dryRun {
-            try fileManager.removeItem(atPath: target.path)
-        }
-
-        AppLogger.shared.info("Cleaned: \(target.path) (\(size) bytes)")
-
-        return CleanResult(freedBytes: size, filesRemoved: 1)
     }
 
     private func calculateSize(at path: String) throws -> UInt64 {
