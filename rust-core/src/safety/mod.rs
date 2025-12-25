@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! Safety validation module
 //!
 //! Provides comprehensive safety validation for cleanup operations:

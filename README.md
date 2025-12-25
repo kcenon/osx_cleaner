@@ -3,7 +3,7 @@
 > **macOS System Cleaning Tool** - Safely clean unnecessary files to free up disk space.
 
 [![macOS](https://img.shields.io/badge/macOS-10.15--15.x-blue.svg)](https://www.apple.com/macos/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Development-orange.svg)]()
 
 ---

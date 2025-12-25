@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! Path definitions for safety classification
 //!
 //! Defines protected paths (DANGER) and warning paths (WARNING) that require

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! Running process detection module
 //!
 //! Detects running applications to prevent cache deletion while they're in use.

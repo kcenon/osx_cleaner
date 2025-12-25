@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Core engine for OSX Cleaner - file scanning, cleanup, and safety validation"
-license = "MIT"
+license = "BSD-3-Clause"
 
 [lib]
 name = "osxcore"

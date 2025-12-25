@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! Cleanup execution module
 //!
 //! Provides safe file and directory cleanup with rollback support.
