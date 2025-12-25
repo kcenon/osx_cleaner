@@ -288,6 +288,12 @@ osxcleaner/
 │       ├── safety/             # Safety validation
 │       ├── scanner/            # Directory scanning
 │       ├── cleaner/            # Cleanup execution
+│       ├── developer/          # Developer tool cleanup (F02)
+│       │   ├── mod.rs          # Module entry & common types
+│       │   ├── xcode.rs        # Xcode cache cleanup
+│       │   ├── simulator.rs    # iOS Simulator management
+│       │   ├── packages.rs     # Package manager caches
+│       │   └── docker.rs       # Docker cleanup
 │       └── fs/                 # Filesystem utilities
 ├── include/                    # Generated C headers
 ├── scripts/                    # Shell scripts
@@ -334,7 +340,11 @@ osxcleaner/
 - [ ] Basic cleanup levels (Level 1-2)
 
 ### Phase 2: Developer Features (v0.5)
-- [ ] Developer tool cache management (F02)
+- [x] Developer tool cache management (F02) ✅
+  - Xcode (DerivedData, Archives, Device Support)
+  - iOS Simulators (via xcrun simctl)
+  - Package managers (npm, yarn, pip, brew, cargo, gradle, etc.)
+  - Docker (images, containers, volumes, build cache)
 - [ ] Level 3 cleanup support
 - [ ] Automation scheduling (F07)
 
