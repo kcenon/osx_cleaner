@@ -62,7 +62,7 @@ public final class CleanerService {
     }
 
     public func clean(with config: CleanerConfiguration) async throws -> CleanResult {
-        AppLogger.shared.operation("Starting cleanup with safety level \(config.safetyLevel)")
+        AppLogger.shared.operation("Starting cleanup with level \(config.cleanupLevel)")
 
         var totalFreed: UInt64 = 0
         var filesRemoved = 0
@@ -108,11 +108,9 @@ public final class CleanerService {
             return CleanResult(freedBytes: 0, filesRemoved: 0)
         }
 
-        let safetyLevel = SafetyLevel(rawValue: Int32(config.safetyLevel)) ?? .moderate
-
         let rustResult = try rustBridge.cleanPath(
             target.path,
-            safetyLevel: safetyLevel,
+            cleanupLevel: config.cleanupLevel,
             dryRun: config.dryRun
         )
 

@@ -7,8 +7,8 @@ struct CleanCommand: AsyncParsableCommand {
         abstract: "Clean specified targets with safety checks"
     )
 
-    @Option(name: .shortAndLong, help: "Safety level (1-5, higher is safer)")
-    var safetyLevel: Int = 3
+    @Option(name: .shortAndLong, help: "Cleanup level (1=light, 2=normal, 3=deep, 4=system)")
+    var level: Int = 2
 
     @Flag(name: .shortAndLong, help: "Perform dry run without actual deletion")
     var dryRun: Bool = false
@@ -28,15 +28,17 @@ struct CleanCommand: AsyncParsableCommand {
     mutating func run() async throws {
         let progressView = ProgressView()
 
+        let cleanupLevel = CleanupLevel(rawValue: Int32(level)) ?? .normal
+
         progressView.display(message: "Starting cleanup...")
-        progressView.display(message: "Safety level: \(safetyLevel)")
+        progressView.display(message: "Cleanup level: \(cleanupLevel.description)")
 
         if dryRun {
             progressView.display(message: "[DRY RUN] No files will be deleted")
         }
 
         let config = CleanerConfiguration(
-            safetyLevel: safetyLevel,
+            cleanupLevel: cleanupLevel,
             dryRun: dryRun,
             includeSystemCaches: systemCaches,
             includeDeveloperCaches: developerCaches,
