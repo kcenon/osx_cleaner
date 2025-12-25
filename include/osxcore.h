@@ -55,14 +55,15 @@ struct osx_FFIResult osx_analyze_path(const char *path);
 int32_t osx_calculate_safety(const char *path);
 
 /**
- * Clean a path with the specified safety level
+ * Clean a path with the specified cleanup level
  *
  * # Safety
  * - `path` must be a valid null-terminated C string
+ * - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
  * - `dry_run` if true, no files will be deleted
  */
 struct osx_FFIResult osx_clean_path(const char *path,
-                                    int32_t safety_level,
+                                    int32_t cleanup_level,
                                     bool dry_run);
 
 /**

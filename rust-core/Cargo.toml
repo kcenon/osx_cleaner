@@ -38,6 +38,12 @@ chrono = "0.4"
 # Regex for pattern matching
 regex = "1.10"
 
+# Glob pattern matching
+glob = "0.3"
+
+# Home directory detection
+dirs = "5.0"
+
 [build-dependencies]
 cbindgen = "0.26"
 

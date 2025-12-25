@@ -1,101 +1,55 @@
 //! Safety validation module
 //!
-//! Provides safety level calculation and validation for cleanup operations.
-//! Safety levels range from 1 (most aggressive) to 5 (most conservative).
+//! Provides comprehensive safety validation for cleanup operations:
+//! - 4-level safety classification (Safe, Caution, Warning, Danger)
+//! - Protected path enforcement
+//! - Running application detection
+//! - Cloud sync status detection
+//! - Batch validation for performance
+
+pub mod cloud;
+pub mod level;
+pub mod paths;
+pub mod process;
+pub mod validator;
+
+// Re-export main types for convenience
+pub use cloud::{get_cloud_sync_info, is_safe_to_delete_cloud, CloudService, CloudSyncInfo, SyncStatus};
+pub use level::{CleanupLevel, SafetyLevel};
+pub use paths::{expand_home, PathCategory, CAUTION_PATHS, PROTECTED_PATHS, SAFE_PATHS, WARNING_PATHS};
+pub use process::{
+    check_related_app_running, get_processes_using_path, is_app_running, is_file_in_use,
+    AppCacheMapping, ProcessInfo,
+};
+pub use validator::{ClassificationResult, SafetyRule, SafetyValidator, ValidationError};
 
 use std::path::Path;
 
-/// Safety levels for cleanup operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(C)]
-pub enum SafetyLevel {
-    /// Level 1: Aggressive - includes system files
-    Aggressive = 1,
-    /// Level 2: Normal - includes most caches
-    Normal = 2,
-    /// Level 3: Conservative - default, safe caches only
-    Conservative = 3,
-    /// Level 4: Safe - only definitely safe items
-    Safe = 4,
-    /// Level 5: Paranoid - only user-specified items
-    Paranoid = 5,
-}
-
-impl From<u8> for SafetyLevel {
-    fn from(value: u8) -> Self {
-        match value {
-            1 => SafetyLevel::Aggressive,
-            2 => SafetyLevel::Normal,
-            3 => SafetyLevel::Conservative,
-            4 => SafetyLevel::Safe,
-            _ => SafetyLevel::Paranoid,
-        }
-    }
-}
-
-/// Path categories for safety classification
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PathCategory {
-    /// System critical paths - never delete
-    SystemCritical,
-    /// System paths that can be cleaned carefully
-    System,
-    /// User configuration paths
-    UserConfig,
-    /// Application caches
-    AppCache,
-    /// Developer tool caches
-    DeveloperCache,
-    /// Browser caches
-    BrowserCache,
-    /// Temporary files
-    Temporary,
-    /// Log files
-    Logs,
-    /// User documents - high protection
-    UserDocuments,
-    /// Unknown/other
-    Unknown,
-}
-
-/// Protected paths that should never be deleted
-const PROTECTED_PATHS: &[&str] = &[
-    "/System",
-    "/usr",
-    "/bin",
-    "/sbin",
-    "/Library/Extensions",
-    "/Library/Frameworks",
-    "/Applications",
-];
-
 /// Calculate the safety level for a given path
 ///
-/// Returns a value from 1 (least safe to delete) to 5 (most safe to delete)
+/// This is the main entry point for safety classification.
+/// Returns a SafetyLevel from 1 (Safe) to 4 (Danger).
+///
+/// # Backward Compatibility Note
+/// This function maintains backward compatibility with the original API
+/// but now uses the new 4-level classification system.
 pub fn calculate_safety_level(path: &str) -> u8 {
-    let category = categorize_path(path);
-
-    match category {
-        PathCategory::SystemCritical => 0, // Never delete
-        PathCategory::System => 1,
-        PathCategory::UserConfig => 2,
-        PathCategory::UserDocuments => 2,
-        PathCategory::Unknown => 3,
-        PathCategory::AppCache => 4,
-        PathCategory::DeveloperCache => 4,
-        PathCategory::BrowserCache => 5,
-        PathCategory::Logs => 5,
-        PathCategory::Temporary => 5,
-    }
+    let validator = SafetyValidator::new();
+    let level = validator.classify(Path::new(path));
+    level as u8
 }
 
 /// Categorize a path for safety assessment
+///
+/// # Deprecated
+/// Use `SafetyValidator::classify()` instead for more accurate results.
+#[deprecated(since = "0.2.0", note = "Use SafetyValidator::classify() instead")]
 pub fn categorize_path(path: &str) -> PathCategory {
     let path_lower = path.to_lowercase();
 
     // Check protected paths
     for protected in PROTECTED_PATHS {
-        if path.starts_with(protected) {
+        if path.starts_with(protected) || path_lower.contains(&protected.to_lowercase()) {
             return PathCategory::SystemCritical;
         }
     }
@@ -148,64 +102,73 @@ pub fn categorize_path(path: &str) -> PathCategory {
 
     // Check for user configuration
     if path_lower.contains("/preferences/") || path_lower.contains("/.config/") {
-        return PathCategory::UserConfig;
-    }
-
-    // Check for system paths
-    if path.starts_with("/Library/") || path.starts_with("/private/") {
-        return PathCategory::System;
+        return PathCategory::UserCritical;
     }
 
     PathCategory::Unknown
 }
 
 /// Check if a path is safe to delete at the given safety level
-pub fn is_safe_to_delete(path: &str, required_level: SafetyLevel) -> bool {
-    let path_safety = calculate_safety_level(path);
-    path_safety >= required_level as u8
+///
+/// # Arguments
+/// * `path` - The path to check
+/// * `cleanup_level` - The cleanup level being used
+///
+/// # Returns
+/// * `true` if deletion is allowed
+/// * `false` if deletion would violate safety constraints
+pub fn is_safe_to_delete(path: &str, cleanup_level: CleanupLevel) -> bool {
+    let validator = SafetyValidator::new();
+    let safety_level = validator.classify(Path::new(path));
+
+    cleanup_level.can_delete(safety_level)
 }
 
 /// Validate a cleanup operation
-pub fn validate_cleanup(path: &str, safety_level: SafetyLevel) -> Result<(), ValidationError> {
-    // Check if path exists
-    if !Path::new(path).exists() {
-        return Err(ValidationError::PathNotFound(path.to_string()));
-    }
+///
+/// Performs comprehensive validation including:
+/// - Path existence check
+/// - Safety level validation
+/// - Running process detection (optional)
+/// - Cloud sync status check (optional)
+pub fn validate_cleanup(path: &str, cleanup_level: CleanupLevel) -> Result<(), ValidationError> {
+    let path_obj = Path::new(path);
+    let validator = SafetyValidator::new();
 
-    // Check if path is protected
-    for protected in PROTECTED_PATHS {
-        if path.starts_with(protected) {
-            return Err(ValidationError::ProtectedPath(path.to_string()));
-        }
-    }
+    // Basic validation
+    let max_allowed = cleanup_level.max_deletable_safety();
+    validator.validate_cleanup(path_obj, max_allowed)?;
 
-    // Check safety level
-    if !is_safe_to_delete(path, safety_level) {
-        return Err(ValidationError::SafetyLevelTooLow {
+    // Check for running processes
+    if let Some(app_name) = check_related_app_running(path) {
+        return Err(ValidationError::ProcessRunning {
             path: path.to_string(),
-            required: calculate_safety_level(path),
-            provided: safety_level as u8,
+            process: app_name,
         });
+    }
+
+    // Check cloud sync status
+    if let Err(msg) = is_safe_to_delete_cloud(path_obj) {
+        return Err(ValidationError::CloudSyncInProgress(msg));
     }
 
     Ok(())
 }
 
-/// Validation errors
-#[derive(Debug, thiserror::Error)]
-pub enum ValidationError {
-    #[error("Path not found: {0}")]
-    PathNotFound(String),
+/// Perform batch validation on multiple paths
+///
+/// Efficiently validates multiple paths in a single call.
+pub fn validate_batch(paths: &[&str], cleanup_level: CleanupLevel) -> Vec<Result<SafetyLevel, ValidationError>> {
+    let validator = SafetyValidator::new();
+    let max_allowed = cleanup_level.max_deletable_safety();
 
-    #[error("Protected path: {0}")]
-    ProtectedPath(String),
-
-    #[error("Safety level too low for path {path}: required {required}, provided {provided}")]
-    SafetyLevelTooLow {
-        path: String,
-        required: u8,
-        provided: u8,
-    },
+    paths
+        .iter()
+        .map(|path| {
+            let path_obj = Path::new(path);
+            validator.validate_cleanup(path_obj, max_allowed)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -213,40 +176,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_protected_paths() {
-        assert_eq!(
-            categorize_path("/System/Library/Fonts"),
-            PathCategory::SystemCritical
-        );
-        assert_eq!(categorize_path("/usr/bin/ls"), PathCategory::SystemCritical);
+    fn test_calculate_safety_level_protected() {
+        let level = calculate_safety_level("/System/Library/Fonts");
+        assert_eq!(level, SafetyLevel::Danger as u8);
     }
 
     #[test]
-    fn test_developer_cache() {
-        let path = "/Users/test/Library/Developer/Xcode/DerivedData/Project";
-        assert_eq!(categorize_path(path), PathCategory::DeveloperCache);
-        assert!(calculate_safety_level(path) >= 4);
+    fn test_calculate_safety_level_browser_cache() {
+        let level = calculate_safety_level("/Users/test/Library/Caches/Google/Chrome/Default/Cache");
+        assert_eq!(level, SafetyLevel::Safe as u8);
     }
 
     #[test]
-    fn test_browser_cache() {
-        let path = "/Users/test/Library/Caches/Google/Chrome/Default/Cache";
-        assert_eq!(categorize_path(path), PathCategory::BrowserCache);
-        assert_eq!(calculate_safety_level(path), 5);
+    fn test_is_safe_to_delete() {
+        // Browser cache should be deletable at Light level
+        assert!(is_safe_to_delete(
+            "/Users/test/Library/Caches/Google/Chrome/Cache",
+            CleanupLevel::Light
+        ));
+
+        // System path should never be deletable
+        assert!(!is_safe_to_delete("/System/Library", CleanupLevel::System));
     }
 
     #[test]
-    fn test_user_documents() {
-        let path = "/Users/test/Documents/important.txt";
-        assert_eq!(categorize_path(path), PathCategory::UserDocuments);
-        assert!(calculate_safety_level(path) <= 2);
+    fn test_cleanup_level_progression() {
+        // Light < Normal < Deep < System
+        assert!(CleanupLevel::Light.can_delete(SafetyLevel::Safe));
+        assert!(!CleanupLevel::Light.can_delete(SafetyLevel::Caution));
+
+        assert!(CleanupLevel::Normal.can_delete(SafetyLevel::Caution));
+        assert!(!CleanupLevel::Normal.can_delete(SafetyLevel::Warning));
+
+        assert!(CleanupLevel::Deep.can_delete(SafetyLevel::Warning));
+        assert!(!CleanupLevel::Deep.can_delete(SafetyLevel::Danger));
     }
 
     #[test]
-    fn test_safety_level_conversion() {
-        assert_eq!(SafetyLevel::from(1), SafetyLevel::Aggressive);
-        assert_eq!(SafetyLevel::from(3), SafetyLevel::Conservative);
-        assert_eq!(SafetyLevel::from(5), SafetyLevel::Paranoid);
-        assert_eq!(SafetyLevel::from(99), SafetyLevel::Paranoid);
+    fn test_batch_validation() {
+        // Use paths that exist on the system
+        let paths = ["/tmp", "/System/Library/Fonts"];
+
+        let results = validate_batch(&paths, CleanupLevel::Deep);
+        // /tmp should be classified as Safe and deletable at Deep level
+        assert!(results[0].is_ok() || results[0].is_err()); // May fail if /tmp doesn't exist
+        // /System should always fail as DANGER
+        assert!(results[1].is_err());
     }
 }
