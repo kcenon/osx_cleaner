@@ -34,7 +34,7 @@ impl From<u8> for SafetyLevel {
 }
 
 /// Path categories for safety classification
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PathCategory {
     /// System critical paths - never delete
     SystemCritical,

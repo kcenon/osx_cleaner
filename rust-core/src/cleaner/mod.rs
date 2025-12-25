@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-use crate::safety::{calculate_safety_level, SafetyLevel};
+use crate::safety::calculate_safety_level;
 
 /// Configuration for cleanup operations
 #[derive(Debug, Clone)]
