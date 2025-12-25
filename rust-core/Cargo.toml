@@ -1,0 +1,50 @@
+[package]
+name = "osxcore"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Core engine for OSX Cleaner - file scanning, cleanup, and safety validation"
+license = "MIT"
+
+[lib]
+name = "osxcore"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+# Parallel processing
+rayon = "1.8"
+
+# Directory traversal
+walkdir = "2.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# System information
+sysinfo = "0.30"
+
+# Date/time handling
+chrono = "0.4"
+
+# Regex for pattern matching
+regex = "1.10"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[dev-dependencies]
+tempfile = "3.9"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
