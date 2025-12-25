@@ -284,12 +284,8 @@ impl DeveloperCleanerManager {
 
     /// Scan all installed tools for cleanup opportunities
     pub fn scan_all(&self) -> Vec<ScanResult> {
-        let cleaners: Vec<&dyn DeveloperCleaner> = vec![
-            &self.xcode,
-            &self.simulator,
-            &self.packages,
-            &self.docker,
-        ];
+        let cleaners: Vec<&dyn DeveloperCleaner> =
+            vec![&self.xcode, &self.simulator, &self.packages, &self.docker];
 
         cleaners.par_iter().map(|c| c.scan()).collect()
     }
@@ -429,13 +425,10 @@ mod tests {
 
     #[test]
     fn test_cleanup_target_builder() {
-        let target = CleanupTarget::new_direct(
-            PathBuf::from("/tmp/test"),
-            "Test Target",
-            SafetyLevel::Safe,
-        )
-        .with_size(1024)
-        .with_description("A test target");
+        let target =
+            CleanupTarget::new_direct(PathBuf::from("/tmp/test"), "Test Target", SafetyLevel::Safe)
+                .with_size(1024)
+                .with_description("A test target");
 
         assert_eq!(target.name, "Test Target");
         assert_eq!(target.size, 1024);

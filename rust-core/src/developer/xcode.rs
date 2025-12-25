@@ -290,12 +290,14 @@ impl XcodeCleaner {
             }
             CleanupMethod::CommandWithArgs(cmd, args) => {
                 if !dry_run {
-                    let output = Command::new(cmd).args(args).output().map_err(|e| {
-                        CleanupError {
-                            target: target.name.clone(),
-                            message: e.to_string(),
-                        }
-                    })?;
+                    let output =
+                        Command::new(cmd)
+                            .args(args)
+                            .output()
+                            .map_err(|e| CleanupError {
+                                target: target.name.clone(),
+                                message: e.to_string(),
+                            })?;
 
                     if !output.status.success() {
                         return Err(CleanupError {

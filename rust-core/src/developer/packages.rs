@@ -196,10 +196,7 @@ impl PackageManagerCleaner {
                                         .and_then(|n| n.to_str())
                                         .unwrap_or("*");
 
-                                    let name = entry
-                                        .file_name()
-                                        .to_string_lossy()
-                                        .to_string();
+                                    let name = entry.file_name().to_string_lossy().to_string();
 
                                     if pattern == "*" || glob_match(pattern, &name) {
                                         let size = calculate_dir_size(&path);
@@ -207,7 +204,11 @@ impl PackageManagerCleaner {
                                             targets.push(self.create_target(
                                                 manager,
                                                 path,
-                                                format!("{}: {}", manager.tool.display_name(), name),
+                                                format!(
+                                                    "{}: {}",
+                                                    manager.tool.display_name(),
+                                                    name
+                                                ),
                                                 size,
                                             ));
                                         }

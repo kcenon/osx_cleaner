@@ -58,8 +58,8 @@ impl SimulatorCleaner {
         }
 
         let json_str = String::from_utf8_lossy(&output.stdout);
-        let parsed: SimctlDevicesOutput =
-            serde_json::from_str(&json_str).map_err(|e| SimulatorError::ParseError(e.to_string()))?;
+        let parsed: SimctlDevicesOutput = serde_json::from_str(&json_str)
+            .map_err(|e| SimulatorError::ParseError(e.to_string()))?;
 
         let mut devices = Vec::new();
 
@@ -123,7 +123,11 @@ impl SimulatorCleaner {
     /// Get unavailable simulators (safe to delete)
     pub fn get_unavailable_simulators(&self) -> Vec<SimulatorDevice> {
         match self.list_devices() {
-            Ok(list) => list.devices.into_iter().filter(|d| !d.is_available).collect(),
+            Ok(list) => list
+                .devices
+                .into_iter()
+                .filter(|d| !d.is_available)
+                .collect(),
             Err(_) => Vec::new(),
         }
     }
