@@ -5,12 +5,13 @@
 //!
 //! Defines the 4-level safety classification system for cleanup operations.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Safety levels for path classification
 ///
 /// Higher numbers indicate more danger - DANGER paths should never be deleted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(C)]
 pub enum SafetyLevel {
     /// Safe to delete immediately, auto-regenerates (e.g., browser cache, Trash)

@@ -11,6 +11,7 @@
 //! The crate exposes a C FFI interface for integration with Swift.
 
 pub mod cleaner;
+pub mod developer;
 pub mod fs;
 pub mod safety;
 pub mod scanner;
