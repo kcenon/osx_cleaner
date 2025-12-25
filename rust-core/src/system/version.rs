@@ -191,18 +191,9 @@ mod tests {
 
     #[test]
     fn test_version_parse() {
-        assert_eq!(
-            Version::parse("15.1.0"),
-            Some(Version::new(15, 1, 0))
-        );
-        assert_eq!(
-            Version::parse("14.5"),
-            Some(Version::new(14, 5, 0))
-        );
-        assert_eq!(
-            Version::parse("10.15.7"),
-            Some(Version::new(10, 15, 7))
-        );
+        assert_eq!(Version::parse("15.1.0"), Some(Version::new(15, 1, 0)));
+        assert_eq!(Version::parse("14.5"), Some(Version::new(14, 5, 0)));
+        assert_eq!(Version::parse("10.15.7"), Some(Version::new(10, 15, 7)));
     }
 
     #[test]

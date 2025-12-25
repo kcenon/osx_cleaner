@@ -83,9 +83,7 @@ impl SystemInfo {
 
     /// Check System Integrity Protection status
     fn check_sip_status() -> bool {
-        let output = Command::new("csrutil")
-            .arg("status")
-            .output();
+        let output = Command::new("csrutil").arg("status").output();
 
         match output {
             Ok(result) => {
@@ -103,14 +101,17 @@ impl SystemInfo {
             self.os_version,
             self.os_name,
             self.architecture.name(),
-            if self.sip_enabled { "enabled" } else { "disabled" }
+            if self.sip_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            }
         )
     }
 
     /// Check if this version has the mediaanalysisd bug (15.1)
     pub fn has_mediaanalysisd_bug(&self) -> bool {
-        self.os_version.is_at_least_patch(15, 1, 0)
-            && !self.os_version.is_at_least_patch(15, 2, 0)
+        self.os_version.is_at_least_patch(15, 1, 0) && !self.os_version.is_at_least_patch(15, 2, 0)
     }
 
     /// Check if this version uses Safari profiles (14.x+)
@@ -270,8 +271,11 @@ mod tests {
         let info = SystemInfo::detect();
 
         // Test architecture checks
-        assert!(info.is_apple_silicon() || info.is_intel() ||
-                matches!(info.architecture, Architecture::Unknown));
+        assert!(
+            info.is_apple_silicon()
+                || info.is_intel()
+                || matches!(info.architecture, Architecture::Unknown)
+        );
     }
 
     #[test]

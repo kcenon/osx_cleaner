@@ -65,8 +65,7 @@ impl Architecture {
 
     /// Check if Rosetta 2 is installed on the system
     pub fn is_rosetta_installed() -> bool {
-        std::path::Path::new("/Library/Apple/usr/libexec/oah/libRosettaRuntime")
-            .exists()
+        std::path::Path::new("/Library/Apple/usr/libexec/oah/libRosettaRuntime").exists()
     }
 
     /// Get the native architecture name
