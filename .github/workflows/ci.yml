@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Rust jobs
+  rust-check:
+    name: Rust Check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check Rust formatting
+        run: cd rust-core && cargo fmt --check
+
+      - name: Run Clippy
+        run: cd rust-core && cargo clippy -- -D warnings
+
+      - name: Build Rust
+        run: cd rust-core && cargo build --release
+
+      - name: Run Rust tests
+        run: cd rust-core && cargo test
+
+  # Swift jobs
+  swift-check:
+    name: Swift Check
+    runs-on: macos-latest
+    needs: rust-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-
+
+      - name: Build Rust core
+        run: cd rust-core && cargo build --release
+
+      - name: Build Swift
+        run: swift build
+
+      - name: Run Swift tests
+        run: swift test
+
+  # Full build and integration test
+  build:
+    name: Full Build
+    runs-on: macos-latest
+    needs: [rust-check, swift-check]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+            .build
+          key: ${{ runner.os }}-full-${{ hashFiles('rust-core/Cargo.lock', 'Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-full-
+
+      - name: Build all
+        run: make all
+
+      - name: Run all tests
+        run: make test
+
+      - name: Verify CLI
+        run: .build/release/osxcleaner --version
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: osxcleaner-macos
+          path: .build/release/osxcleaner
+
+  # Code coverage
+  coverage:
+    name: Code Coverage
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate Rust coverage
+        run: |
+          cd rust-core
+          cargo llvm-cov --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: rust-core/lcov.info
+          fail_ci_if_error: false
