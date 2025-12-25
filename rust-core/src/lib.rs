@@ -15,6 +15,7 @@ pub mod developer;
 pub mod fs;
 pub mod safety;
 pub mod scanner;
+pub mod targets;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
