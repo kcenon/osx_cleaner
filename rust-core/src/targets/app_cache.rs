@@ -260,7 +260,7 @@ impl AppCacheCleaner {
         // Fallback: parse bundle ID
         // e.g., com.apple.Preview -> Preview
         //       com.spotify.client -> Spotify
-        bundle_id.split('.').last().map(|s| {
+        bundle_id.split('.').next_back().map(|s| {
             let mut chars = s.chars();
             match chars.next() {
                 None => String::new(),
@@ -279,7 +279,7 @@ impl AppCacheCleaner {
         // Try common process name patterns
         let process_patterns = [
             bundle_id.to_string(),
-            bundle_id.split('.').last().unwrap_or("").to_string(),
+            bundle_id.split('.').next_back().unwrap_or("").to_string(),
         ];
 
         for pattern in process_patterns {
@@ -314,27 +314,20 @@ impl AppCacheCleaner {
                 }
             }
             CloudServiceType::Dropbox => {
-                // Check for .dropbox.cache or running Dropbox process
-                if is_app_running("Dropbox") {
-                    // Dropbox is running, check for sync indicators
-                    SyncStatus::NotApplicable // Can't easily determine without Dropbox CLI
-                } else {
-                    SyncStatus::NotApplicable
-                }
+                // Can't easily determine sync status without Dropbox CLI
+                // TODO: Implement proper Dropbox sync detection
+                let _ = is_app_running("Dropbox"); // Check if running for future use
+                SyncStatus::NotApplicable
             }
             CloudServiceType::OneDrive => {
-                if is_app_running("OneDrive") {
-                    SyncStatus::NotApplicable
-                } else {
-                    SyncStatus::NotApplicable
-                }
+                // TODO: Implement proper OneDrive sync detection
+                let _ = is_app_running("OneDrive");
+                SyncStatus::NotApplicable
             }
             CloudServiceType::GoogleDrive => {
-                if is_app_running("Google Drive") {
-                    SyncStatus::NotApplicable
-                } else {
-                    SyncStatus::NotApplicable
-                }
+                // TODO: Implement proper Google Drive sync detection
+                let _ = is_app_running("Google Drive");
+                SyncStatus::NotApplicable
             }
         }
     }

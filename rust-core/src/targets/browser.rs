@@ -16,7 +16,7 @@
 //! - iCloud, Dropbox, OneDrive, Google Drive
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rayon::prelude::*;
@@ -266,7 +266,7 @@ impl BrowserCleaner {
     }
 
     /// Determine the cache type from path
-    fn determine_cache_type(&self, path: &PathBuf) -> BrowserCacheType {
+    fn determine_cache_type(&self, path: &Path) -> BrowserCacheType {
         let path_str = path.to_string_lossy().to_lowercase();
 
         if path_str.contains("code cache") {
