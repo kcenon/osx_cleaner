@@ -17,6 +17,17 @@ typedef struct osx_FFIResult {
     char *data;
 } osx_FFIResult;
 
+/**
+ * macOS version representation
+ *
+ * Stores major, minor, and patch version numbers (e.g., 15.1.0 for Sequoia 15.1)
+ */
+typedef struct osx_Version {
+    uint32_t major;
+    uint32_t minor;
+    uint32_t patch;
+} osx_Version;
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -82,6 +93,85 @@ void osx_free_string(char *s);
  * - `result` must be a valid pointer to an FFIResult
  */
 void osx_free_result(struct osx_FFIResult *result);
+
+/**
+ * Get system information as JSON
+ *
+ * # Safety
+ * The returned string must be freed with `osx_free_string`.
+ */
+char *osx_system_info(void);
+
+/**
+ * Get macOS version string (e.g., "15.1.0")
+ *
+ * # Safety
+ * The returned string must be freed with `osx_free_string`.
+ */
+char *osx_macos_version(void);
+
+/**
+ * Get macOS codename (e.g., "Sequoia")
+ *
+ * # Safety
+ * The returned string must be freed with `osx_free_string`.
+ */
+char *osx_macos_codename(void);
+
+/**
+ * Get CPU architecture (0=AppleSilicon, 1=Intel, 2=Unknown)
+ */
+int32_t osx_architecture(void);
+
+/**
+ * Check if running on Apple Silicon
+ */
+bool osx_is_apple_silicon(void);
+
+/**
+ * Check if Rosetta 2 is installed
+ */
+bool osx_is_rosetta_installed(void);
+
+/**
+ * Check if current process is running under Rosetta
+ */
+bool osx_is_running_under_rosetta(void);
+
+/**
+ * Check if SIP (System Integrity Protection) is enabled
+ */
+bool osx_is_sip_enabled(void);
+
+/**
+ * Check if version is at least the specified version
+ */
+bool osx_is_version_at_least(uint32_t major,
+                             uint32_t minor);
+
+/**
+ * Get version-specific paths as JSON
+ *
+ * # Safety
+ * The returned string must be freed with `osx_free_string`.
+ */
+char *osx_version_specific_paths(void);
+
+/**
+ * Get special cleanup targets for the current version as JSON
+ *
+ * # Safety
+ * The returned string must be freed with `osx_free_string`.
+ */
+char *osx_special_targets(void);
+
+/**
+ * Check if the current version has a known bug
+ *
+ * # Safety
+ * - `bug_name` must be a valid null-terminated C string
+ */
+bool osx_has_known_bug(const char *bug_name);
 
 #ifdef __cplusplus
 } // extern "C"
