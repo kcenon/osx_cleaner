@@ -10,7 +10,8 @@ struct OSXCleaner: AsyncParsableCommand {
         subcommands: [
             CleanCommand.self,
             AnalyzeCommand.self,
-            ConfigCommand.self
+            ConfigCommand.self,
+            ScheduleCommand.self
         ],
         defaultSubcommand: AnalyzeCommand.self
     )

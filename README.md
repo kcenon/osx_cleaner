@@ -174,18 +174,58 @@ osxcleaner analyze
 # Analyze with details
 osxcleaner analyze --verbose
 
+# Analyze specific category with top items
+osxcleaner analyze --category xcode --top 10
+
+# Analyze with JSON output (for CI/CD)
+osxcleaner analyze --format json
+
 # Clean with default cleanup level (normal)
 osxcleaner clean --dry-run
 
 # Clean with light level (safe items only)
-osxcleaner clean --level 1 --dry-run
+osxcleaner clean --level light --dry-run
 
 # Clean developer caches with deep level
-osxcleaner clean --developer-caches --level 3
+osxcleaner clean --level deep --target developer
+
+# Clean for CI/CD (non-interactive with JSON output)
+osxcleaner clean --level normal --non-interactive --format json
 
 # Show configuration
 osxcleaner config show
+
+# Schedule automated daily cleanup
+osxcleaner schedule add --frequency daily --level light --hour 3
+
+# List configured schedules
+osxcleaner schedule list
+
+# Enable a schedule
+osxcleaner schedule enable daily
 ```
+
+### CLI Commands Reference
+
+| Command | Description |
+|---------|-------------|
+| `analyze` | Analyze disk usage and find cleanup opportunities |
+| `clean` | Clean specified targets with safety checks |
+| `config` | Manage osxcleaner configuration |
+| `schedule` | Manage automated cleanup schedules |
+
+### Common Options
+
+| Option | Commands | Description |
+|--------|----------|-------------|
+| `--level` | clean | Cleanup level (light, normal, deep, system) |
+| `--target` | clean | Cleanup target (browser, developer, logs, all) |
+| `--category` | analyze | Filter by category (all, xcode, docker, browser, caches, logs) |
+| `--format` | clean, analyze, schedule | Output format (text, json) |
+| `--dry-run` | clean | Preview without actual deletion |
+| `--non-interactive` | clean | Skip confirmation prompts (for CI/CD) |
+| `--verbose` | clean, analyze | Show detailed output |
+| `--quiet` | clean, analyze | Minimal output |
 
 ### Manual Build
 

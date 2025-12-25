@@ -174,15 +174,58 @@ osxcleaner analyze
 # 상세 분석
 osxcleaner analyze --verbose
 
-# 기본 안전 레벨(3)로 정리 (dry-run)
+# 특정 카테고리 분석 (상위 N개 표시)
+osxcleaner analyze --category xcode --top 10
+
+# JSON 출력 (CI/CD용)
+osxcleaner analyze --format json
+
+# 기본 정리 레벨(normal)로 정리 (dry-run)
 osxcleaner clean --dry-run
 
-# 개발자 캐시 정리
-osxcleaner clean --developer-caches --safety-level 4
+# 가벼운 정리 (안전한 항목만)
+osxcleaner clean --level light --dry-run
+
+# 개발자 캐시 심층 정리
+osxcleaner clean --level deep --target developer
+
+# CI/CD 환경 정리 (비대화식, JSON 출력)
+osxcleaner clean --level normal --non-interactive --format json
 
 # 설정 확인
 osxcleaner config show
+
+# 일일 자동 정리 스케줄 생성
+osxcleaner schedule add --frequency daily --level light --hour 3
+
+# 설정된 스케줄 목록
+osxcleaner schedule list
+
+# 스케줄 활성화
+osxcleaner schedule enable daily
 ```
+
+### CLI 명령어 참조
+
+| 명령어 | 설명 |
+|--------|------|
+| `analyze` | 디스크 사용량 분석 및 정리 가능 항목 찾기 |
+| `clean` | 안전성 검사를 통한 대상 정리 |
+| `config` | osxcleaner 설정 관리 |
+| `schedule` | 자동화 정리 스케줄 관리 |
+
+### 주요 옵션
+
+| 옵션 | 명령어 | 설명 |
+|------|--------|------|
+| `--level` | clean | 정리 레벨 (light, normal, deep, system) |
+| `--target` | clean | 정리 대상 (browser, developer, logs, all) |
+| `--category` | analyze | 카테고리 필터 (all, xcode, docker, browser, caches, logs) |
+| `--format` | clean, analyze, schedule | 출력 형식 (text, json) |
+| `--dry-run` | clean | 실제 삭제 없이 미리보기 |
+| `--non-interactive` | clean | 확인 프롬프트 건너뛰기 (CI/CD용) |
+| `--verbose` | clean, analyze | 상세 출력 |
+| `--quiet` | clean, analyze | 최소 출력 |
 
 ### 수동 빌드
 
