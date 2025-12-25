@@ -302,6 +302,16 @@ osxcleaner/
 
 ## 문서
 
+### 사용자 가이드
+
+| 문서 | 설명 |
+|------|------|
+| [설치 가이드](docs/INSTALLATION.md) | 시스템 요구사항, 설치 방법, 문제 해결 |
+| [사용 가이드](docs/USAGE.md) | CLI 명령어, 예제, CI/CD 통합 |
+| [안전 가이드](docs/SAFETY.md) | 안전 분류 체계, 보호 경로, FAQ |
+| [기여 가이드](docs/CONTRIBUTING.md) | 기여 방법, 코딩 표준 |
+| [변경 이력](docs/CHANGELOG.md) | 버전 히스토리 및 릴리스 노트 |
+
 ### 프로젝트 문서
 
 | 문서 | 설명 | 한글 | English |
@@ -352,7 +362,7 @@ osxcleaner/
 
 ## 기여
 
-기여를 환영합니다! 자세한 내용은 [개발자 가이드](docs/reference/07-developer-guide.md)를 참조하세요.
+기여를 환영합니다! 자세한 내용은 [기여 가이드](docs/CONTRIBUTING.md)를 참조하세요.
 
 ---
 
@@ -369,4 +379,4 @@ osxcleaner/
 
 ---
 
-*마지막 업데이트: 2025-12-25*
+*마지막 업데이트: 2025-12-26*
