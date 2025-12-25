@@ -74,10 +74,7 @@ impl Default for AppCacheCleaner {
 impl AppCacheCleaner {
     /// Create a new app cache cleaner
     pub fn new() -> Self {
-        let exclusions = DEFAULT_EXCLUSIONS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let exclusions = DEFAULT_EXCLUSIONS.iter().map(|s| s.to_string()).collect();
 
         Self {
             cache_base: expand_home("~/Library/Caches"),
@@ -88,10 +85,8 @@ impl AppCacheCleaner {
 
     /// Create a new app cache cleaner with custom exclusions
     pub fn with_exclusions(exclusions: Vec<String>) -> Self {
-        let mut all_exclusions: HashSet<String> = DEFAULT_EXCLUSIONS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let mut all_exclusions: HashSet<String> =
+            DEFAULT_EXCLUSIONS.iter().map(|s| s.to_string()).collect();
         all_exclusions.extend(exclusions);
 
         Self {
@@ -180,10 +175,7 @@ impl AppCacheCleaner {
                         ),
                         SyncStatus::Pending => (
                             SafetyLevel::Caution,
-                            Some(format!(
-                                "{} has pending sync items",
-                                service.display_name()
-                            )),
+                            Some(format!("{} has pending sync items", service.display_name())),
                         ),
                         SyncStatus::CloudOnly => (
                             SafetyLevel::Warning,
@@ -305,9 +297,7 @@ impl AppCacheCleaner {
         match service {
             CloudServiceType::ICloud => {
                 // Check iCloud sync status using brctl
-                let output = Command::new("brctl")
-                    .args(["status"])
-                    .output();
+                let output = Command::new("brctl").args(["status"]).output();
 
                 match output {
                     Ok(o) if o.status.success() => {

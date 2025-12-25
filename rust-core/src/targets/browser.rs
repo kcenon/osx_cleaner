@@ -76,10 +76,7 @@ impl BrowserCleaner {
                 let cache_paths = self.get_cache_paths(browser);
                 let profile_path = self.get_profile_path(browser);
                 let cache_size = if is_installed {
-                    cache_paths
-                        .iter()
-                        .map(|p| calculate_dir_size(p))
-                        .sum()
+                    cache_paths.iter().map(|p| calculate_dir_size(p)).sum()
                 } else {
                     0
                 };
@@ -104,10 +101,7 @@ impl BrowserCleaner {
             Browser::Safari => {
                 paths.push(self.cache_base.join("com.apple.Safari"));
                 paths.push(self.cache_base.join("com.apple.Safari.SafeBrowsing"));
-                paths.push(
-                    self.cache_base
-                        .join("com.apple.WebKit.WebContent"),
-                );
+                paths.push(self.cache_base.join("com.apple.WebKit.WebContent"));
             }
             Browser::Chrome => {
                 paths.push(self.cache_base.join("Google/Chrome"));
@@ -206,11 +200,7 @@ impl BrowserCleaner {
 
     /// Scan a specific browser for cache
     pub fn scan_browser(&self, browser: Browser) -> BrowserScanResult {
-        let target = self
-            .browsers
-            .iter()
-            .find(|b| b.browser == browser)
-            .cloned();
+        let target = self.browsers.iter().find(|b| b.browser == browser).cloned();
 
         match target {
             Some(t) => {
@@ -530,7 +520,8 @@ mod tests {
     fn test_cache_type_determination() {
         let cleaner = BrowserCleaner::new();
 
-        let code_cache = PathBuf::from("/Users/test/Library/Caches/Google/Chrome/Default/Code Cache");
+        let code_cache =
+            PathBuf::from("/Users/test/Library/Caches/Google/Chrome/Default/Code Cache");
         assert_eq!(
             cleaner.determine_cache_type(&code_cache),
             BrowserCacheType::CodeCache
