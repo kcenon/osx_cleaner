@@ -1,4 +1,5 @@
 import ArgumentParser
+import Foundation
 import OSXCleanerKit
 
 struct AnalyzeCommand: AsyncParsableCommand {
