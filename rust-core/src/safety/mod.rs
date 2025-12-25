@@ -14,9 +14,13 @@ pub mod process;
 pub mod validator;
 
 // Re-export main types for convenience
-pub use cloud::{get_cloud_sync_info, is_safe_to_delete_cloud, CloudService, CloudSyncInfo, SyncStatus};
+pub use cloud::{
+    get_cloud_sync_info, is_safe_to_delete_cloud, CloudService, CloudSyncInfo, SyncStatus,
+};
 pub use level::{CleanupLevel, SafetyLevel};
-pub use paths::{expand_home, PathCategory, CAUTION_PATHS, PROTECTED_PATHS, SAFE_PATHS, WARNING_PATHS};
+pub use paths::{
+    expand_home, PathCategory, CAUTION_PATHS, PROTECTED_PATHS, SAFE_PATHS, WARNING_PATHS,
+};
 pub use process::{
     check_related_app_running, get_processes_using_path, is_app_running, is_file_in_use,
     AppCacheMapping, ProcessInfo,
@@ -158,7 +162,10 @@ pub fn validate_cleanup(path: &str, cleanup_level: CleanupLevel) -> Result<(), V
 /// Perform batch validation on multiple paths
 ///
 /// Efficiently validates multiple paths in a single call.
-pub fn validate_batch(paths: &[&str], cleanup_level: CleanupLevel) -> Vec<Result<SafetyLevel, ValidationError>> {
+pub fn validate_batch(
+    paths: &[&str],
+    cleanup_level: CleanupLevel,
+) -> Vec<Result<SafetyLevel, ValidationError>> {
     let validator = SafetyValidator::new();
     let max_allowed = cleanup_level.max_deletable_safety();
 
@@ -183,7 +190,8 @@ mod tests {
 
     #[test]
     fn test_calculate_safety_level_browser_cache() {
-        let level = calculate_safety_level("/Users/test/Library/Caches/Google/Chrome/Default/Cache");
+        let level =
+            calculate_safety_level("/Users/test/Library/Caches/Google/Chrome/Default/Cache");
         assert_eq!(level, SafetyLevel::Safe as u8);
     }
 
@@ -220,7 +228,7 @@ mod tests {
         let results = validate_batch(&paths, CleanupLevel::Deep);
         // /tmp should be classified as Safe and deletable at Deep level
         assert!(results[0].is_ok() || results[0].is_err()); // May fail if /tmp doesn't exist
-        // /System should always fail as DANGER
+                                                            // /System should always fail as DANGER
         assert!(results[1].is_err());
     }
 }

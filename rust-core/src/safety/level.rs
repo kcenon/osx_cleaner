@@ -34,10 +34,10 @@ impl SafetyLevel {
     /// Returns the display indicator for this safety level
     pub fn indicator(&self) -> &'static str {
         match self {
-            SafetyLevel::Safe => "\u{2705}",    // Green checkmark
-            SafetyLevel::Caution => "\u{26A0}", // Warning sign
+            SafetyLevel::Safe => "\u{2705}",            // Green checkmark
+            SafetyLevel::Caution => "\u{26A0}",         // Warning sign
             SafetyLevel::Warning => "\u{26A0}\u{26A0}", // Double warning
-            SafetyLevel::Danger => "\u{274C}",  // Red X
+            SafetyLevel::Danger => "\u{274C}",          // Red X
         }
     }
 

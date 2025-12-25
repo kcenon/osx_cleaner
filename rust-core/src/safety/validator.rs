@@ -43,7 +43,9 @@ pub enum ValidationError {
     #[error("Protected path: {path} - {reason}")]
     ProtectedPath { path: String, reason: String },
 
-    #[error("Safety level {required} required for {path}, but cleanup level only allows {allowed}")]
+    #[error(
+        "Safety level {required} required for {path}, but cleanup level only allows {allowed}"
+    )]
     SafetyLevelMismatch {
         path: String,
         required: SafetyLevel,

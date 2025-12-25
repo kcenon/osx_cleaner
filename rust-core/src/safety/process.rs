@@ -111,10 +111,7 @@ impl AppCacheMapping {
 
 /// Detect running processes using pgrep
 pub fn get_running_processes() -> Vec<ProcessInfo> {
-    let output = Command::new("pgrep")
-        .args(["-l", "-x", ".*"])
-        .output()
-        .ok();
+    let output = Command::new("pgrep").args(["-l", "-x", ".*"]).output().ok();
 
     match output {
         Some(output) if output.status.success() => {
@@ -141,10 +138,7 @@ pub fn get_running_processes() -> Vec<ProcessInfo> {
 
 /// Check if a specific application is running
 pub fn is_app_running(app_name: &str) -> bool {
-    let output = Command::new("pgrep")
-        .args(["-x", app_name])
-        .output()
-        .ok();
+    let output = Command::new("pgrep").args(["-x", app_name]).output().ok();
 
     matches!(output, Some(o) if o.status.success())
 }

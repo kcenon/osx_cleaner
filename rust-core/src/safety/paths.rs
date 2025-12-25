@@ -64,10 +64,7 @@ pub const WARNING_PATHS: &[&str] = &[
 ];
 
 /// Glob patterns for warning paths
-pub const WARNING_PATTERNS: &[&str] = &[
-    "com.apple.*",
-    "*.app/Contents/MacOS/*",
-];
+pub const WARNING_PATTERNS: &[&str] = &["com.apple.*", "*.app/Contents/MacOS/*"];
 
 /// Caution paths that are safe to delete but may require rebuild (CAUTION level)
 pub const CAUTION_PATHS: &[&str] = &[
