@@ -298,6 +298,11 @@ osxcleaner/
 │       │   ├── mod.rs          # Module entry & types
 │       │   ├── browser.rs      # Browser cache cleanup
 │       │   └── app_cache.rs    # General app cache cleanup
+│       ├── system/             # macOS system detection (F10)
+│       │   ├── mod.rs          # Module entry & SystemInfo
+│       │   ├── version.rs      # macOS version detection
+│       │   ├── architecture.rs # CPU architecture detection
+│       │   └── paths.rs        # Version-specific path resolution
 │       └── fs/                 # Filesystem utilities
 ├── include/                    # Generated C headers
 ├── scripts/                    # Shell scripts
@@ -341,6 +346,11 @@ osxcleaner/
 ### Phase 1: MVP (v0.1) - Core Features
 - [x] CLI-based cleanup tool
 - [x] Safety classification system implementation (F01)
+- [x] macOS version optimization (F10)
+  - Version detection (10.15 ~ 15.x)
+  - Architecture detection (Intel/Apple Silicon)
+  - Rosetta 2 status detection
+  - Version-specific path resolution
 - [ ] Basic cleanup levels (Level 1-2)
 
 ### Phase 2: Developer Features (v0.5)

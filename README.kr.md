@@ -283,6 +283,11 @@ osxcleaner/
 │       ├── safety/             # 안전 검증
 │       ├── scanner/            # 디렉토리 스캔
 │       ├── cleaner/            # 정리 실행
+│       ├── system/             # macOS 시스템 감지 (F10)
+│       │   ├── mod.rs          # 모듈 진입점 & SystemInfo
+│       │   ├── version.rs      # macOS 버전 감지
+│       │   ├── architecture.rs # CPU 아키텍처 감지
+│       │   └── paths.rs        # 버전별 경로 해결
 │       └── fs/                 # 파일시스템 유틸
 ├── include/                    # 생성된 C 헤더
 ├── scripts/                    # 셸 스크립트
@@ -324,8 +329,13 @@ osxcleaner/
 ## 로드맵
 
 ### Phase 1: MVP (v0.1) - 핵심 기능
-- [ ] CLI 기반 정리 도구
-- [ ] 안전 등급 시스템 구현
+- [x] CLI 기반 정리 도구
+- [x] 안전 등급 시스템 구현 (F01)
+- [x] macOS 버전 최적화 (F10)
+  - 버전 감지 (10.15 ~ 15.x)
+  - 아키텍처 감지 (Intel/Apple Silicon)
+  - Rosetta 2 상태 감지
+  - 버전별 경로 해결
 - [ ] 기본 정리 레벨 (Level 1-2)
 
 ### Phase 2: 개발자 기능 (v0.5)
