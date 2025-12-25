@@ -59,10 +59,10 @@ public enum CleanupTarget: String, CaseIterable, ExpressibleByArgument {
     }
 }
 
-// MARK: - AnalysisCategory
+// MARK: - AnalysisCategoryFilter
 
-/// Category for analysis operations
-public enum AnalysisCategory: String, CaseIterable, ExpressibleByArgument {
+/// Category filter for analysis operations
+public enum AnalysisCategoryFilter: String, CaseIterable, ExpressibleByArgument {
     case all
     case xcode
     case docker
