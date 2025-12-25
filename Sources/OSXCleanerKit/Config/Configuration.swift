@@ -8,7 +8,7 @@ public struct AppConfiguration: Codable {
     public var excludedPaths: [String]
 
     public static let `default` = AppConfiguration(
-        defaultSafetyLevel: 3,
+        defaultSafetyLevel: 2, // Normal cleanup level
         autoBackup: true,
         logLevel: "info",
         excludedPaths: [
@@ -35,7 +35,7 @@ public struct AppConfiguration: Codable {
 
 /// Configuration for cleanup operations
 public struct CleanerConfiguration {
-    public let safetyLevel: Int
+    public let cleanupLevel: CleanupLevel
     public let dryRun: Bool
     public let includeSystemCaches: Bool
     public let includeDeveloperCaches: Bool
@@ -43,14 +43,32 @@ public struct CleanerConfiguration {
     public let specificPaths: [String]
 
     public init(
-        safetyLevel: Int = 3,
+        cleanupLevel: CleanupLevel = .normal,
         dryRun: Bool = false,
         includeSystemCaches: Bool = false,
         includeDeveloperCaches: Bool = false,
         includeBrowserCaches: Bool = false,
         specificPaths: [String] = []
     ) {
-        self.safetyLevel = safetyLevel
+        self.cleanupLevel = cleanupLevel
+        self.dryRun = dryRun
+        self.includeSystemCaches = includeSystemCaches
+        self.includeDeveloperCaches = includeDeveloperCaches
+        self.includeBrowserCaches = includeBrowserCaches
+        self.specificPaths = specificPaths
+    }
+
+    /// Create configuration from legacy safety level (deprecated)
+    @available(*, deprecated, message: "Use cleanupLevel instead of safetyLevel")
+    public init(
+        safetyLevel: Int,
+        dryRun: Bool = false,
+        includeSystemCaches: Bool = false,
+        includeDeveloperCaches: Bool = false,
+        includeBrowserCaches: Bool = false,
+        specificPaths: [String] = []
+    ) {
+        self.cleanupLevel = CleanupLevel(rawValue: Int32(safetyLevel)) ?? .normal
         self.dryRun = dryRun
         self.includeSystemCaches = includeSystemCaches
         self.includeDeveloperCaches = includeDeveloperCaches
@@ -119,8 +137,8 @@ public final class ConfigurationService {
         var config = try load()
 
         switch key.lowercased() {
-        case "safetylevel", "safety-level", "default-safety-level":
-            guard let level = Int(value), (1...5).contains(level) else {
+        case "safetylevel", "safety-level", "default-safety-level", "cleanuplevel", "cleanup-level":
+            guard let level = Int(value), (1...4).contains(level) else {
                 throw ConfigurationError.invalidValue(key: key, value: value)
             }
             config.defaultSafetyLevel = level

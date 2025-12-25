@@ -106,15 +106,16 @@ pub unsafe extern "C" fn osx_calculate_safety(path: *const c_char) -> i32 {
     safety::calculate_safety_level(path_str) as i32
 }
 
-/// Clean a path with the specified safety level
+/// Clean a path with the specified cleanup level
 ///
 /// # Safety
 /// - `path` must be a valid null-terminated C string
+/// - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
 /// - `dry_run` if true, no files will be deleted
 #[no_mangle]
 pub unsafe extern "C" fn osx_clean_path(
     path: *const c_char,
-    safety_level: i32,
+    cleanup_level: i32,
     dry_run: bool,
 ) -> FFIResult {
     if path.is_null() {
@@ -126,10 +127,7 @@ pub unsafe extern "C" fn osx_clean_path(
         Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
     };
 
-    let config = cleaner::CleanConfig {
-        safety_level: safety_level as u8,
-        dry_run,
-    };
+    let config = cleaner::CleanConfig::from_safety_level(cleanup_level as u8, dry_run);
 
     match cleaner::clean(path_str, &config) {
         Ok(result) => {

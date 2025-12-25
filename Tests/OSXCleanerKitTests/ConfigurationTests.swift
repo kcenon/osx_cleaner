@@ -5,7 +5,7 @@ final class ConfigurationTests: XCTestCase {
     func testDefaultConfiguration() {
         let config = AppConfiguration.default
 
-        XCTAssertEqual(config.defaultSafetyLevel, 3)
+        XCTAssertEqual(config.defaultSafetyLevel, 2) // Normal cleanup level
         XCTAssertTrue(config.autoBackup)
         XCTAssertEqual(config.logLevel, "info")
         XCTAssertFalse(config.excludedPaths.isEmpty)
@@ -14,7 +14,7 @@ final class ConfigurationTests: XCTestCase {
     func testCleanerConfigurationDefaults() {
         let config = CleanerConfiguration()
 
-        XCTAssertEqual(config.safetyLevel, 3)
+        XCTAssertEqual(config.cleanupLevel, .normal)
         XCTAssertFalse(config.dryRun)
         XCTAssertFalse(config.includeSystemCaches)
         XCTAssertFalse(config.includeDeveloperCaches)

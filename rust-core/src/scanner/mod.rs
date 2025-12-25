@@ -2,6 +2,9 @@
 //!
 //! Provides parallel directory scanning and analysis capabilities.
 
+// Allow deprecated categorize_path until scanner is refactored to use SafetyValidator
+#![allow(deprecated)]
+
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

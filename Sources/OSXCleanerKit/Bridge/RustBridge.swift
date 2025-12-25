@@ -92,11 +92,11 @@ public final class RustBridge {
 
     /// Calculate the safety level for a path
     ///
-    /// Returns a safety level indicating how safe it is to delete the path.
-    /// Higher values indicate safer paths to delete.
+    /// Returns a safety level indicating how dangerous it is to delete the path.
+    /// SafetyLevel.safe = 1 (safest to delete), SafetyLevel.danger = 4 (never delete)
     ///
     /// - Parameter path: The path to evaluate
-    /// - Returns: Safety level (1-5)
+    /// - Returns: Safety level (1-4)
     /// - Throws: `RustBridgeError` if the operation fails
     public func calculateSafety(for path: String) throws -> SafetyLevel {
         try ensureInitialized()
@@ -109,34 +109,56 @@ public final class RustBridge {
             throw RustBridgeError.rustError("Failed to calculate safety level")
         }
 
-        return SafetyLevel(rawValue: level) ?? .moderate
+        return SafetyLevel(rawValue: level) ?? .caution
     }
 
     // MARK: - Cleaning
 
-    /// Clean a path with the specified safety level
+    /// Clean a path with the specified cleanup level
     ///
     /// This method performs the actual cleanup operation using the Rust core.
-    /// It respects the safety level to prevent accidental deletion of important files.
+    /// It respects the cleanup level to prevent accidental deletion of important files.
     ///
     /// - Parameters:
     ///   - path: The path to clean
-    ///   - safetyLevel: Minimum safety level required for deletion
+    ///   - cleanupLevel: The cleanup level (determines which safety levels can be deleted)
     ///   - dryRun: If true, only simulate the cleanup without deleting files
     /// - Returns: Clean result with statistics
     /// - Throws: `RustBridgeError` if the operation fails
     public func cleanPath(
         _ path: String,
-        safetyLevel: SafetyLevel,
+        cleanupLevel: CleanupLevel,
         dryRun: Bool
     ) throws -> RustCleanResult {
         try ensureInitialized()
 
         let result = path.withCString { pathPtr in
-            osx_clean_path(pathPtr, safetyLevel.rawValue, dryRun)
+            osx_clean_path(pathPtr, cleanupLevel.rawValue, dryRun)
         }
 
         return try processFFIResult(result)
+    }
+
+    /// Clean a path with the specified safety level (deprecated)
+    @available(*, deprecated, renamed: "cleanPath(_:cleanupLevel:dryRun:)")
+    public func cleanPath(
+        _ path: String,
+        safetyLevel: SafetyLevel,
+        dryRun: Bool
+    ) throws -> RustCleanResult {
+        // Map old safety level to new cleanup level
+        let cleanupLevel: CleanupLevel
+        switch safetyLevel {
+        case .safe:
+            cleanupLevel = .light
+        case .caution:
+            cleanupLevel = .normal
+        case .warning:
+            cleanupLevel = .deep
+        case .danger:
+            cleanupLevel = .system
+        }
+        return try cleanPath(path, cleanupLevel: cleanupLevel, dryRun: dryRun)
     }
 
     // MARK: - Helpers
@@ -177,19 +199,37 @@ public final class RustBridge {
 // MARK: - Convenience Extensions
 
 extension RustBridge {
-    /// Check if a path is safe to clean at the given level
+    /// Check if a path can be cleaned at the given cleanup level
     ///
     /// - Parameters:
     ///   - path: The path to check
-    ///   - level: The required safety level
-    /// - Returns: True if the path is safe to clean at the given level
-    public func isPathSafe(_ path: String, atLevel level: SafetyLevel) -> Bool {
+    ///   - cleanupLevel: The cleanup level to use
+    /// - Returns: True if the path can be cleaned at the given cleanup level
+    public func canCleanPath(_ path: String, atLevel cleanupLevel: CleanupLevel) -> Bool {
         do {
             let pathSafety = try calculateSafety(for: path)
-            return pathSafety.rawValue >= level.rawValue
+            return cleanupLevel.canDelete(pathSafety)
         } catch {
             AppLogger.shared.warning("Failed to calculate safety for \(path): \(error)")
             return false
         }
+    }
+
+    /// Check if a path is safe to clean (deprecated)
+    @available(*, deprecated, renamed: "canCleanPath(_:atLevel:)")
+    public func isPathSafe(_ path: String, atLevel level: SafetyLevel) -> Bool {
+        // Map old safety level to cleanup level
+        let cleanupLevel: CleanupLevel
+        switch level {
+        case .safe:
+            cleanupLevel = .light
+        case .caution:
+            cleanupLevel = .normal
+        case .warning:
+            cleanupLevel = .deep
+        case .danger:
+            cleanupLevel = .system
+        }
+        return canCleanPath(path, atLevel: cleanupLevel)
     }
 }

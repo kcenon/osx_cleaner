@@ -7,20 +7,30 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-use crate::safety::calculate_safety_level;
+use crate::safety::{calculate_safety_level, CleanupLevel, SafetyLevel};
 
 /// Configuration for cleanup operations
 #[derive(Debug, Clone)]
 pub struct CleanConfig {
-    pub safety_level: u8,
+    pub cleanup_level: CleanupLevel,
     pub dry_run: bool,
 }
 
 impl Default for CleanConfig {
     fn default() -> Self {
         CleanConfig {
-            safety_level: 3,
+            cleanup_level: CleanupLevel::Normal,
             dry_run: false,
+        }
+    }
+}
+
+impl CleanConfig {
+    /// Create config from raw safety level (for FFI compatibility)
+    pub fn from_safety_level(safety_level: u8, dry_run: bool) -> Self {
+        CleanConfig {
+            cleanup_level: CleanupLevel::from(safety_level),
+            dry_run,
         }
     }
 }
@@ -51,13 +61,13 @@ pub fn clean(path: &str, config: &CleanConfig) -> Result<CleanResult, CleanError
         return Err(CleanError::PathNotFound(path.to_string()));
     }
 
-    // Check safety level
-    let path_safety = calculate_safety_level(path);
-    if path_safety < config.safety_level {
+    // Check safety level using new 4-level system
+    let path_safety = SafetyLevel::from(calculate_safety_level(path));
+    if !config.cleanup_level.can_delete(path_safety) {
         return Err(CleanError::SafetyViolation {
             path: path.to_string(),
-            required: path_safety,
-            provided: config.safety_level,
+            required: path_safety as u8,
+            provided: config.cleanup_level as u8,
         });
     }
 
@@ -131,15 +141,15 @@ fn clean_directory(
     // Process each entry
     for (entry_path, size) in sizes {
         let path_str = entry_path.to_string_lossy();
-        let entry_safety = calculate_safety_level(&path_str);
+        let entry_safety = SafetyLevel::from(calculate_safety_level(&path_str));
 
-        // Check if this entry is safe to delete at our safety level
-        if entry_safety < config.safety_level {
+        // Check if this entry is safe to delete at our cleanup level
+        if !config.cleanup_level.can_delete(entry_safety) {
             result.errors.push(CleanErrorInfo {
                 path: path_str.to_string(),
                 reason: format!(
-                    "Safety level {} required, but only {} is safe",
-                    config.safety_level, entry_safety
+                    "Safety level {:?} required, cleanup level {:?} not sufficient",
+                    entry_safety, config.cleanup_level
                 ),
             });
             continue;
@@ -224,7 +234,7 @@ mod tests {
         std::fs::write(&file_path, "test content").unwrap();
 
         let config = CleanConfig {
-            safety_level: 1,
+            cleanup_level: CleanupLevel::System, // Allow all levels
             dry_run: true,
         };
 
@@ -244,7 +254,7 @@ mod tests {
         std::fs::write(&file_path, "test content").unwrap();
 
         let config = CleanConfig {
-            safety_level: 1,
+            cleanup_level: CleanupLevel::System,
             dry_run: false,
         };
 
@@ -261,5 +271,12 @@ mod tests {
         let config = CleanConfig::default();
         let result = clean("/nonexistent/path", &config);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_safety_level() {
+        let config = CleanConfig::from_safety_level(2, true);
+        assert_eq!(config.cleanup_level, CleanupLevel::Normal);
+        assert!(config.dry_run);
     }
 }

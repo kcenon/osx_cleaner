@@ -174,11 +174,14 @@ osxcleaner analyze
 # Analyze with details
 osxcleaner analyze --verbose
 
-# Clean with default safety level (3)
+# Clean with default cleanup level (normal)
 osxcleaner clean --dry-run
 
-# Clean developer caches
-osxcleaner clean --developer-caches --safety-level 4
+# Clean with light level (safe items only)
+osxcleaner clean --level 1 --dry-run
+
+# Clean developer caches with deep level
+osxcleaner clean --developer-caches --level 3
 
 # Show configuration
 osxcleaner config show
@@ -286,8 +289,8 @@ osxcleaner/
 ## Roadmap
 
 ### Phase 1: MVP (v0.1) - Core Features
-- [ ] CLI-based cleanup tool
-- [ ] Safety classification system implementation
+- [x] CLI-based cleanup tool
+- [x] Safety classification system implementation (F01)
 - [ ] Basic cleanup levels (Level 1-2)
 
 ### Phase 2: Developer Features (v0.5)
