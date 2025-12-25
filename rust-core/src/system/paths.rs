@@ -133,7 +133,7 @@ impl VersionPaths {
 
     fn add_version_specific_targets(
         version: &Version,
-        home: &PathBuf,
+        home: &std::path::Path,
         targets: &mut Vec<SpecialTarget>,
     ) {
         // mediaanalysisd issue in macOS 15.1
