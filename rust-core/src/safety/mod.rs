@@ -141,9 +141,7 @@ pub fn categorize_path(path: &str) -> PathCategory {
     }
 
     // Check for temporary files
-    if path_lower.contains("/tmp/")
-        || path_lower.contains("/temp/")
-        || path_lower.contains("/.tmp")
+    if path_lower.contains("/tmp/") || path_lower.contains("/temp/") || path_lower.contains("/.tmp")
     {
         return PathCategory::Temporary;
     }

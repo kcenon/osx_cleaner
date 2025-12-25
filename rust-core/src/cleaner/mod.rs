@@ -80,8 +80,14 @@ pub fn clean(path: &str, config: &CleanConfig) -> Result<CleanResult, CleanError
 }
 
 /// Clean a single file
-fn clean_file(path: &Path, config: &CleanConfig, result: &mut CleanResult) -> Result<(), CleanError> {
-    let metadata = path.metadata().map_err(|e| CleanError::IoError(e.to_string()))?;
+fn clean_file(
+    path: &Path,
+    config: &CleanConfig,
+    result: &mut CleanResult,
+) -> Result<(), CleanError> {
+    let metadata = path
+        .metadata()
+        .map_err(|e| CleanError::IoError(e.to_string()))?;
     let size = metadata.len();
 
     if !config.dry_run {
@@ -172,7 +178,10 @@ fn calculate_size(path: &Path) -> Result<u64, std::io::Error> {
         Ok(path.metadata()?.len())
     } else if path.is_dir() {
         let mut total = 0u64;
-        for entry in walkdir::WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        for entry in walkdir::WalkDir::new(path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if entry.file_type().is_file() {
                 total += entry.metadata().map(|m| m.len()).unwrap_or(0);
             }

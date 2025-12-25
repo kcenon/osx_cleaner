@@ -9,8 +9,8 @@ fn main() {
     std::fs::create_dir_all(&output_dir).unwrap();
 
     // Generate C header
-    let config = cbindgen::Config::from_file("cbindgen.toml")
-        .expect("Failed to read cbindgen.toml");
+    let config =
+        cbindgen::Config::from_file("cbindgen.toml").expect("Failed to read cbindgen.toml");
 
     cbindgen::Builder::new()
         .with_crate(&crate_dir)
