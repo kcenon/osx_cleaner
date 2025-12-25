@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! File system scanner module
 //!
 //! Provides parallel directory scanning and analysis capabilities.

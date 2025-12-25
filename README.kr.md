@@ -3,7 +3,7 @@
 > **macOS 시스템 정리 도구** - 안전하게 불필요한 파일을 정리하여 디스크 공간을 확보합니다.
 
 [![macOS](https://img.shields.io/badge/macOS-10.15--15.x-blue.svg)](https://www.apple.com/macos/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Development-orange.svg)]()
 
 ---

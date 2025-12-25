@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! Safety level definitions
 //!
 //! Defines the 4-level safety classification system for cleanup operations.

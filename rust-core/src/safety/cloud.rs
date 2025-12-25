@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
+
 //! Cloud sync status detection module
 //!
 //! Detects if files are being synced by cloud services to prevent data loss.
