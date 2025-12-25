@@ -26,10 +26,16 @@ let package = Package(
             ],
             path: "Sources/osxcleaner"
         ),
-        // Swift Library
+        // Rust Core C Bridge
+        .systemLibrary(
+            name: "COSXCore",
+            path: "Sources/COSXCore"
+        ),
+        // Swift Library with Rust FFI Bridge
         .target(
             name: "OSXCleanerKit",
             dependencies: [
+                "COSXCore",
                 .product(name: "Logging", package: "swift-log")
             ],
             path: "Sources/OSXCleanerKit",

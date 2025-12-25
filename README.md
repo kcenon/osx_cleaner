@@ -225,13 +225,18 @@ osxcleaner/
 ├── Makefile                    # Unified build script
 ├── Sources/                    # Swift sources
 │   ├── osxcleaner/             # CLI application
-│   │   ├── main.swift
+│   │   ├── OSXCleaner.swift    # Entry point
 │   │   ├── Commands/           # CLI commands
 │   │   └── UI/                 # Progress display
-│   └── OSXCleanerKit/          # Swift library
-│       ├── Services/           # Business logic
-│       ├── Config/             # Configuration
-│       └── Logger/             # Logging
+│   ├── OSXCleanerKit/          # Swift library
+│   │   ├── Bridge/             # Rust FFI bridge
+│   │   │   ├── RustBridge.swift   # FFI wrapper
+│   │   │   └── FFITypes.swift     # FFI type definitions
+│   │   ├── Services/           # Business logic
+│   │   ├── Config/             # Configuration
+│   │   └── Logger/             # Logging
+│   └── COSXCore/               # C module for Rust FFI
+│       └── module.modulemap    # Module definition
 ├── rust-core/                  # Rust sources
 │   ├── Cargo.toml
 │   ├── cbindgen.toml           # FFI header generation

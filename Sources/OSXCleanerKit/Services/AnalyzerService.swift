@@ -4,7 +4,11 @@ import Foundation
 public struct AnalysisResult {
     public let totalSize: UInt64
     public let potentialSavings: UInt64
+    public let fileCount: Int
+    public let directoryCount: Int
     public let categories: [AnalysisCategory]
+    public let largestItems: [AnalysisItem]
+    public let oldestItems: [AnalysisItem]
 
     public var formattedTotalSize: String {
         ByteCountFormatter.string(fromByteCount: Int64(totalSize), countStyle: .file)
@@ -14,10 +18,22 @@ public struct AnalysisResult {
         ByteCountFormatter.string(fromByteCount: Int64(potentialSavings), countStyle: .file)
     }
 
-    public init(totalSize: UInt64, potentialSavings: UInt64, categories: [AnalysisCategory]) {
+    public init(
+        totalSize: UInt64,
+        potentialSavings: UInt64,
+        fileCount: Int = 0,
+        directoryCount: Int = 0,
+        categories: [AnalysisCategory],
+        largestItems: [AnalysisItem] = [],
+        oldestItems: [AnalysisItem] = []
+    ) {
         self.totalSize = totalSize
         self.potentialSavings = potentialSavings
+        self.fileCount = fileCount
+        self.directoryCount = directoryCount
         self.categories = categories
+        self.largestItems = largestItems
+        self.oldestItems = oldestItems
     }
 }
 
@@ -32,7 +48,7 @@ public struct AnalysisCategory {
         ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
 
-    public init(name: String, size: UInt64, itemCount: Int, topItems: [AnalysisItem]) {
+    public init(name: String, size: UInt64, itemCount: Int, topItems: [AnalysisItem] = []) {
         self.name = name
         self.size = size
         self.itemCount = itemCount
@@ -45,28 +61,107 @@ public struct AnalysisItem {
     public let path: String
     public let size: UInt64
     public let lastAccessed: Date?
+    public let category: String?
 
     public var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
 
-    public init(path: String, size: UInt64, lastAccessed: Date? = nil) {
+    public init(path: String, size: UInt64, lastAccessed: Date? = nil, category: String? = nil) {
         self.path = path
         self.size = size
         self.lastAccessed = lastAccessed
+        self.category = category
     }
 }
 
 /// Service for analyzing disk usage
+///
+/// This service uses the Rust core library for high-performance parallel
+/// directory scanning. Falls back to Swift implementation if Rust core
+/// is not available.
 public final class AnalyzerService {
     private let fileManager: FileManager
+    private let rustBridge: RustBridge
+    private var useRustCore: Bool = true
 
-    public init(fileManager: FileManager = .default) {
+    public init(
+        fileManager: FileManager = .default,
+        rustBridge: RustBridge = .shared
+    ) {
         self.fileManager = fileManager
+        self.rustBridge = rustBridge
+
+        // Try to initialize Rust core
+        do {
+            try rustBridge.initialize()
+        } catch {
+            AppLogger.shared.warning("Rust core unavailable, using Swift fallback: \(error)")
+            useRustCore = false
+        }
     }
 
     public func analyze(with config: AnalyzerConfiguration) async throws -> AnalysisResult {
         AppLogger.shared.operation("Starting analysis of \(config.targetPath)")
+
+        // Use Rust core for single path analysis
+        if useRustCore && !config.targetPath.isEmpty && config.targetPath != "~" {
+            return try await analyzeWithRust(config)
+        }
+
+        return try await analyzeWithSwift(config)
+    }
+
+    // MARK: - Rust Core Analysis
+
+    private func analyzeWithRust(_ config: AnalyzerConfiguration) async throws -> AnalysisResult {
+        let expandedPath = (config.targetPath as NSString).expandingTildeInPath
+
+        let rustResult = try rustBridge.analyzePath(expandedPath)
+
+        let categories = rustResult.categories.map { cat in
+            AnalysisCategory(
+                name: cat.category,
+                size: cat.size,
+                itemCount: cat.count
+            )
+        }
+
+        let largestItems = rustResult.largestItems.map { item in
+            AnalysisItem(
+                path: item.path,
+                size: item.size,
+                lastAccessed: item.modified.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+                category: item.category
+            )
+        }
+
+        let oldestItems = rustResult.oldestItems.map { item in
+            AnalysisItem(
+                path: item.path,
+                size: item.size,
+                lastAccessed: item.modified.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+                category: item.category
+            )
+        }
+
+        AppLogger.shared.success("Rust analysis completed: \(rustResult.fileCount) files, \(rustResult.totalSize) bytes")
+
+        return AnalysisResult(
+            totalSize: rustResult.totalSize,
+            potentialSavings: rustResult.totalSize,
+            fileCount: rustResult.fileCount,
+            directoryCount: rustResult.directoryCount,
+            categories: categories,
+            largestItems: largestItems,
+            oldestItems: oldestItems
+        )
+    }
+
+    // MARK: - Swift Fallback Analysis
+
+    private func analyzeWithSwift(_ config: AnalyzerConfiguration) async throws -> AnalysisResult {
+        AppLogger.shared.info("Using Swift fallback for analysis")
 
         var categories: [AnalysisCategory] = []
         var totalSize: UInt64 = 0
