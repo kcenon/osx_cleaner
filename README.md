@@ -294,6 +294,10 @@ osxcleaner/
 │       │   ├── simulator.rs    # iOS Simulator management
 │       │   ├── packages.rs     # Package manager caches
 │       │   └── docker.rs       # Docker cleanup
+│       ├── targets/            # User-facing app cleanup (F03)
+│       │   ├── mod.rs          # Module entry & types
+│       │   ├── browser.rs      # Browser cache cleanup
+│       │   └── app_cache.rs    # General app cache cleanup
 │       └── fs/                 # Filesystem utilities
 ├── include/                    # Generated C headers
 ├── scripts/                    # Shell scripts
@@ -345,6 +349,10 @@ osxcleaner/
   - iOS Simulators (via xcrun simctl)
   - Package managers (npm, yarn, pip, brew, cargo, gradle, etc.)
   - Docker (images, containers, volumes, build cache)
+- [x] Browser/App cache cleanup (F03) ✅
+  - Browser caches (Safari, Chrome, Firefox, Edge, Brave, Opera, Arc)
+  - Cloud service caches (iCloud, Dropbox, OneDrive, Google Drive)
+  - General application cache cleanup
 - [ ] Level 3 cleanup support
 - [ ] Automation scheduling (F07)
 
