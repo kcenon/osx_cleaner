@@ -152,6 +152,53 @@ OSX Cleaner adopts a **Swift + Rust hybrid** architecture.
 
 ---
 
+## Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/kcenon/osx_cleaner.git
+cd osx_cleaner
+
+# Build and install
+./scripts/install.sh
+```
+
+### Basic Usage
+
+```bash
+# Analyze disk usage
+osxcleaner analyze
+
+# Analyze with details
+osxcleaner analyze --verbose
+
+# Clean with default safety level (3)
+osxcleaner clean --dry-run
+
+# Clean developer caches
+osxcleaner clean --developer-caches --safety-level 4
+
+# Show configuration
+osxcleaner config show
+```
+
+### Manual Build
+
+```bash
+# Build everything
+make all
+
+# Run tests
+make test
+
+# Build for development
+make debug
+```
+
+---
+
 ## System Requirements
 
 ### Supported Platforms
@@ -167,6 +214,41 @@ OSX Cleaner adopts a **Swift + Rust hybrid** architecture.
 - **Swift**: 5.9+
 - **Rust**: 1.75+
 - **Xcode**: 15+
+
+---
+
+## Project Structure
+
+```
+osxcleaner/
+├── Package.swift               # Swift Package definition
+├── Makefile                    # Unified build script
+├── Sources/                    # Swift sources
+│   ├── osxcleaner/             # CLI application
+│   │   ├── main.swift
+│   │   ├── Commands/           # CLI commands
+│   │   └── UI/                 # Progress display
+│   └── OSXCleanerKit/          # Swift library
+│       ├── Services/           # Business logic
+│       ├── Config/             # Configuration
+│       └── Logger/             # Logging
+├── rust-core/                  # Rust sources
+│   ├── Cargo.toml
+│   ├── cbindgen.toml           # FFI header generation
+│   └── src/
+│       ├── lib.rs              # FFI entry point
+│       ├── safety/             # Safety validation
+│       ├── scanner/            # Directory scanning
+│       ├── cleaner/            # Cleanup execution
+│       └── fs/                 # Filesystem utilities
+├── include/                    # Generated C headers
+├── scripts/                    # Shell scripts
+│   ├── install.sh
+│   ├── uninstall.sh
+│   └── launchd/                # launchd agent
+├── Tests/                      # Test files
+└── docs/                       # Documentation
+```
 
 ---
 
