@@ -65,6 +65,8 @@ pub struct SafetyValidator {
     warning_paths: Vec<PathBuf>,
     custom_rules: Vec<Arc<dyn SafetyRule>>,
     glob_patterns: Vec<glob::Pattern>,
+    /// Cache for classification results (reserved for future optimization)
+    #[allow(dead_code)]
     classification_cache: HashMap<PathBuf, SafetyLevel>,
 }
 
