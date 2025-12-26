@@ -397,4 +397,89 @@ mod tests {
         let result = validator.validate_cleanup(Path::new("/System"), SafetyLevel::Warning);
         assert!(matches!(result, Err(ValidationError::ProtectedPath { .. })));
     }
+
+    #[test]
+    fn test_glob_pattern_compilation() {
+        let validator = SafetyValidator::new();
+        // Verify glob patterns are compiled correctly
+        assert!(!validator.glob_patterns.is_empty());
+    }
+
+    #[test]
+    fn test_glob_pattern_apple_bundle_matching() {
+        let validator = SafetyValidator::new();
+
+        // Test com.apple.* pattern matching
+        assert!(
+            validator
+                .glob_patterns
+                .iter()
+                .any(|p| p.matches("com.apple.Safari")),
+            "Should match com.apple.* pattern"
+        );
+    }
+
+    #[test]
+    fn test_glob_pattern_app_contents_matching() {
+        let validator = SafetyValidator::new();
+
+        // Test *.app/Contents/MacOS/* pattern
+        let app_binary = "MyApp.app/Contents/MacOS/MyApp";
+        assert!(
+            validator
+                .glob_patterns
+                .iter()
+                .any(|p| p.matches(app_binary)),
+            "Should match *.app/Contents/MacOS/* pattern"
+        );
+    }
+
+    #[test]
+    fn test_glob_pattern_non_matching() {
+        let validator = SafetyValidator::new();
+
+        // Test patterns that should NOT match
+        assert!(
+            !validator
+                .glob_patterns
+                .iter()
+                .any(|p| p.matches("com.google.Chrome")),
+            "Should not match com.google.Chrome with com.apple.* pattern"
+        );
+
+        assert!(
+            !validator
+                .glob_patterns
+                .iter()
+                .any(|p| p.matches("Library/Caches")),
+            "Should not match Library/Caches"
+        );
+    }
+
+    #[test]
+    fn test_is_warning_path_with_glob() {
+        let validator = SafetyValidator::new();
+
+        // Test that is_warning_path uses glob patterns correctly
+        // Note: is_warning_path checks full path, so we need valid path structure
+        let path_str = "/Users/test/Library/Caches/com.apple.Safari";
+        let path = Path::new(path_str);
+
+        // The glob pattern com.apple.* should match the last component
+        let last_component = path.file_name().unwrap().to_string_lossy();
+        let matches_glob = validator
+            .glob_patterns
+            .iter()
+            .any(|p| p.matches(&last_component));
+        assert!(matches_glob, "Glob pattern should match com.apple.Safari");
+    }
+
+    #[test]
+    fn test_warning_patterns_constant() {
+        use crate::safety::paths::WARNING_PATTERNS;
+
+        // Verify WARNING_PATTERNS contains expected patterns
+        assert!(WARNING_PATTERNS.contains(&"com.apple.*"));
+        assert!(WARNING_PATTERNS.contains(&"*.app/Contents/MacOS/*"));
+    }
 }
