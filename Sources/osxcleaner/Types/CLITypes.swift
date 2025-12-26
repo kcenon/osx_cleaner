@@ -115,6 +115,45 @@ public enum OutputFormat: String, CaseIterable, ExpressibleByArgument {
     }
 }
 
+// MARK: - SpaceUnit
+
+/// Unit for disk space threshold
+public enum SpaceUnit: String, CaseIterable, ExpressibleByArgument {
+    case mb
+    case gb
+    case tb
+
+    public var description: String {
+        switch self {
+        case .mb:
+            return "Megabytes"
+        case .gb:
+            return "Gigabytes"
+        case .tb:
+            return "Terabytes"
+        }
+    }
+
+    public var bytesMultiplier: UInt64 {
+        switch self {
+        case .mb:
+            return 1_000_000
+        case .gb:
+            return 1_000_000_000
+        case .tb:
+            return 1_000_000_000_000
+        }
+    }
+
+    public static var allValueStrings: [String] {
+        allCases.map { $0.rawValue }
+    }
+
+    public static var defaultCompletionKind: CompletionKind {
+        .list(allValueStrings)
+    }
+}
+
 // MARK: - Exit Codes
 
 /// Standard exit codes for CLI operations
@@ -131,4 +170,6 @@ public enum ExitCode {
     public static let configurationError: Int32 = 4
     /// User cancelled operation
     public static let userCancelled: Int32 = 5
+    /// Cleanup skipped (space sufficient)
+    public static let skipped: Int32 = 0
 }
