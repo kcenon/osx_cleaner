@@ -109,23 +109,11 @@ fn clean_file(
 
     if config.dry_run {
         // Log dry run
-        log_deletion(
-            &path_str,
-            safety_level,
-            DeletionResult::DryRun,
-            size,
-            None,
-        );
+        log_deletion(&path_str, safety_level, DeletionResult::DryRun, size, None);
     } else {
         match fs::remove_file(path) {
             Ok(_) => {
-                log_deletion(
-                    &path_str,
-                    safety_level,
-                    DeletionResult::Success,
-                    size,
-                    None,
-                );
+                log_deletion(&path_str, safety_level, DeletionResult::Success, size, None);
             }
             Err(e) => {
                 log_deletion(
@@ -193,13 +181,7 @@ fn clean_directory(
         }
 
         if config.dry_run {
-            log_deletion(
-                &path_str,
-                entry_safety,
-                DeletionResult::DryRun,
-                size,
-                None,
-            );
+            log_deletion(&path_str, entry_safety, DeletionResult::DryRun, size, None);
         } else {
             let remove_result = if entry_path.is_dir() {
                 fs::remove_dir_all(&entry_path)
@@ -209,13 +191,7 @@ fn clean_directory(
 
             match remove_result {
                 Ok(_) => {
-                    log_deletion(
-                        &path_str,
-                        entry_safety,
-                        DeletionResult::Success,
-                        size,
-                        None,
-                    );
+                    log_deletion(&path_str, entry_safety, DeletionResult::Success, size, None);
                 }
                 Err(e) => {
                     log_deletion(

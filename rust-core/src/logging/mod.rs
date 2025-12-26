@@ -90,12 +90,7 @@ impl DeletionLogEntry {
 
         format!(
             "[{}] {} | {} | {} | {} bytes{}",
-            self.timestamp,
-            self.result,
-            self.safety_level,
-            self.path,
-            self.bytes_freed,
-            error_info
+            self.timestamp, self.result, self.safety_level, self.path, self.bytes_freed, error_info
         )
     }
 }
@@ -132,10 +127,7 @@ impl DeletionLogger {
             std::fs::create_dir_all(parent)?;
         }
 
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
 
         Ok(DeletionLogger {
             log_file_path: Some(path),
@@ -319,9 +311,8 @@ static GLOBAL_LOGGER: std::sync::OnceLock<DeletionLogger> = std::sync::OnceLock:
 /// Initialize the global logger
 pub fn init_global_logger(log_path: Option<&Path>) -> Result<(), String> {
     let logger = match log_path {
-        Some(path) => {
-            DeletionLogger::with_file(path).map_err(|e| format!("Failed to create log file: {}", e))?
-        }
+        Some(path) => DeletionLogger::with_file(path)
+            .map_err(|e| format!("Failed to create log file: {}", e))?,
         None => DeletionLogger::new(),
     };
 
@@ -388,8 +379,20 @@ mod tests {
     fn test_memory_logger() {
         let logger = DeletionLogger::new();
 
-        logger.log_deletion("/test/1", SafetyLevel::Safe, DeletionResult::Success, 100, None);
-        logger.log_deletion("/test/2", SafetyLevel::Caution, DeletionResult::DryRun, 200, None);
+        logger.log_deletion(
+            "/test/1",
+            SafetyLevel::Safe,
+            DeletionResult::Success,
+            100,
+            None,
+        );
+        logger.log_deletion(
+            "/test/2",
+            SafetyLevel::Caution,
+            DeletionResult::DryRun,
+            200,
+            None,
+        );
 
         let entries = logger.get_entries();
         assert_eq!(entries.len(), 2);
@@ -401,7 +404,13 @@ mod tests {
         let log_path = dir.path().join("test.log");
 
         let logger = DeletionLogger::with_file(&log_path).unwrap();
-        logger.log_deletion("/test/path", SafetyLevel::Safe, DeletionResult::Success, 1024, None);
+        logger.log_deletion(
+            "/test/path",
+            SafetyLevel::Safe,
+            DeletionResult::Success,
+            1024,
+            None,
+        );
 
         // Flush and check file exists
         drop(logger);
@@ -412,8 +421,20 @@ mod tests {
     fn test_log_stats() {
         let logger = DeletionLogger::new();
 
-        logger.log_deletion("/test/1", SafetyLevel::Safe, DeletionResult::Success, 100, None);
-        logger.log_deletion("/test/2", SafetyLevel::Safe, DeletionResult::Success, 200, None);
+        logger.log_deletion(
+            "/test/1",
+            SafetyLevel::Safe,
+            DeletionResult::Success,
+            100,
+            None,
+        );
+        logger.log_deletion(
+            "/test/2",
+            SafetyLevel::Safe,
+            DeletionResult::Success,
+            200,
+            None,
+        );
         logger.log_deletion(
             "/test/3",
             SafetyLevel::Danger,
