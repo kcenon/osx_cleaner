@@ -88,6 +88,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive test suite (14 unit tests)
 
 ### Testing
+- **F02-5: DockerCleaner Test Coverage Expansion** (#36)
+  - Default trait implementation tests
+  - Size parsing edge cases (empty, whitespace, lowercase, short units)
+  - DockerDiskUsage default values and serialization tests
+  - DockerImage and DockerContainer struct validation tests
+  - DockerError variants verification tests
+  - Scan result structure validation tests
+  - Dry run cleanup with empty targets tests
+  - CleanupTarget method and safety level validation tests
+  - Serialization/deserialization tests for all data structures
+  - Increase test count from 4 to 20
+
 - **F02-4: PackageManagerCleaner Test Coverage Expansion** (#35)
   - AC-04: Comprehensive package manager detection tests
   - AC-09: Graceful handling of missing tools tests
