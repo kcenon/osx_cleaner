@@ -23,7 +23,7 @@ use std::path::PathBuf;
 pub use app_cache::AppCacheCleaner;
 pub use browser::BrowserCleaner;
 pub use logs::{
-    LogCleanupError, LogCleanupResult, LogCleaner, LogEntry, LogScanSummary, LogSource, LogType,
+    LogCleaner, LogCleanupError, LogCleanupResult, LogEntry, LogScanSummary, LogSource, LogType,
 };
 
 /// Supported browsers

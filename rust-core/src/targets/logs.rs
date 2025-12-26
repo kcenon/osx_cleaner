@@ -471,11 +471,9 @@ impl LogCleaner {
         // Use parallel processing for deletion
         let results: Vec<_> = safe_entries
             .par_iter()
-            .map(|entry| {
-                match fs::remove_file(&entry.path) {
-                    Ok(()) => Ok(entry.size),
-                    Err(e) => Err(LogCleanupError::new(entry.path.clone(), e.to_string())),
-                }
+            .map(|entry| match fs::remove_file(&entry.path) {
+                Ok(()) => Ok(entry.size),
+                Err(e) => Err(LogCleanupError::new(entry.path.clone(), e.to_string())),
             })
             .collect();
 
