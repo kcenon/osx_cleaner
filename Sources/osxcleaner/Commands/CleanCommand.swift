@@ -67,8 +67,11 @@ struct CleanCommand: AsyncParsableCommand {
         let config = buildConfiguration()
         let service = CleanerService()
 
+        // Determine trigger type based on execution mode
+        let triggerType: CleanupSession.TriggerType = nonInteractive ? .scheduled : .manual
+
         do {
-            let result = try await service.clean(with: config)
+            let result = try await service.clean(with: config, triggerType: triggerType)
             displayResult(result, output: output)
         } catch {
             output.displayError(error)

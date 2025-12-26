@@ -328,9 +328,36 @@ extension MonitorCommand {
                     progressView.display(message: "")
                     progressView.display(message: "Auto-cleanup triggered at emergency threshold...")
 
-                    // Note: Would trigger actual cleanup here
-                    AppLogger.shared.info("Auto-cleanup would run at level: \(level.rawValue)")
-                    progressView.display(message: "Run 'osxcleaner clean --level \(level.rawValue)' to clean up")
+                    // Log disk monitor trigger
+                    let loggingService = AutomatedCleanupLoggingService.shared
+                    loggingService.logDiskMonitorTrigger(
+                        usagePercent: diskInfo.usagePercent,
+                        threshold: "\(threshold)"
+                    )
+
+                    // Execute actual cleanup
+                    let cleanerService = CleanerService()
+                    let config = CleanerConfiguration(
+                        cleanupLevel: level,
+                        dryRun: false,
+                        includeSystemCaches: true,
+                        includeDeveloperCaches: true,
+                        includeBrowserCaches: true,
+                        specificPaths: []
+                    )
+
+                    do {
+                        let result = try await cleanerService.clean(
+                            with: config,
+                            triggerType: .diskMonitor
+                        )
+                        progressView.displaySuccess(
+                            "Auto-cleanup completed: freed \(result.formattedFreedSpace)"
+                        )
+                    } catch {
+                        progressView.displayError(error)
+                        AppLogger.shared.error("Auto-cleanup failed: \(error.localizedDescription)")
+                    }
                 }
             } catch {
                 progressView.displayError(error)

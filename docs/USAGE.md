@@ -13,6 +13,8 @@
 - [Snapshot Command](#snapshot-command)
 - [Config Command](#config-command)
 - [Schedule Command](#schedule-command)
+- [Monitor Command](#monitor-command)
+- [Cleanup Logging](#cleanup-logging)
 - [Cleanup Levels](#cleanup-levels)
 - [Cleanup Targets](#cleanup-targets)
 - [Examples and Recipes](#examples-and-recipes)
@@ -46,6 +48,7 @@ osxcleaner clean --level light
 | `snapshot` | Manage Time Machine snapshots | Free snapshot space |
 | `config` | Manage configuration | Initial setup |
 | `schedule` | Manage schedules | Automation |
+| `monitor` | Monitor disk usage | Disk alerts |
 
 ### Global Options
 
@@ -439,6 +442,122 @@ weekly     Weekly     Normal  Sun 02:00   Enabled
 monthly    Monthly    Deep    1st 04:00   Disabled
 
 Next scheduled run: daily at 2025-12-27 03:00:00
+```
+
+---
+
+## Monitor Command
+
+Monitor disk usage and receive alerts when disk space is running low.
+
+### Check Status
+
+```bash
+# Show current disk usage and monitoring status
+osxcleaner monitor status
+
+# JSON output for scripting
+osxcleaner monitor status --format json
+```
+
+### Enable Monitoring
+
+```bash
+# Enable with default settings (1 hour interval)
+osxcleaner monitor enable
+
+# Custom interval (30 minutes)
+osxcleaner monitor enable --interval 1800
+
+# Enable with auto-cleanup at emergency threshold
+osxcleaner monitor enable --auto-cleanup --level light
+
+# Custom thresholds
+osxcleaner monitor enable --warning 80 --critical 88 --emergency 93
+```
+
+### Disable Monitoring
+
+```bash
+# Disable background monitoring
+osxcleaner monitor disable
+```
+
+### Manual Check
+
+```bash
+# Perform immediate disk usage check
+osxcleaner monitor check
+
+# Check with auto-cleanup if threshold exceeded
+osxcleaner monitor check --auto-cleanup --level light
+
+# Quiet mode (no notifications)
+osxcleaner monitor check --quiet
+```
+
+### Disk Thresholds
+
+| Threshold | Default | Notification |
+|-----------|---------|--------------|
+| Warning   | 85%     | Yellow alert |
+| Critical  | 90%     | Orange alert with recommendation |
+| Emergency | 95%     | Red alert, auto-cleanup if enabled |
+
+---
+
+## Cleanup Logging
+
+All automated cleanup operations are logged for audit and debugging purposes.
+
+### Log Location
+
+Logs are stored in `~/.config/osxcleaner/logs/cleanup.log`.
+
+### Log Format
+
+Each log entry is a JSON object:
+
+```json
+{
+  "timestamp": "2025-12-26T15:30:00.000+0900",
+  "level": "INFO",
+  "event": "SESSION_START",
+  "session_id": "abc123-def456",
+  "message": "Cleanup session started",
+  "details": {
+    "trigger_type": "scheduled",
+    "cleanup_level": "light"
+  }
+}
+```
+
+### Trigger Types
+
+| Type | Description |
+|------|-------------|
+| `manual` | User-initiated cleanup |
+| `scheduled` | Scheduled cleanup via launchd |
+| `auto_cleanup` | Triggered by schedule with `--non-interactive` |
+| `disk_monitor` | Triggered by disk usage threshold |
+
+### Log Rotation
+
+- Maximum log file size: 10 MB
+- Rotated files kept: 5
+- Rotation creates: `cleanup.log.1`, `cleanup.log.2`, etc.
+
+### Reading Logs
+
+```bash
+# View recent log entries
+tail -20 ~/.config/osxcleaner/logs/cleanup.log | jq .
+
+# Filter by event type
+grep "SESSION_END" ~/.config/osxcleaner/logs/cleanup.log | jq .
+
+# Get total freed space from recent sessions
+grep "SESSION_END" ~/.config/osxcleaner/logs/cleanup.log | jq -r '.details.freed_formatted'
 ```
 
 ---
