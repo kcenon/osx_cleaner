@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
+- **F01-3: Expand Protected and Warning Path Lists** (#23)
+  - Implement `categorize_path` function for comprehensive path classification
+  - Support PathCategory: SystemCritical, UserCritical, DeveloperCache, AppContainer, BrowserCache, AppCache, Logs, Temporary, UserDocuments, Unknown
+  - 40+ comprehensive unit tests for all path categories
+  - Tests for home directory (~) expansion functionality
+  - Export categorize_path in public API
+
 - **F01-5: Running Process Detection FFI Bindings** (#25)
   - `osx_is_app_running`: Check if a specific application is running
   - `osx_is_file_in_use`: Check if a file/directory is in use by any process
