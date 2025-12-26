@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+use crate::logging::{log_deletion, DeletionResult};
 use crate::safety::{calculate_safety_level, CleanupLevel, SafetyLevel};
 
 /// Configuration for cleanup operations
@@ -98,24 +99,49 @@ fn clean_file(
     config: &CleanConfig,
     result: &mut CleanResult,
 ) -> Result<(), CleanError> {
+    let path_str = path.to_string_lossy().to_string();
+    let safety_level = SafetyLevel::from(calculate_safety_level(&path_str));
+
     let metadata = path
         .metadata()
         .map_err(|e| CleanError::IoError(e.to_string()))?;
     let size = metadata.len();
 
-    if !config.dry_run {
-        fs::remove_file(path).map_err(|e| CleanError::IoError(e.to_string()))?;
+    if config.dry_run {
+        // Log dry run
+        log_deletion(
+            &path_str,
+            safety_level,
+            DeletionResult::DryRun,
+            size,
+            None,
+        );
+    } else {
+        match fs::remove_file(path) {
+            Ok(_) => {
+                log_deletion(
+                    &path_str,
+                    safety_level,
+                    DeletionResult::Success,
+                    size,
+                    None,
+                );
+            }
+            Err(e) => {
+                log_deletion(
+                    &path_str,
+                    safety_level,
+                    DeletionResult::Failed,
+                    0,
+                    Some(e.to_string()),
+                );
+                return Err(CleanError::IoError(e.to_string()));
+            }
+        }
     }
 
     result.freed_bytes += size;
     result.files_removed += 1;
-
-    log::info!(
-        "{}Removed file: {} ({} bytes)",
-        if config.dry_run { "[DRY RUN] " } else { "" },
-        path.display(),
-        size
-    );
 
     Ok(())
 }
@@ -143,34 +169,68 @@ fn clean_directory(
 
     // Process each entry
     for (entry_path, size) in sizes {
-        let path_str = entry_path.to_string_lossy();
+        let path_str = entry_path.to_string_lossy().to_string();
         let entry_safety = SafetyLevel::from(calculate_safety_level(&path_str));
 
         // Check if this entry is safe to delete at our cleanup level
         if !config.cleanup_level.can_delete(entry_safety) {
+            let reason = format!(
+                "Safety level {:?} required, cleanup level {:?} not sufficient",
+                entry_safety, config.cleanup_level
+            );
+            log_deletion(
+                &path_str,
+                entry_safety,
+                DeletionResult::Skipped,
+                0,
+                Some(reason.clone()),
+            );
             result.errors.push(CleanErrorInfo {
-                path: path_str.to_string(),
-                reason: format!(
-                    "Safety level {:?} required, cleanup level {:?} not sufficient",
-                    entry_safety, config.cleanup_level
-                ),
+                path: path_str,
+                reason,
             });
             continue;
         }
 
-        if !config.dry_run {
+        if config.dry_run {
+            log_deletion(
+                &path_str,
+                entry_safety,
+                DeletionResult::DryRun,
+                size,
+                None,
+            );
+        } else {
             let remove_result = if entry_path.is_dir() {
                 fs::remove_dir_all(&entry_path)
             } else {
                 fs::remove_file(&entry_path)
             };
 
-            if let Err(e) = remove_result {
-                result.errors.push(CleanErrorInfo {
-                    path: path_str.to_string(),
-                    reason: e.to_string(),
-                });
-                continue;
+            match remove_result {
+                Ok(_) => {
+                    log_deletion(
+                        &path_str,
+                        entry_safety,
+                        DeletionResult::Success,
+                        size,
+                        None,
+                    );
+                }
+                Err(e) => {
+                    log_deletion(
+                        &path_str,
+                        entry_safety,
+                        DeletionResult::Failed,
+                        0,
+                        Some(e.to_string()),
+                    );
+                    result.errors.push(CleanErrorInfo {
+                        path: path_str,
+                        reason: e.to_string(),
+                    });
+                    continue;
+                }
             }
         }
 

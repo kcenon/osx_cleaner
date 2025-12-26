@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User documentation (INSTALLATION.md, USAGE.md, SAFETY.md, CONTRIBUTING.md)
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
+- **F01-7: Comprehensive Logging for Deletion Operations** (#27)
+
+  - Structured DeletionLogEntry with timestamp, path, safety level, result, bytes freed
+  - DeletionLogger with memory and file output support
+  - Log rotation support (10MB max file size, 5 rotated files)
+  - FFI bindings for Swift integration (osx_init_logger, osx_get_deletion_logs, osx_get_log_stats)
+  - LogStats for summary statistics (success/failed/skipped counts, bytes freed)
+  - Integration with cleaner module for automatic logging of all deletion attempts
+
 - **F06: Disk Usage Analysis** (#10)
 
   - DiskSpace query with total/used/available information

@@ -14,6 +14,7 @@ pub mod analyzer;
 pub mod cleaner;
 pub mod developer;
 pub mod fs;
+pub mod logging;
 pub mod safety;
 pub mod scanner;
 pub mod system;
@@ -269,6 +270,59 @@ pub extern "C" fn osx_full_analysis() -> FFIResult {
         }
         Err(e) => FFIResult::err(e.to_string()),
     }
+}
+
+// ============================================================================
+// Logging FFI Functions
+// ============================================================================
+
+/// Initialize the deletion logger with optional file output
+///
+/// # Safety
+/// - `log_path` may be null for memory-only logging
+/// - If not null, must be a valid null-terminated C string
+#[no_mangle]
+pub unsafe extern "C" fn osx_init_logger(log_path: *const c_char) -> FFIResult {
+    let path = if log_path.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(log_path).to_str() {
+            Ok(s) => Some(std::path::PathBuf::from(s)),
+            Err(_) => return FFIResult::err("Invalid UTF-8 in log path".to_string()),
+        }
+    };
+
+    match logging::init_global_logger(path.as_deref()) {
+        Ok(_) => FFIResult::ok(None),
+        Err(e) => FFIResult::err(e),
+    }
+}
+
+/// Get all deletion log entries as JSON
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+#[no_mangle]
+pub extern "C" fn osx_get_deletion_logs() -> FFIResult {
+    let json = logging::global_logger().get_entries_json();
+    FFIResult::ok(Some(json))
+}
+
+/// Get deletion log statistics as JSON
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+#[no_mangle]
+pub extern "C" fn osx_get_log_stats() -> FFIResult {
+    let stats = logging::global_logger().get_stats();
+    let json = serde_json::to_string(&stats).unwrap_or_else(|_| "{}".to_string());
+    FFIResult::ok(Some(json))
+}
+
+/// Clear all deletion logs from memory
+#[no_mangle]
+pub extern "C" fn osx_clear_logs() {
+    logging::global_logger().clear();
 }
 
 #[cfg(test)]
