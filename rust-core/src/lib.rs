@@ -505,6 +505,178 @@ pub extern "C" fn osx_clear_logs() {
     logging::global_logger().clear();
 }
 
+// ============================================================================
+// Process Detection FFI Functions
+// ============================================================================
+
+/// Check if a specific application is running
+///
+/// # Safety
+/// - `app_name` must be a valid null-terminated C string
+/// - Returns true if the application is running, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_app_running(app_name: *const c_char) -> bool {
+    if app_name.is_null() {
+        return false;
+    }
+
+    let name = match CStr::from_ptr(app_name).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    safety::process::is_app_running(name)
+}
+
+/// Check if a file or directory is in use by any process
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - Returns true if the path is in use, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_file_in_use(path: *const c_char) -> bool {
+    if path.is_null() {
+        return false;
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    safety::process::is_file_in_use(std::path::Path::new(path_str))
+}
+
+/// Check if any application related to a cache path is running
+///
+/// # Safety
+/// - `cache_path` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON: {"running": bool, "app_name": "..." or null}
+#[no_mangle]
+pub unsafe extern "C" fn osx_check_related_app_running(cache_path: *const c_char) -> FFIResult {
+    if cache_path.is_null() {
+        return FFIResult::err("Cache path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(cache_path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in cache path".to_string()),
+    };
+
+    #[derive(serde::Serialize)]
+    struct RelatedAppResult {
+        running: bool,
+        app_name: Option<String>,
+    }
+
+    let result = match safety::process::check_related_app_running(path_str) {
+        Some(app_name) => RelatedAppResult {
+            running: true,
+            app_name: Some(app_name),
+        },
+        None => RelatedAppResult {
+            running: false,
+            app_name: None,
+        },
+    };
+
+    let json = serde_json::to_string(&result).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Get a list of all running processes
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON array: [{"pid": N, "name": "...", "path": "..." or null}, ...]
+#[no_mangle]
+pub extern "C" fn osx_get_running_processes() -> FFIResult {
+    let processes = safety::process::get_running_processes();
+
+    #[derive(serde::Serialize)]
+    struct ProcessResult {
+        pid: u32,
+        name: String,
+        path: Option<String>,
+    }
+
+    let results: Vec<ProcessResult> = processes
+        .into_iter()
+        .map(|p| ProcessResult {
+            pid: p.pid,
+            name: p.name,
+            path: p.path,
+        })
+        .collect();
+
+    let json = serde_json::to_string(&results).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Get processes using a specific file or directory
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON array: [{"pid": N, "name": "...", "path": "..." or null}, ...]
+#[no_mangle]
+pub unsafe extern "C" fn osx_get_processes_using_path(path: *const c_char) -> FFIResult {
+    if path.is_null() {
+        return FFIResult::err("Path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
+    };
+
+    let processes = safety::process::get_processes_using_path(std::path::Path::new(path_str));
+
+    #[derive(serde::Serialize)]
+    struct ProcessResult {
+        pid: u32,
+        name: String,
+        path: Option<String>,
+    }
+
+    let results: Vec<ProcessResult> = processes
+        .into_iter()
+        .map(|p| ProcessResult {
+            pid: p.pid,
+            name: p.name,
+            path: p.path,
+        })
+        .collect();
+
+    let json = serde_json::to_string(&results).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Get cache paths associated with a specific application
+///
+/// # Safety
+/// - `app_name` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON array of paths: ["path1", "path2", ...]
+#[no_mangle]
+pub unsafe extern "C" fn osx_get_app_cache_paths(app_name: *const c_char) -> FFIResult {
+    if app_name.is_null() {
+        return FFIResult::err("App name is null".to_string());
+    }
+
+    let name = match CStr::from_ptr(app_name).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in app name".to_string()),
+    };
+
+    let mapping = safety::process::AppCacheMapping::new();
+    let paths = mapping.get_cache_paths(name);
+
+    let json = serde_json::to_string(&paths).unwrap_or_else(|_| "[]".to_string());
+    FFIResult::ok(Some(json))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,6 +702,121 @@ mod tests {
 
         unsafe {
             osx_free_string(result.error_message);
+        }
+    }
+
+    // Process Detection FFI Tests
+
+    #[test]
+    fn test_is_app_running_null() {
+        unsafe {
+            // Null pointer should return false
+            assert!(!osx_is_app_running(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn test_is_app_running_valid() {
+        use std::ffi::CString;
+        unsafe {
+            // Test with a valid app name (Finder is usually always running on macOS)
+            let app_name = CString::new("Finder").unwrap();
+            // Don't assert specific value - just ensure it doesn't crash
+            let _ = osx_is_app_running(app_name.as_ptr());
+        }
+    }
+
+    #[test]
+    fn test_is_file_in_use_null() {
+        unsafe {
+            // Null pointer should return false
+            assert!(!osx_is_file_in_use(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn test_is_file_in_use_valid() {
+        use std::ffi::CString;
+        unsafe {
+            // Test with a valid path
+            let path = CString::new("/tmp").unwrap();
+            // Don't assert specific value - just ensure it doesn't crash
+            let _ = osx_is_file_in_use(path.as_ptr());
+        }
+    }
+
+    #[test]
+    fn test_check_related_app_running_null() {
+        unsafe {
+            let result = osx_check_related_app_running(std::ptr::null());
+            assert!(!result.success);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_check_related_app_running_valid() {
+        use std::ffi::CString;
+        unsafe {
+            let cache_path = CString::new("Library/Caches/Google/Chrome").unwrap();
+            let result = osx_check_related_app_running(cache_path.as_ptr());
+            assert!(result.success);
+            // Parse and validate JSON
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.contains("running"));
+            }
+            osx_free_string(result.data);
+        }
+    }
+
+    #[test]
+    fn test_get_running_processes() {
+        let result = osx_get_running_processes();
+        assert!(result.success);
+        // Should return a JSON array (even if empty)
+        if !result.data.is_null() {
+            unsafe {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.starts_with('['));
+                assert!(data_str.ends_with(']'));
+                osx_free_string(result.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_processes_using_path_null() {
+        unsafe {
+            let result = osx_get_processes_using_path(std::ptr::null());
+            assert!(!result.success);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_get_app_cache_paths_null() {
+        unsafe {
+            let result = osx_get_app_cache_paths(std::ptr::null());
+            assert!(!result.success);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_get_app_cache_paths_valid() {
+        use std::ffi::CString;
+        unsafe {
+            let app_name = CString::new("Google Chrome").unwrap();
+            let result = osx_get_app_cache_paths(app_name.as_ptr());
+            assert!(result.success);
+            // Should return a JSON array
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                // Chrome should have cache paths defined
+                assert!(data_str.contains("Chrome") || data_str == "null");
+                osx_free_string(result.data);
+            }
         }
     }
 }

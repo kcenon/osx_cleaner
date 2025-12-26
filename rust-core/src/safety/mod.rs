@@ -25,8 +25,8 @@ pub use paths::{
     expand_home, PathCategory, CAUTION_PATHS, PROTECTED_PATHS, SAFE_PATHS, WARNING_PATHS,
 };
 pub use process::{
-    check_related_app_running, get_processes_using_path, is_app_running, is_file_in_use,
-    AppCacheMapping, ProcessInfo,
+    check_related_app_running, get_processes_using_path, get_running_processes, is_app_running,
+    is_file_in_use, AppCacheMapping, ProcessInfo,
 };
 pub use validator::{ClassificationResult, SafetyRule, SafetyValidator, ValidationError};
 
