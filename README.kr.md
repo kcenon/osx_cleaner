@@ -213,6 +213,7 @@ osxcleaner schedule enable daily
 | `clean` | 안전성 검사를 통한 대상 정리 |
 | `config` | osxcleaner 설정 관리 |
 | `schedule` | 자동화 정리 스케줄 관리 |
+| `team` | 팀 환경 설정 관리 |
 
 ### 주요 옵션
 
@@ -226,6 +227,73 @@ osxcleaner schedule enable daily
 | `--non-interactive` | clean | 확인 프롬프트 건너뛰기 (CI/CD용) |
 | `--verbose` | clean, analyze | 상세 출력 |
 | `--quiet` | clean, analyze | 최소 출력 |
+| `--ignore-team` | clean | 팀 설정 정책 무시 |
+
+### 팀 설정 (F09)
+
+팀 설정을 통해 개발팀 전체에 공유 정리 정책을 적용할 수 있습니다.
+
+```bash
+# 팀 설정 상태 확인
+osxcleaner team status
+
+# 파일에서 팀 설정 로드
+osxcleaner team load ~/team-config.yaml
+
+# 원격 URL에서 로드
+osxcleaner team load https://config.example.com/team/osxcleaner.yaml
+
+# 적용 없이 검증만
+osxcleaner team load ~/team-config.yaml --validate-only
+
+# 원격 설정과 동기화
+osxcleaner team sync
+
+# 샘플 설정 생성
+osxcleaner team sample
+
+# 팀 설정 제거
+osxcleaner team remove --force
+```
+
+#### 팀 설정 샘플 (YAML)
+
+```yaml
+version: "1.0"
+team: "iOS 개발팀"
+
+policies:
+  cleanup_level: "normal"
+  schedule: "weekly"
+  allow_override: true
+  max_disk_usage: 90
+  enforce_dry_run: false
+
+exclusions:
+  - "~/Projects/**/build/"
+  - "~/Library/Developer/Xcode/Archives/"
+
+targets:
+  xcode:
+    derived_data: true
+    device_support: false
+    simulators: "unavailable"
+    archives: false
+  docker:
+    enabled: true
+    keep_running: true
+    prune_images: true
+
+notifications:
+  threshold: 85
+  auto_cleanup: false
+  enabled: true
+
+sync:
+  remote_url: "https://config.example.com/team/ios-dev/osxcleaner.yaml"
+  interval_seconds: 3600
+  sync_on_startup: true
+```
 
 ### 수동 빌드
 

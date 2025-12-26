@@ -52,6 +52,9 @@ struct CleanCommand: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Show detailed output")
     var verbose: Bool = false
 
+    @Flag(name: .long, help: "Ignore team configuration policies")
+    var ignoreTeam: Bool = false
+
     // MARK: - Arguments
 
     @Argument(help: "Specific paths to clean (optional)")
@@ -153,14 +156,49 @@ struct CleanCommand: AsyncParsableCommand {
         let includeBrowser = target == .browser || target == .all
         let includeLogs = target == .logs || target == .all
 
+        // Check for team configuration
+        let teamService = TeamConfigService.shared
+        var effectiveDryRun = dryRun
+        var effectiveLevel = level
+        var effectivePaths = paths
+
+        if !ignoreTeam, let teamConfig = teamService.getActiveConfig() {
+            // Apply team policies
+            if teamConfig.policies.enforceDryRun {
+                effectiveDryRun = true
+            }
+
+            // Override cleanup level if team policy doesn't allow override
+            if !teamConfig.policies.allowOverride {
+                switch teamConfig.policies.cleanupLevel.lowercased() {
+                case "light":
+                    effectiveLevel = .light
+                case "deep", "aggressive":
+                    effectiveLevel = .deep
+                case "system":
+                    effectiveLevel = .system
+                default:
+                    effectiveLevel = .normal
+                }
+            }
+
+            // Apply exclusions to specific paths
+            if !effectivePaths.isEmpty {
+                effectivePaths = teamService.applyExclusions(
+                    to: effectivePaths,
+                    using: teamConfig
+                )
+            }
+        }
+
         return CleanerConfiguration(
-            cleanupLevel: level,
-            dryRun: dryRun,
+            cleanupLevel: effectiveLevel,
+            dryRun: effectiveDryRun,
             includeSystemCaches: includeSystem,
             includeDeveloperCaches: includeDeveloper,
             includeBrowserCaches: includeBrowser,
             includeLogsCaches: includeLogs,
-            specificPaths: paths
+            specificPaths: effectivePaths
         )
     }
 
