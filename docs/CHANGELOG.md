@@ -88,6 +88,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive test suite (14 unit tests)
 
 ### Testing
+- **F02-3: SimulatorCleaner Test Coverage Expansion** (#34)
+  - JSON parsing tests for `xcrun simctl list devices` output
+  - JSON parsing tests for `xcrun simctl runtime list` output
+  - Tempfile integration tests for cache scanning
+  - Edge case tests for missing/unavailable data handling
+  - Error display tests for SimulatorError
+  - Cleanup target construction tests
+  - Increase test count from 3 to 18
+
 - **F01-8: Comprehensive unit tests for safety module** (#28)
   - Edge case tests (symlinks, permissions, missing paths)
   - Unicode and special character path handling tests
