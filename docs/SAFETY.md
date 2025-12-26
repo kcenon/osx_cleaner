@@ -197,6 +197,7 @@ These paths are classified as **Danger** and will never be deleted:
 | `/bin` | Essential binaries |
 | `/sbin` | System binaries |
 | `/private/var/db` | System databases |
+| `/private/var/folders` | Per-user temporary items |
 | `/Library/Extensions` | Kernel extensions |
 | `/Library/Frameworks` | System frameworks |
 
@@ -210,8 +211,11 @@ These paths are classified as **Danger** and will never be deleted:
 | `~/Library/Messages` | iMessage history |
 | `~/Library/Preferences` | App preferences |
 | `~/Library/Accounts` | Account credentials |
+| `~/Library/Cookies` | Browser cookies |
 | `~/Library/Calendars` | Calendar data |
 | `~/Library/Contacts` | Contact database |
+| `~/Library/Safari/Bookmarks.plist` | Safari bookmarks |
+| `~/Library/Safari/History.db` | Safari history |
 
 ### User Documents
 
@@ -232,7 +236,9 @@ These paths are Warning level and require confirmation before deletion:
 |------|--------|
 | `~/Library/Developer/Xcode/iOS DeviceSupport` | Large SDK files (10-50GB) |
 | `~/Library/Developer/Xcode/watchOS DeviceSupport` | Watch SDK files |
+| `~/Library/Developer/Xcode/tvOS DeviceSupport` | tvOS SDK files |
 | `~/Library/Containers` | Sandboxed app data |
+| `~/Library/Group Containers` | Shared app container data |
 | `~/.docker` | Docker configuration |
 | `/Library/Caches` | System-wide caches |
 
