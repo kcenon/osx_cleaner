@@ -400,11 +400,7 @@ mod tests {
 
         // Add some files
         fs::write(temp.path().join("Documents/test.txt"), "hello").unwrap();
-        fs::write(
-            temp.path().join("Downloads/big_file.zip"),
-            "x".repeat(1000),
-        )
-        .unwrap();
+        fs::write(temp.path().join("Downloads/big_file.zip"), "x".repeat(1000)).unwrap();
 
         let dirs = analyze_home_directory(temp.path(), 10);
 

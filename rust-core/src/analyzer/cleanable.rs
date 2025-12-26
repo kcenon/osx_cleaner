@@ -151,9 +151,7 @@ pub fn estimate_cleanable(
     for component in developer {
         let impact = match component.safety_level {
             SafetyLevel::Safe => "Build cache - regenerates on next build",
-            SafetyLevel::Caution => {
-                "May need to rebuild projects or reconfigure simulators"
-            }
+            SafetyLevel::Caution => "May need to rebuild projects or reconfigure simulators",
             SafetyLevel::Warning => "Debug symbols - re-download from device on next connection",
             SafetyLevel::Danger => "Critical developer data - do not delete",
         };

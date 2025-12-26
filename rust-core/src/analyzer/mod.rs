@@ -141,12 +141,7 @@ impl DiskAnalyzer {
         // Run analysis tasks in parallel
         let (home_top_dirs, (caches, developer_components)) = rayon::join(
             || self.analyze_home_directory(10),
-            || {
-                rayon::join(
-                    || self.analyze_caches(),
-                    || self.analyze_developer(),
-                )
-            },
+            || rayon::join(|| self.analyze_caches(), || self.analyze_developer()),
         );
 
         // Calculate cleanable estimate
