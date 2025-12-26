@@ -357,7 +357,10 @@ fn test_all_safety_levels_represented() {
             "/Users/test/Library/Caches/Google/Chrome/Cache",
             SafetyLevel::Safe,
         ),
-        ("/Users/test/Library/Caches/com.app.test", SafetyLevel::Caution),
+        (
+            "/Users/test/Library/Caches/com.app.test",
+            SafetyLevel::Caution,
+        ),
         (
             "/Users/test/Library/Developer/Xcode/iOS DeviceSupport/17.0",
             SafetyLevel::Warning,

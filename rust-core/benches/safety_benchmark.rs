@@ -5,7 +5,7 @@
 //!
 //! Tests performance of path classification with large numbers of paths.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::path::{Path, PathBuf};
 
 use osxcore::safety::SafetyValidator;
@@ -45,9 +45,15 @@ fn bench_classify_single(c: &mut Criterion) {
     let validator = SafetyValidator::new();
 
     let test_cases = [
-        ("/Users/test/Library/Caches/Google/Chrome/Cache", "browser_cache"),
+        (
+            "/Users/test/Library/Caches/Google/Chrome/Cache",
+            "browser_cache",
+        ),
         ("/System/Library/Frameworks", "system_protected"),
-        ("/Users/test/Library/Developer/Xcode/DerivedData", "developer_cache"),
+        (
+            "/Users/test/Library/Developer/Xcode/DerivedData",
+            "developer_cache",
+        ),
         ("/tmp/test.tmp", "temp_file"),
         ("/Users/test/Library/Caches/com.app.test", "app_cache"),
     ];
@@ -94,13 +100,18 @@ fn bench_is_protected(c: &mut Criterion) {
     let mut group = c.benchmark_group("is_protected");
 
     for (path, expected) in test_cases {
-        let name = if expected { "protected" } else { "not_protected" };
+        let name = if expected {
+            "protected"
+        } else {
+            "not_protected"
+        };
         group.bench_with_input(
-            BenchmarkId::new("path", format!("{}_{}", name, path.split('/').last().unwrap_or("root"))),
+            BenchmarkId::new(
+                "path",
+                format!("{}_{}", name, path.split('/').last().unwrap_or("root")),
+            ),
             &path,
-            |b, path| {
-                b.iter(|| validator.is_protected(black_box(Path::new(path))))
-            },
+            |b, path| b.iter(|| validator.is_protected(black_box(Path::new(path)))),
         );
     }
 
@@ -109,9 +120,7 @@ fn bench_is_protected(c: &mut Criterion) {
 
 /// Benchmark validator creation
 fn bench_validator_creation(c: &mut Criterion) {
-    c.bench_function("validator_new", |b| {
-        b.iter(|| SafetyValidator::new())
-    });
+    c.bench_function("validator_new", |b| b.iter(|| SafetyValidator::new()));
 }
 
 /// Performance test: classify 10,000+ paths
