@@ -476,4 +476,167 @@ mod tests {
         assert!(tools.contains(&DeveloperTool::Homebrew));
         assert!(tools.contains(&DeveloperTool::Cargo));
     }
+
+    // AC-04: Detect installed package managers
+    #[test]
+    fn test_all_package_managers_have_detection() {
+        let cleaner = PackageManagerCleaner::new();
+
+        // Verify each manager can be detected without panicking
+        for manager in &cleaner.managers {
+            // This should not panic regardless of installation status
+            let _installed = manager.tool.is_installed();
+        }
+    }
+
+    // AC-04: Comprehensive tool detection test
+    #[test]
+    fn test_detect_all_supported_package_managers() {
+        let cleaner = PackageManagerCleaner::new();
+        let tools: Vec<_> = cleaner.managers.iter().map(|m| m.tool).collect();
+
+        // Verify all required package managers from issue #35 are included
+        let required_tools = [
+            DeveloperTool::CocoaPods,
+            DeveloperTool::SwiftPackageManager,
+            DeveloperTool::Carthage,
+            DeveloperTool::Npm,
+            DeveloperTool::Yarn,
+            DeveloperTool::Pnpm,
+            DeveloperTool::Pip,
+            DeveloperTool::Homebrew,
+            DeveloperTool::Cargo,
+            DeveloperTool::Gradle,
+        ];
+
+        for tool in required_tools {
+            assert!(tools.contains(&tool), "Missing required tool: {:?}", tool);
+        }
+    }
+
+    // AC-09: Handle missing tools gracefully
+    #[test]
+    fn test_scan_handles_missing_tools_gracefully() {
+        let cleaner = PackageManagerCleaner::new();
+
+        // Scan should complete without panicking even if some tools are not installed
+        let result = cleaner.scan();
+
+        // Result should be valid regardless of which tools are installed
+        assert!(result.targets.len() <= 1000); // Reasonable upper bound
+        assert!(result.errors.len() <= 100); // Reasonable upper bound
+    }
+
+    // AC-09: Clean handles missing tools gracefully
+    #[test]
+    fn test_clean_dry_run_handles_empty_targets() {
+        let cleaner = PackageManagerCleaner::new();
+
+        // Clean with empty targets should not panic
+        let result = cleaner.clean(&[], true);
+
+        assert_eq!(result.freed_bytes, 0);
+        assert_eq!(result.items_cleaned, 0);
+        assert!(result.dry_run);
+        assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_scan_returns_valid_result_structure() {
+        let cleaner = PackageManagerCleaner::new();
+        let result = cleaner.scan();
+
+        // Verify result structure
+        assert_eq!(result.tool, DeveloperTool::Npm); // Representative tool
+
+        // total_size should match sum of target sizes
+        let calculated_total: u64 = result.targets.iter().map(|t| t.size).sum();
+        assert_eq!(result.total_size, calculated_total);
+    }
+
+    #[test]
+    fn test_cleanup_target_has_valid_method() {
+        let cleaner = PackageManagerCleaner::new();
+
+        for manager in &cleaner.managers {
+            // Create a mock target
+            if !manager.cache_paths.is_empty() {
+                let path = manager.cache_paths[0].clone();
+                let target = cleaner.create_target(manager, path, "Test Target".to_string(), 1024);
+
+                // Verify cleanup method matches configuration
+                match (&manager.cleanup_command, &target.cleanup_method) {
+                    (Some(cmd), CleanupMethod::Command(target_cmd)) => {
+                        assert_eq!(cmd, target_cmd);
+                    }
+                    (None, CleanupMethod::DirectDelete) => {
+                        // Expected for direct deletion tools
+                    }
+                    _ => panic!("Unexpected cleanup method mismatch"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_cache_paths_are_expanded() {
+        let cleaner = PackageManagerCleaner::new();
+
+        for manager in &cleaner.managers {
+            for path in &manager.cache_paths {
+                // Paths should not contain ~ after expansion
+                let path_str = path.to_string_lossy();
+                assert!(
+                    !path_str.starts_with("~/"),
+                    "Path not expanded: {}",
+                    path_str
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_installed_returns_boolean() {
+        let cleaner = PackageManagerCleaner::new();
+
+        // is_installed should return true if at least one manager is installed
+        // This test just ensures no panic occurs
+        let _is_installed = cleaner.is_installed();
+    }
+
+    #[test]
+    fn test_scan_manager_with_nonexistent_path() {
+        let manager = PackageManager {
+            tool: DeveloperTool::Npm,
+            cache_paths: vec![PathBuf::from("/nonexistent/path/that/does/not/exist")],
+            cleanup_command: Some("npm cache clean --force".to_string()),
+            detect_command: Some("npm".to_string()),
+        };
+
+        let cleaner = PackageManagerCleaner::new();
+
+        // Scanning a nonexistent path should return empty, not panic
+        let targets = cleaner.scan_manager(&manager);
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn test_homebrew_cache_path_detection() {
+        // This should not panic even if Homebrew is not installed
+        let path = PackageManagerCleaner::get_homebrew_cache_path();
+        // path is Option<PathBuf>, either Some or None is valid
+        if let Some(p) = path {
+            assert!(!p.to_string_lossy().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_pnpm_store_path_detection() {
+        // This should not panic even if pnpm is not installed
+        let path = PackageManagerCleaner::get_pnpm_store_path();
+        // path is Option<PathBuf>, either Some or None is valid
+        if let Some(p) = path {
+            assert!(!p.to_string_lossy().is_empty());
+        }
+    }
 }

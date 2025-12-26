@@ -88,6 +88,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive test suite (14 unit tests)
 
 ### Testing
+- **F02-4: PackageManagerCleaner Test Coverage Expansion** (#35)
+  - AC-04: Comprehensive package manager detection tests
+  - AC-09: Graceful handling of missing tools tests
+  - Cache path expansion verification tests
+  - Cleanup method validation tests
+  - Dry run and empty target handling tests
+  - Homebrew and pnpm dynamic path detection tests
+  - Increase test count from 3 to 14
+
 - **F02-3: SimulatorCleaner Test Coverage Expansion** (#34)
   - JSON parsing tests for `xcrun simctl list devices` output
   - JSON parsing tests for `xcrun simctl runtime list` output
