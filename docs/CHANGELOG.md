@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
+- **F02-2: XcodeCleaner Enhancement** (#33)
+  - Add connected device detection using `xcrun devicectl` (Xcode 15+)
+  - Implement AC-08: Preserve currently used iOS Device Support versions
+  - Add `get_connected_ios_versions()` and `get_connected_watchos_versions()` methods
+  - Add `get_device_support_cleanup_targets_smart()` for intelligent Device Support cleanup
+  - Smart cleanup preserves both latest N versions AND versions for connected devices
+  - 5 new unit tests for connected device detection functionality
+
 - **F01-3: Expand Protected and Warning Path Lists** (#23)
   - Implement `categorize_path` function for comprehensive path classification
   - Support PathCategory: SystemCritical, UserCritical, DeveloperCache, AppContainer, BrowserCache, AppCache, Logs, Temporary, UserDocuments, Unknown
