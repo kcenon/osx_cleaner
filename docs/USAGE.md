@@ -11,6 +11,7 @@
 - [Interactive Command](#interactive-command)
 - [Analyze Command](#analyze-command)
 - [Clean Command](#clean-command)
+- [Logs Command](#logs-command)
 - [Snapshot Command](#snapshot-command)
 - [Config Command](#config-command)
 - [Schedule Command](#schedule-command)
@@ -47,6 +48,7 @@ osxcleaner clean --level light
 | `interactive` | Launch interactive TUI | Easy navigation |
 | `analyze` | Analyze disk usage | Before cleanup |
 | `clean` | Clean specified targets | Regular maintenance |
+| `logs` | Analyze and clean crash reports | Pre-cleanup analysis |
 | `snapshot` | Manage Time Machine snapshots | Free snapshot space |
 | `config` | Manage configuration | Initial setup |
 | `schedule` | Manage schedules | Automation |
@@ -518,6 +520,75 @@ monthly    Monthly    Deep    1st 04:00   Disabled
 
 Next scheduled run: daily at 2025-12-27 03:00:00
 ```
+
+---
+
+## Logs Command
+
+Analyze and clean crash reports and logs. View crash report analysis before cleanup to identify problematic apps.
+
+### Analyze Crash Reports
+
+```bash
+# Show crash report analysis
+osxcleaner logs analyze
+
+# Detailed output
+osxcleaner logs analyze --verbose
+
+# JSON output for scripting
+osxcleaner logs analyze --format json
+```
+
+**Example Output:**
+```
+Crash Report Analysis
+─────────────────────────────────────────
+  Safari: 3 reports (latest: 2 days ago)
+  Xcode: 12 reports (latest: today)  ⚠️ Repeated crashes
+  Finder: 1 report (latest: 45 days ago)
+
+─────────────────────────────────────────
+  Total: 16 reports (2.3MB)
+  Reports older than 30 days: 8 reports (1.1MB)
+
+💡 Recommendation:
+   The following apps have repeated crashes. Consider:
+   - Updating to the latest version
+   - Reinstalling the app
+   - Checking for known issues
+
+   • Xcode (12 crashes)
+```
+
+### Clean Crash Reports
+
+```bash
+# Clean reports older than 30 days (default)
+osxcleaner logs clean
+
+# Clean reports older than 7 days
+osxcleaner logs clean --age 7
+
+# Clean all crash reports
+osxcleaner logs clean --all
+
+# Preview cleanup (dry run)
+osxcleaner logs clean --dry-run
+
+# Skip confirmation
+osxcleaner logs clean --force
+```
+
+### Supported Report Types
+
+| Extension | Description | macOS Version |
+|-----------|-------------|---------------|
+| `.crash` | Traditional crash report | All |
+| `.ips` | Modern crash format (JSON-based) | 12+ |
+| `.spin` | Spin report (unresponsive app) | All |
+| `.hang` | Hang report | All |
+| `.diag` | Diagnostic report | All |
 
 ---
 

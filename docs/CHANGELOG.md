@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **F04-2: Crash Report Analysis** (#81)
+  - CrashReportAnalysisService for analyzing crash reports
+  - Parse .crash, .ips, .spin, .hang, .diag report files
+  - Support for modern macOS 12+ .ips crash format
+  - Extract app name and crash date from reports
+  - Aggregate crash counts by app
+  - Identify apps with repeated crashes (>5 reports)
+  - CLI `logs` command with subcommands:
+    - `logs analyze`: Display crash report analysis with recommendations
+    - `logs clean`: Clean old crash reports with age-based filtering
+  - Age-based cleanup (default: 30 days)
+  - Recommendations for apps with repeated crashes
+
 - User documentation (INSTALLATION.md, USAGE.md, SAFETY.md, CONTRIBUTING.md)
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
