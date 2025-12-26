@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User documentation (INSTALLATION.md, USAGE.md, SAFETY.md, CONTRIBUTING.md)
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
+- **F06: Disk Usage Analysis** (#10)
+  - DiskSpace query with total/used/available information
+  - Home directory analysis with Top N by size
+  - Application cache analysis (~/Library/Caches)
+  - Developer component analysis (~/Library/Developer)
+  - Cleanable space estimation by safety level
+  - FFI bindings for Swift integration
 
 ---
 
