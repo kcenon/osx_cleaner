@@ -242,6 +242,80 @@ make debug
 
 ---
 
+## CI/CD 통합
+
+OSX Cleaner는 CI/CD 파이프라인에 통합하여 빌드 중 디스크 공간 문제를 예방할 수 있습니다.
+
+### GitHub Actions
+
+```yaml
+- name: 빌드 전 정리
+  uses: kcenon/osx_cleaner/.github/actions/osxcleaner@v1
+  with:
+    level: 'normal'
+    min-space: '20'  # 20GB 미만일 때만 정리 실행
+
+- name: 빌드
+  run: xcodebuild -scheme MyApp
+
+- name: 빌드 후 정리
+  uses: kcenon/osx_cleaner/.github/actions/osxcleaner@v1
+  with:
+    level: 'deep'
+    target: 'developer'
+```
+
+### CI/CD용 CLI 사용법
+
+```bash
+# 비대화형 정리 (JSON 출력)
+osxcleaner clean --level normal --non-interactive --format json
+
+# 가용 공간이 20GB 미만일 때만 정리
+osxcleaner clean --level deep --non-interactive --min-space 20 --format json
+
+# CI 로그에서 정리 미리보기
+osxcleaner clean --level deep --dry-run --format json
+```
+
+### JSON 출력
+
+`--format json` 플래그는 CI/CD 통합을 위한 기계 판독 가능한 결과를 출력합니다:
+
+```json
+{
+  "status": "success",
+  "freed_bytes": 50000000000,
+  "freed_formatted": "50 GB",
+  "files_removed": 12345,
+  "before": {
+    "total": 512000000000,
+    "used": 450000000000,
+    "available": 62000000000
+  },
+  "after": {
+    "total": 512000000000,
+    "used": 400000000000,
+    "available": 112000000000
+  },
+  "duration_ms": 45000
+}
+```
+
+### 종료 코드
+
+| 코드 | 의미 |
+|------|------|
+| 0 | 성공 (또는 공간이 충분하여 정리 건너뜀) |
+| 1 | 일반 오류 |
+| 2 | 공간 부족 (정리가 필요했으나 실패) |
+| 3 | 권한 거부 |
+| 4 | 설정 오류 |
+
+자세한 사용법은 [GitHub Action README](.github/actions/osxcleaner/README.md)를 참조하세요.
+
+---
+
 ## 시스템 요구사항
 
 ### 지원 플랫폼
@@ -355,7 +429,10 @@ osxcleaner/
 
 ### Phase 3: 완성 (v1.0)
 - [ ] GUI 인터페이스
-- [ ] CI/CD 통합 (F08)
+- [x] CI/CD 통합 (F08) ✅
+  - CLI 비대화형 모드 및 JSON 출력
+  - `--min-space` 조건부 정리 옵션
+  - 자동화 워크플로우용 GitHub Action
 - [ ] 팀 환경 관리 (F09)
 
 ---
@@ -379,4 +456,4 @@ osxcleaner/
 
 ---
 
-*마지막 업데이트: 2025-12-26*
+*마지막 업데이트: 2025-12-27*

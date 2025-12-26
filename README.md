@@ -242,6 +242,80 @@ make debug
 
 ---
 
+## CI/CD Integration
+
+OSX Cleaner can be integrated into CI/CD pipelines to prevent disk space issues during builds.
+
+### GitHub Actions
+
+```yaml
+- name: Pre-build cleanup
+  uses: kcenon/osx_cleaner/.github/actions/osxcleaner@v1
+  with:
+    level: 'normal'
+    min-space: '20'  # Only cleanup if less than 20GB available
+
+- name: Build
+  run: xcodebuild -scheme MyApp
+
+- name: Post-build cleanup
+  uses: kcenon/osx_cleaner/.github/actions/osxcleaner@v1
+  with:
+    level: 'deep'
+    target: 'developer'
+```
+
+### CLI Usage for CI/CD
+
+```bash
+# Non-interactive cleanup with JSON output
+osxcleaner clean --level normal --non-interactive --format json
+
+# Cleanup only if available space is below 20GB
+osxcleaner clean --level deep --non-interactive --min-space 20 --format json
+
+# Preview cleanup in CI logs
+osxcleaner clean --level deep --dry-run --format json
+```
+
+### JSON Output
+
+The `--format json` flag outputs machine-readable results for CI/CD integration:
+
+```json
+{
+  "status": "success",
+  "freed_bytes": 50000000000,
+  "freed_formatted": "50 GB",
+  "files_removed": 12345,
+  "before": {
+    "total": 512000000000,
+    "used": 450000000000,
+    "available": 62000000000
+  },
+  "after": {
+    "total": 512000000000,
+    "used": 400000000000,
+    "available": 112000000000
+  },
+  "duration_ms": 45000
+}
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success (or cleanup skipped when space sufficient) |
+| 1 | General error |
+| 2 | Insufficient space (cleanup needed but failed) |
+| 3 | Permission denied |
+| 4 | Configuration error |
+
+See [GitHub Action README](.github/actions/osxcleaner/README.md) for detailed usage.
+
+---
+
 ## System Requirements
 
 ### Supported Platforms
@@ -378,7 +452,10 @@ osxcleaner/
 
 ### Phase 3: Complete (v1.0)
 - [ ] GUI interface
-- [ ] CI/CD integration (F08)
+- [x] CI/CD integration (F08) ✅
+  - CLI non-interactive mode with JSON output
+  - `--min-space` option for conditional cleanup
+  - GitHub Action for automated workflows
 - [ ] Team environment management (F09)
 
 ---
@@ -402,4 +479,4 @@ This project is distributed under the MIT License. See the [LICENSE](LICENSE) fi
 
 ---
 
-*Last updated: 2025-12-26*
+*Last updated: 2025-12-27*
