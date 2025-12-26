@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
+- **F01-5: Running Process Detection FFI Bindings** (#25)
+  - `osx_is_app_running`: Check if a specific application is running
+  - `osx_is_file_in_use`: Check if a file/directory is in use by any process
+  - `osx_check_related_app_running`: Check if app related to cache path is running
+  - `osx_get_running_processes`: Get list of all running processes
+  - `osx_get_processes_using_path`: Get processes using a specific path
+  - `osx_get_app_cache_paths`: Get cache paths for an application
+  - Comprehensive FFI unit tests (10 test cases)
+
 - **F05: Time Machine Snapshot Management** (#9)
 
   - TimeMachineService for managing local APFS snapshots

@@ -221,6 +221,63 @@ struct osx_FFIResult osx_get_log_stats(void);
 void osx_clear_logs(void);
 
 /**
+ * Check if a specific application is running
+ *
+ * # Safety
+ * - `app_name` must be a valid null-terminated C string
+ * - Returns true if the application is running, false otherwise
+ */
+bool osx_is_app_running(const char *app_name);
+
+/**
+ * Check if a file or directory is in use by any process
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - Returns true if the path is in use, false otherwise
+ */
+bool osx_is_file_in_use(const char *path);
+
+/**
+ * Check if any application related to a cache path is running
+ *
+ * # Safety
+ * - `cache_path` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON: {"running": bool, "app_name": "..." or null}
+ */
+struct osx_FFIResult osx_check_related_app_running(const char *cache_path);
+
+/**
+ * Get a list of all running processes
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON array: [{"pid": N, "name": "...", "path": "..." or null}, ...]
+ */
+struct osx_FFIResult osx_get_running_processes(void);
+
+/**
+ * Get processes using a specific file or directory
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON array: [{"pid": N, "name": "...", "path": "..." or null}, ...]
+ */
+struct osx_FFIResult osx_get_processes_using_path(const char *path);
+
+/**
+ * Get cache paths associated with a specific application
+ *
+ * # Safety
+ * - `app_name` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON array of paths: ["path1", "path2", ...]
+ */
+struct osx_FFIResult osx_get_app_cache_paths(const char *app_name);
+
+/**
  * Get system information as JSON
  *
  * # Safety
