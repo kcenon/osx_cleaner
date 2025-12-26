@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
+- **F11: Interactive Terminal User Interface** (#71)
+  - TerminalUtils for ANSI escape sequence control
+  - InteractiveTUI class with menu-driven navigation
+  - InteractiveCommand CLI command (`osxcleaner interactive`)
+  - Visual disk usage display with colored progress bar
+  - Main menu with 8 options + help
+  - Sub-menus for analyze, clean, schedule, snapshot, config, monitor
+  - Keyboard navigation (number keys, b for back, q to quit)
+  - Real-time status messages
+  - Graceful signal handling (Ctrl+C)
+  - TTY detection for terminal requirement
+
 - **F04-1: Log Cleanup CLI Integration** (#69)
   - Integrate Rust LogCleaner module into CLI interface
   - Add `includeLogsCaches` field to CleanerConfiguration
