@@ -46,14 +46,17 @@ public struct CleanError: Error {
 public final class CleanerService {
     private let fileManager: FileManager
     private let rustBridge: RustBridge
+    private let loggingService: AutomatedCleanupLoggingService
     private var useRustCore: Bool = true
 
     public init(
         fileManager: FileManager = .default,
-        rustBridge: RustBridge = .shared
+        rustBridge: RustBridge = .shared,
+        loggingService: AutomatedCleanupLoggingService = .shared
     ) {
         self.fileManager = fileManager
         self.rustBridge = rustBridge
+        self.loggingService = loggingService
 
         // Try to initialize Rust core
         do {
@@ -65,6 +68,29 @@ public final class CleanerService {
     }
 
     public func clean(with config: CleanerConfiguration) async throws -> CleanResult {
+        try await clean(with: config, triggerType: .manual)
+    }
+
+    /// Perform cleanup with specified trigger type for logging purposes
+    /// - Parameters:
+    ///   - config: The cleanup configuration
+    ///   - triggerType: The type of trigger that initiated the cleanup
+    /// - Returns: The cleanup result
+    public func clean(
+        with config: CleanerConfiguration,
+        triggerType: CleanupSession.TriggerType
+    ) async throws -> CleanResult {
+        let startTime = Date()
+        var session = CleanupSession(
+            triggerType: triggerType,
+            cleanupLevel: "\(config.cleanupLevel)"
+        )
+
+        // Log session start for automated cleanups
+        if triggerType != .manual {
+            loggingService.logSessionStart(session)
+        }
+
         AppLogger.shared.operation("Starting cleanup with level \(config.cleanupLevel)")
 
         var totalFreed: UInt64 = 0
@@ -87,14 +113,40 @@ public final class CleanerService {
                 directoriesRemoved += result.directoriesRemoved
                 errors.append(contentsOf: result.errors)
             } catch {
-                errors.append(CleanError(
+                let cleanError = CleanError(
                     path: target.path,
                     reason: error.localizedDescription
-                ))
+                )
+                errors.append(cleanError)
+
+                // Log errors for automated cleanups
+                if triggerType != .manual {
+                    loggingService.logError(
+                        sessionId: session.sessionId,
+                        path: target.path,
+                        error: error.localizedDescription
+                    )
+                }
             }
         }
 
+        let endTime = Date()
+        let duration = endTime.timeIntervalSince(startTime)
+
         AppLogger.shared.success("Cleanup completed: \(filesRemoved) files, \(directoriesRemoved) directories, \(totalFreed) bytes freed")
+
+        // Log session end for automated cleanups
+        if triggerType != .manual {
+            session.endTime = endTime
+            session.result = CleanupSessionResult(
+                freedBytes: totalFreed,
+                filesRemoved: filesRemoved,
+                directoriesRemoved: directoriesRemoved,
+                errorsCount: errors.count,
+                durationSeconds: duration
+            )
+            loggingService.logSessionEnd(session)
+        }
 
         return CleanResult(
             freedBytes: totalFreed,
