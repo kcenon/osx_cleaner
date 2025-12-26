@@ -10,6 +10,7 @@
 - [Commands Overview](#commands-overview)
 - [Analyze Command](#analyze-command)
 - [Clean Command](#clean-command)
+- [Snapshot Command](#snapshot-command)
 - [Config Command](#config-command)
 - [Schedule Command](#schedule-command)
 - [Cleanup Levels](#cleanup-levels)
@@ -42,6 +43,7 @@ osxcleaner clean --level light
 |---------|-------------|------------|
 | `analyze` | Analyze disk usage | Before cleanup |
 | `clean` | Clean specified targets | Regular maintenance |
+| `snapshot` | Manage Time Machine snapshots | Free snapshot space |
 | `config` | Manage configuration | Initial setup |
 | `schedule` | Manage schedules | Automation |
 
@@ -221,6 +223,113 @@ Safety breakdown:
 
 Use 'osxcleaner clean --level normal' to proceed.
 ```
+
+---
+
+## Snapshot Command
+
+The `snapshot` command manages Time Machine local APFS snapshots.
+
+### Why Manage Snapshots?
+
+Time Machine creates local snapshots hourly, which can consume 10-50GB or more:
+- Snapshots persist until disk pressure triggers cleanup
+- macOS only auto-deletes when disk usage exceeds 80-90%
+- Manual management gives you control over disk space
+
+### Basic Usage
+
+```bash
+# List all local snapshots
+osxcleaner snapshot list
+
+# Show Time Machine status
+osxcleaner snapshot status
+
+# Preview thinning (dry run)
+osxcleaner snapshot thin --dry-run
+
+# Actually thin all snapshots
+osxcleaner snapshot thin --force
+```
+
+### List Snapshots
+
+```bash
+# List snapshots with basic info
+osxcleaner snapshot list
+
+# Verbose output with IDs
+osxcleaner snapshot list --verbose
+
+# JSON output
+osxcleaner snapshot list --format json
+```
+
+**Sample Output:**
+
+```
+Found 5 local snapshot(s):
+
+  1. Dec 26, 2025 at 11:00 AM
+  2. Dec 26, 2025 at 10:00 AM
+  3. Dec 26, 2025 at 9:00 AM
+  4. Dec 25, 2025 at 8:00 PM
+  5. Dec 25, 2025 at 7:00 PM
+
+Use 'osxcleaner snapshot delete <date>' to remove snapshots.
+```
+
+### Check Status
+
+```bash
+osxcleaner snapshot status
+```
+
+**Sample Output:**
+
+```
+Time Machine Status
+─────────────────────────────────────────
+  Enabled:              Yes ✓
+  Currently Backing Up: No
+  Last Backup:          Dec 26, 2025 at 10:30 AM
+  Destination:          /Volumes/Backup
+  Local Snapshots:      5
+─────────────────────────────────────────
+```
+
+### Delete Specific Snapshot
+
+```bash
+# Delete by date (format: YYYY-MM-DD-HHMMSS)
+osxcleaner snapshot delete 2025-12-26-110000
+
+# Skip confirmation
+osxcleaner snapshot delete 2025-12-26-110000 --force
+
+# Preview without deleting
+osxcleaner snapshot delete 2025-12-26-110000 --dry-run
+```
+
+### Thin All Snapshots
+
+```bash
+# Preview thinning
+osxcleaner snapshot thin --dry-run
+
+# Thin with confirmation
+osxcleaner snapshot thin
+
+# Thin without confirmation (CI/CD)
+osxcleaner snapshot thin --force
+```
+
+### Safety Notes
+
+- ⚠️ **Snapshot deletion is irreversible** - once deleted, data cannot be recovered
+- ✅ **Safe for disk space** - snapshots are copies, not original files
+- 💡 **Recommendation** - always use `--dry-run` first to preview
 
 ---
 
