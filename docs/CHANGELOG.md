@@ -262,20 +262,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Roadmap
 
-### v0.2.0 (Planned)
+### v0.2.0 ✅ (Implemented in Unreleased)
 - Level 1-2 cleanup execution
 - Disk usage analysis visualization (F06)
 - Improved error handling
 
-### v0.5.0 (Planned)
+### v0.5.0 ✅ (Implemented in Unreleased)
 - Level 3 cleanup support
 - Automation scheduling (F07)
-- GUI interface preview
+- Log and crash report management (F04)
+- Time Machine snapshot management (F05)
+- Interactive terminal UI (F11)
+- Team environment management (F09)
 
 ### v1.0.0 (Planned)
-- Full GUI interface
-- CI/CD integration (F08)
-- Team environment management (F09)
+- Full GUI interface (SwiftUI)
 
 ---
 
