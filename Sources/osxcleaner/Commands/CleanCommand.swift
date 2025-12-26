@@ -32,6 +32,12 @@ struct CleanCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Output format (text, json)")
     var format: OutputFormat = .text
 
+    @Option(name: .long, help: "Minimum available space threshold (triggers cleanup if below)")
+    var minSpace: UInt64?
+
+    @Option(name: .long, help: "Unit for min-space (mb, gb, tb)")
+    var minSpaceUnit: SpaceUnit = .gb
+
     // MARK: - Flags
 
     @Flag(name: .shortAndLong, help: "Perform dry run without actual deletion")
@@ -55,6 +61,54 @@ struct CleanCommand: AsyncParsableCommand {
 
     mutating func run() async throws {
         let output = OutputHandler(format: format, quiet: quiet, verbose: verbose)
+        let startTime = Date()
+        let diskMonitor = DiskMonitoringService.shared
+
+        // Get disk space before cleanup
+        let diskInfoBefore: DiskSpaceInfo
+        do {
+            diskInfoBefore = try diskMonitor.getDiskSpace()
+        } catch {
+            output.displayError(error)
+            throw ExitCode.generalError
+        }
+
+        // Check min-space threshold
+        if let threshold = minSpace {
+            let thresholdBytes = threshold * minSpaceUnit.bytesMultiplier
+            if diskInfoBefore.availableSpace >= thresholdBytes {
+                let skippedResult = CleanResultJSON(
+                    status: "skipped",
+                    dryRun: dryRun,
+                    freedBytes: 0,
+                    freedFormatted: "0 bytes",
+                    filesRemoved: 0,
+                    directoriesRemoved: 0,
+                    errorCount: 0,
+                    before: DiskSpaceJSON(from: diskInfoBefore),
+                    after: DiskSpaceJSON(from: diskInfoBefore),
+                    durationMs: 0
+                )
+
+                if format == .json {
+                    if let jsonData = try? JSONEncoder().encode(skippedResult),
+                       let jsonString = String(data: jsonData, encoding: .utf8) {
+                        print(jsonString)
+                    }
+                } else {
+                    output.display(
+                        message: "Cleanup skipped: available space (\(diskInfoBefore.formattedAvailable)) >= threshold (\(threshold) \(minSpaceUnit.rawValue.uppercased()))",
+                        level: .normal
+                    )
+                }
+                return
+            }
+
+            output.display(
+                message: "Available space (\(diskInfoBefore.formattedAvailable)) < threshold (\(threshold) \(minSpaceUnit.rawValue.uppercased())), proceeding with cleanup",
+                level: .normal
+            )
+        }
 
         output.display(message: "Starting cleanup...", level: .normal)
         output.display(message: "Cleanup level: \(level.description)", level: .verbose)
@@ -72,7 +126,19 @@ struct CleanCommand: AsyncParsableCommand {
 
         do {
             let result = try await service.clean(with: config, triggerType: triggerType)
-            displayResult(result, output: output)
+
+            // Get disk space after cleanup
+            let diskInfoAfter = try diskMonitor.getDiskSpace()
+            let endTime = Date()
+            let durationMs = Int(endTime.timeIntervalSince(startTime) * 1000)
+
+            displayResult(
+                result,
+                output: output,
+                diskInfoBefore: diskInfoBefore,
+                diskInfoAfter: diskInfoAfter,
+                durationMs: durationMs
+            )
         } catch {
             output.displayError(error)
             throw ExitCode.generalError
@@ -98,16 +164,39 @@ struct CleanCommand: AsyncParsableCommand {
         )
     }
 
-    private func displayResult(_ result: CleanResult, output: OutputHandler) {
+    private func displayResult(
+        _ result: CleanResult,
+        output: OutputHandler,
+        diskInfoBefore: DiskSpaceInfo,
+        diskInfoAfter: DiskSpaceInfo,
+        durationMs: Int
+    ) {
         switch format {
         case .text:
-            displayTextResult(result, output: output)
+            displayTextResult(
+                result,
+                output: output,
+                diskInfoBefore: diskInfoBefore,
+                diskInfoAfter: diskInfoAfter,
+                durationMs: durationMs
+            )
         case .json:
-            displayJSONResult(result, output: output)
+            displayJSONResult(
+                result,
+                diskInfoBefore: diskInfoBefore,
+                diskInfoAfter: diskInfoAfter,
+                durationMs: durationMs
+            )
         }
     }
 
-    private func displayTextResult(_ result: CleanResult, output: OutputHandler) {
+    private func displayTextResult(
+        _ result: CleanResult,
+        output: OutputHandler,
+        diskInfoBefore: DiskSpaceInfo,
+        diskInfoAfter: DiskSpaceInfo,
+        durationMs: Int
+    ) {
         output.display(message: "", level: .normal)
         output.displaySuccess("Cleanup completed!")
         output.display(message: "Freed: \(result.formattedFreedSpace)", level: .normal)
@@ -119,6 +208,15 @@ struct CleanCommand: AsyncParsableCommand {
                 level: .normal
             )
         }
+
+        output.display(
+            message: "Available space: \(diskInfoBefore.formattedAvailable) → \(diskInfoAfter.formattedAvailable)",
+            level: .verbose
+        )
+        output.display(
+            message: "Duration: \(durationMs)ms",
+            level: .verbose
+        )
 
         if !result.errors.isEmpty && verbose {
             output.display(message: "", level: .normal)
@@ -135,7 +233,12 @@ struct CleanCommand: AsyncParsableCommand {
         }
     }
 
-    private func displayJSONResult(_ result: CleanResult, output: OutputHandler) {
+    private func displayJSONResult(
+        _ result: CleanResult,
+        diskInfoBefore: DiskSpaceInfo,
+        diskInfoAfter: DiskSpaceInfo,
+        durationMs: Int
+    ) {
         let jsonOutput = CleanResultJSON(
             status: result.errors.isEmpty ? "success" : "completed_with_errors",
             dryRun: dryRun,
@@ -143,7 +246,10 @@ struct CleanCommand: AsyncParsableCommand {
             freedFormatted: result.formattedFreedSpace,
             filesRemoved: result.filesRemoved,
             directoriesRemoved: result.directoriesRemoved,
-            errorCount: result.errors.count
+            errorCount: result.errors.count,
+            before: DiskSpaceJSON(from: diskInfoBefore),
+            after: DiskSpaceJSON(from: diskInfoAfter),
+            durationMs: durationMs
         )
 
         if let jsonData = try? JSONEncoder().encode(jsonOutput),
@@ -159,6 +265,18 @@ extension Int32: @retroactive Error {}
 
 // MARK: - JSON Output Structure
 
+private struct DiskSpaceJSON: Encodable {
+    let total: UInt64
+    let used: UInt64
+    let available: UInt64
+
+    init(from info: DiskSpaceInfo) {
+        self.total = info.totalSpace
+        self.used = info.usedSpace
+        self.available = info.availableSpace
+    }
+}
+
 private struct CleanResultJSON: Encodable {
     let status: String
     let dryRun: Bool
@@ -167,6 +285,9 @@ private struct CleanResultJSON: Encodable {
     let filesRemoved: Int
     let directoriesRemoved: Int
     let errorCount: Int
+    let before: DiskSpaceJSON
+    let after: DiskSpaceJSON
+    let durationMs: Int
 
     enum CodingKeys: String, CodingKey {
         case status
@@ -176,6 +297,9 @@ private struct CleanResultJSON: Encodable {
         case filesRemoved = "files_removed"
         case directoriesRemoved = "directories_removed"
         case errorCount = "error_count"
+        case before
+        case after
+        case durationMs = "duration_ms"
     }
 }
 
