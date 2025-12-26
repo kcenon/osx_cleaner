@@ -95,6 +95,60 @@ void osx_free_string(char *s);
 void osx_free_result(struct osx_FFIResult *result);
 
 /**
+ * Get disk space information for the root filesystem
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON-encoded DiskSpace struct
+ */
+struct osx_FFIResult osx_get_disk_space(void);
+
+/**
+ * Analyze home directory and get top N directories by size
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON-encoded Vec<DirectoryInfo>
+ */
+struct osx_FFIResult osx_analyze_home(int32_t top_n);
+
+/**
+ * Analyze application caches
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON-encoded Vec<CacheInfo>
+ */
+struct osx_FFIResult osx_analyze_caches(void);
+
+/**
+ * Analyze developer tool components
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON-encoded Vec<DeveloperComponentInfo>
+ */
+struct osx_FFIResult osx_analyze_developer(void);
+
+/**
+ * Estimate cleanable space
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON-encoded CleanableEstimate
+ */
+struct osx_FFIResult osx_estimate_cleanable(void);
+
+/**
+ * Perform full disk analysis
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON-encoded AnalysisResult
+ */
+struct osx_FFIResult osx_full_analysis(void);
+
+/**
  * Get system information as JSON
  *
  * # Safety

@@ -10,6 +10,7 @@
 //!
 //! The crate exposes a C FFI interface for integration with Swift.
 
+pub mod analyzer;
 pub mod cleaner;
 pub mod developer;
 pub mod fs;
@@ -166,6 +167,107 @@ pub unsafe extern "C" fn osx_free_result(result: *mut FFIResult) {
         let r = Box::from_raw(result);
         osx_free_string(r.error_message);
         osx_free_string(r.data);
+    }
+}
+
+// ============================================================================
+// Disk Analyzer FFI Functions
+// ============================================================================
+
+/// Get disk space information for the root filesystem
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON-encoded DiskSpace struct
+#[no_mangle]
+pub extern "C" fn osx_get_disk_space() -> FFIResult {
+    let analyzer = analyzer::DiskAnalyzer::new();
+
+    match analyzer.get_disk_space() {
+        Ok(space) => {
+            let json = serde_json::to_string(&space).unwrap_or_default();
+            FFIResult::ok(Some(json))
+        }
+        Err(e) => FFIResult::err(e.to_string()),
+    }
+}
+
+/// Analyze home directory and get top N directories by size
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON-encoded Vec<DirectoryInfo>
+#[no_mangle]
+pub extern "C" fn osx_analyze_home(top_n: i32) -> FFIResult {
+    let analyzer = analyzer::DiskAnalyzer::new();
+    let n = top_n.max(1) as usize;
+
+    let dirs = analyzer.analyze_home_directory(n);
+    let json = serde_json::to_string(&dirs).unwrap_or_default();
+
+    FFIResult::ok(Some(json))
+}
+
+/// Analyze application caches
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON-encoded Vec<CacheInfo>
+#[no_mangle]
+pub extern "C" fn osx_analyze_caches() -> FFIResult {
+    let analyzer = analyzer::DiskAnalyzer::new();
+
+    let caches = analyzer.analyze_caches();
+    let json = serde_json::to_string(&caches).unwrap_or_default();
+
+    FFIResult::ok(Some(json))
+}
+
+/// Analyze developer tool components
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON-encoded Vec<DeveloperComponentInfo>
+#[no_mangle]
+pub extern "C" fn osx_analyze_developer() -> FFIResult {
+    let analyzer = analyzer::DiskAnalyzer::new();
+
+    let components = analyzer.analyze_developer();
+    let json = serde_json::to_string(&components).unwrap_or_default();
+
+    FFIResult::ok(Some(json))
+}
+
+/// Estimate cleanable space
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON-encoded CleanableEstimate
+#[no_mangle]
+pub extern "C" fn osx_estimate_cleanable() -> FFIResult {
+    let analyzer = analyzer::DiskAnalyzer::new();
+
+    let estimate = analyzer.estimate_cleanable();
+    let json = serde_json::to_string(&estimate).unwrap_or_default();
+
+    FFIResult::ok(Some(json))
+}
+
+/// Perform full disk analysis
+///
+/// # Safety
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON-encoded AnalysisResult
+#[no_mangle]
+pub extern "C" fn osx_full_analysis() -> FFIResult {
+    let analyzer = analyzer::DiskAnalyzer::new();
+
+    match analyzer.analyze() {
+        Ok(result) => {
+            let json = serde_json::to_string(&result).unwrap_or_default();
+            FFIResult::ok(Some(json))
+        }
+        Err(e) => FFIResult::err(e.to_string()),
     }
 }
 
