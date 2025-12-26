@@ -14,7 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
-- **F07: Automation Scheduling - Disk Monitoring** (#63, #64, #65)
+- **F07: Automation Scheduling - Complete Implementation** (#11)
+  - SchedulerService for managing launchd-based cleanup schedules
+  - ScheduleConfig, ScheduleInfo, ScheduleFrequency types for schedule management
+  - CLI `schedule` command with subcommands:
+    - `schedule list`: List all configured schedules
+    - `schedule add`: Add a new cleanup schedule (daily/weekly/monthly)
+    - `schedule remove`: Remove a cleanup schedule
+    - `schedule enable`: Enable a schedule (load launchd agent)
+    - `schedule disable`: Disable a schedule (unload launchd agent)
+  - Support for daily, weekly, and monthly schedules
+  - Customizable execution time (hour, minute, weekday, day)
+  - launchd plist generation with proper configuration
+  - 35 comprehensive unit tests for scheduler functionality
   - NotificationService for macOS system notifications
   - DiskThreshold enum for 85%/90%/95% warning levels
   - Notification categories with action buttons (Run Cleanup, Retry, View Logs)
