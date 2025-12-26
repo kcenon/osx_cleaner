@@ -213,6 +213,7 @@ osxcleaner schedule enable daily
 | `clean` | Clean specified targets with safety checks |
 | `config` | Manage osxcleaner configuration |
 | `schedule` | Manage automated cleanup schedules |
+| `team` | Manage team environment configuration |
 
 ### Common Options
 
@@ -226,6 +227,73 @@ osxcleaner schedule enable daily
 | `--non-interactive` | clean | Skip confirmation prompts (for CI/CD) |
 | `--verbose` | clean, analyze | Show detailed output |
 | `--quiet` | clean, analyze | Minimal output |
+| `--ignore-team` | clean | Ignore team configuration policies |
+
+### Team Configuration (F09)
+
+Team configuration enables shared cleanup policies across development teams.
+
+```bash
+# Show team configuration status
+osxcleaner team status
+
+# Load team configuration from file
+osxcleaner team load ~/team-config.yaml
+
+# Load from remote URL
+osxcleaner team load https://config.example.com/team/osxcleaner.yaml
+
+# Validate configuration without applying
+osxcleaner team load ~/team-config.yaml --validate-only
+
+# Sync with remote configuration
+osxcleaner team sync
+
+# Generate sample configuration
+osxcleaner team sample
+
+# Remove team configuration
+osxcleaner team remove --force
+```
+
+#### Sample Team Configuration (YAML)
+
+```yaml
+version: "1.0"
+team: "iOS Development"
+
+policies:
+  cleanup_level: "normal"
+  schedule: "weekly"
+  allow_override: true
+  max_disk_usage: 90
+  enforce_dry_run: false
+
+exclusions:
+  - "~/Projects/**/build/"
+  - "~/Library/Developer/Xcode/Archives/"
+
+targets:
+  xcode:
+    derived_data: true
+    device_support: false
+    simulators: "unavailable"
+    archives: false
+  docker:
+    enabled: true
+    keep_running: true
+    prune_images: true
+
+notifications:
+  threshold: 85
+  auto_cleanup: false
+  enabled: true
+
+sync:
+  remote_url: "https://config.example.com/team/ios-dev/osxcleaner.yaml"
+  interval_seconds: 3600
+  sync_on_startup: true
+```
 
 ### Manual Build
 
