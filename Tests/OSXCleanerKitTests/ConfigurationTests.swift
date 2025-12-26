@@ -19,7 +19,41 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertFalse(config.includeSystemCaches)
         XCTAssertFalse(config.includeDeveloperCaches)
         XCTAssertFalse(config.includeBrowserCaches)
+        XCTAssertFalse(config.includeLogsCaches)
         XCTAssertTrue(config.specificPaths.isEmpty)
+    }
+
+    func testCleanerConfigurationWithLogs() {
+        let config = CleanerConfiguration(
+            cleanupLevel: .deep,
+            dryRun: true,
+            includeLogsCaches: true
+        )
+
+        XCTAssertEqual(config.cleanupLevel, .deep)
+        XCTAssertTrue(config.dryRun)
+        XCTAssertFalse(config.includeSystemCaches)
+        XCTAssertFalse(config.includeDeveloperCaches)
+        XCTAssertFalse(config.includeBrowserCaches)
+        XCTAssertTrue(config.includeLogsCaches)
+    }
+
+    func testCleanerConfigurationWithAllTargets() {
+        let config = CleanerConfiguration(
+            cleanupLevel: .system,
+            dryRun: false,
+            includeSystemCaches: true,
+            includeDeveloperCaches: true,
+            includeBrowserCaches: true,
+            includeLogsCaches: true,
+            specificPaths: ["/custom/path"]
+        )
+
+        XCTAssertTrue(config.includeSystemCaches)
+        XCTAssertTrue(config.includeDeveloperCaches)
+        XCTAssertTrue(config.includeBrowserCaches)
+        XCTAssertTrue(config.includeLogsCaches)
+        XCTAssertEqual(config.specificPaths, ["/custom/path"])
     }
 
     func testAnalyzerConfigurationDefaults() {
