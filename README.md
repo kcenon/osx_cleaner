@@ -317,6 +317,16 @@ osxcleaner/
 
 ## Documentation
 
+### User Guides
+
+| Document | Description |
+|----------|-------------|
+| [Installation Guide](docs/INSTALLATION.md) | System requirements, installation methods, troubleshooting |
+| [Usage Guide](docs/USAGE.md) | CLI commands, examples, CI/CD integration |
+| [Safety Guide](docs/SAFETY.md) | Safety classification, protected paths, FAQ |
+| [Contributing Guide](docs/CONTRIBUTING.md) | How to contribute, coding standards |
+| [Changelog](docs/CHANGELOG.md) | Version history and release notes |
+
 ### Project Documents
 
 | Document | Description | 한글 | English |
@@ -375,7 +385,7 @@ osxcleaner/
 
 ## Contributing
 
-Contributions are welcome! Please see the [Developer Guide](docs/reference/07-developer-guide.md) for details.
+Contributions are welcome! Please see the [Contributing Guide](docs/CONTRIBUTING.md) for details on how to get started.
 
 ---
 
@@ -392,4 +402,4 @@ This project is distributed under the MIT License. See the [LICENSE](LICENSE) fi
 
 ---
 
-*Last updated: 2025-12-25*
+*Last updated: 2025-12-26*
