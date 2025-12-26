@@ -43,6 +43,7 @@ public struct CleanerConfiguration {
     public let includeSystemCaches: Bool
     public let includeDeveloperCaches: Bool
     public let includeBrowserCaches: Bool
+    public let includeLogsCaches: Bool
     public let specificPaths: [String]
 
     public init(
@@ -51,6 +52,7 @@ public struct CleanerConfiguration {
         includeSystemCaches: Bool = false,
         includeDeveloperCaches: Bool = false,
         includeBrowserCaches: Bool = false,
+        includeLogsCaches: Bool = false,
         specificPaths: [String] = []
     ) {
         self.cleanupLevel = cleanupLevel
@@ -58,6 +60,7 @@ public struct CleanerConfiguration {
         self.includeSystemCaches = includeSystemCaches
         self.includeDeveloperCaches = includeDeveloperCaches
         self.includeBrowserCaches = includeBrowserCaches
+        self.includeLogsCaches = includeLogsCaches
         self.specificPaths = specificPaths
     }
 
@@ -69,6 +72,7 @@ public struct CleanerConfiguration {
         includeSystemCaches: Bool = false,
         includeDeveloperCaches: Bool = false,
         includeBrowserCaches: Bool = false,
+        includeLogsCaches: Bool = false,
         specificPaths: [String] = []
     ) {
         self.cleanupLevel = CleanupLevel(rawValue: Int32(safetyLevel)) ?? .normal
@@ -76,6 +80,7 @@ public struct CleanerConfiguration {
         self.includeSystemCaches = includeSystemCaches
         self.includeDeveloperCaches = includeDeveloperCaches
         self.includeBrowserCaches = includeBrowserCaches
+        self.includeLogsCaches = includeLogsCaches
         self.specificPaths = specificPaths
     }
 }
