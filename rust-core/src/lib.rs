@@ -677,6 +677,214 @@ pub unsafe extern "C" fn osx_get_app_cache_paths(app_name: *const c_char) -> FFI
     FFIResult::ok(Some(json))
 }
 
+// ============================================================================
+// Cloud Sync Detection FFI Functions
+// ============================================================================
+
+/// Detect which cloud service (if any) a path belongs to
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON: {"service": "iCloud"|"Dropbox"|"OneDrive"|"Google Drive"|null, "is_cloud_path": bool}
+#[no_mangle]
+pub unsafe extern "C" fn osx_detect_cloud_service(path: *const c_char) -> FFIResult {
+    if path.is_null() {
+        return FFIResult::err("Path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
+    };
+
+    let path_obj = std::path::Path::new(path_str);
+
+    #[derive(serde::Serialize)]
+    struct CloudServiceResult {
+        service: Option<String>,
+        is_cloud_path: bool,
+    }
+
+    let result = match safety::cloud::detect_cloud_service(path_obj) {
+        Some(service) => CloudServiceResult {
+            service: Some(service.name().to_string()),
+            is_cloud_path: true,
+        },
+        None => CloudServiceResult {
+            service: None,
+            is_cloud_path: false,
+        },
+    };
+
+    let json = serde_json::to_string(&result).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Get detailed cloud sync information for a path
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON: {"service": "...", "status": "...", "path": "...", "is_cloud_path": bool}
+/// - Status can be: "Synced", "Syncing", "Pending", "CloudOnly", "LocalOnly", "Error", "NotApplicable"
+#[no_mangle]
+pub unsafe extern "C" fn osx_get_cloud_sync_info(path: *const c_char) -> FFIResult {
+    if path.is_null() {
+        return FFIResult::err("Path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
+    };
+
+    let path_obj = std::path::Path::new(path_str);
+
+    #[derive(serde::Serialize)]
+    struct CloudSyncResult {
+        service: Option<String>,
+        status: String,
+        path: String,
+        is_cloud_path: bool,
+    }
+
+    let result = match safety::cloud::get_cloud_sync_info(path_obj) {
+        Some(info) => CloudSyncResult {
+            service: Some(info.service.name().to_string()),
+            status: format!("{:?}", info.status),
+            path: info.path,
+            is_cloud_path: true,
+        },
+        None => CloudSyncResult {
+            service: None,
+            status: "NotApplicable".to_string(),
+            path: path_str.to_string(),
+            is_cloud_path: false,
+        },
+    };
+
+    let json = serde_json::to_string(&result).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Check if a path is safe to delete from a cloud sync perspective
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON: {"safe": bool, "warning": "..." or null}
+/// - If not safe, warning explains why (e.g., "File is currently syncing to iCloud")
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_safe_to_delete_cloud(path: *const c_char) -> FFIResult {
+    if path.is_null() {
+        return FFIResult::err("Path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
+    };
+
+    let path_obj = std::path::Path::new(path_str);
+
+    #[derive(serde::Serialize)]
+    struct CloudSafetyResult {
+        safe: bool,
+        warning: Option<String>,
+    }
+
+    let result = match safety::cloud::is_safe_to_delete_cloud(path_obj) {
+        Ok(()) => CloudSafetyResult {
+            safe: true,
+            warning: None,
+        },
+        Err(warning) => CloudSafetyResult {
+            safe: false,
+            warning: Some(warning),
+        },
+    };
+
+    let json = serde_json::to_string(&result).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Check if a path is within an iCloud synced location
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - Returns true if the path is in an iCloud location, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_icloud_path(path: *const c_char) -> bool {
+    if path.is_null() {
+        return false;
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    safety::cloud::is_icloud_path(std::path::Path::new(path_str))
+}
+
+/// Check if a path is within a Dropbox synced location
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - Returns true if the path is in a Dropbox location, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_dropbox_path(path: *const c_char) -> bool {
+    if path.is_null() {
+        return false;
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    safety::cloud::is_dropbox_path(std::path::Path::new(path_str))
+}
+
+/// Check if a path is within a OneDrive synced location
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - Returns true if the path is in a OneDrive location, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_onedrive_path(path: *const c_char) -> bool {
+    if path.is_null() {
+        return false;
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    safety::cloud::is_onedrive_path(std::path::Path::new(path_str))
+}
+
+/// Check if a path is within a Google Drive synced location
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - Returns true if the path is in a Google Drive location, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_google_drive_path(path: *const c_char) -> bool {
+    if path.is_null() {
+        return false;
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    safety::cloud::is_google_drive_path(std::path::Path::new(path_str))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -817,6 +1025,205 @@ mod tests {
                 assert!(data_str.contains("Chrome") || data_str == "null");
                 osx_free_string(result.data);
             }
+        }
+    }
+
+    // Cloud Sync Detection FFI Tests
+
+    #[test]
+    fn test_detect_cloud_service_null() {
+        unsafe {
+            let result = osx_detect_cloud_service(std::ptr::null());
+            assert!(!result.success);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_detect_cloud_service_local_path() {
+        use std::ffi::CString;
+        unsafe {
+            let path = CString::new("/tmp/test").unwrap();
+            let result = osx_detect_cloud_service(path.as_ptr());
+            assert!(result.success);
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.contains("is_cloud_path"));
+                assert!(data_str.contains("false")); // /tmp is not a cloud path
+                osx_free_string(result.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_detect_cloud_service_icloud_path() {
+        use std::ffi::CString;
+        unsafe {
+            let path =
+                CString::new("/Users/test/Library/Mobile Documents/com~apple~CloudDocs/file.txt")
+                    .unwrap();
+            let result = osx_detect_cloud_service(path.as_ptr());
+            assert!(result.success);
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.contains("iCloud"));
+                assert!(data_str.contains("\"is_cloud_path\":true"));
+                osx_free_string(result.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_detect_cloud_service_dropbox_path() {
+        use std::ffi::CString;
+        unsafe {
+            let path = CString::new("/Users/test/Dropbox/document.txt").unwrap();
+            let result = osx_detect_cloud_service(path.as_ptr());
+            assert!(result.success);
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.contains("Dropbox"));
+                assert!(data_str.contains("\"is_cloud_path\":true"));
+                osx_free_string(result.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_cloud_sync_info_null() {
+        unsafe {
+            let result = osx_get_cloud_sync_info(std::ptr::null());
+            assert!(!result.success);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_get_cloud_sync_info_local_path() {
+        use std::ffi::CString;
+        unsafe {
+            let path = CString::new("/tmp/test").unwrap();
+            let result = osx_get_cloud_sync_info(path.as_ptr());
+            assert!(result.success);
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.contains("\"is_cloud_path\":false"));
+                assert!(data_str.contains("NotApplicable"));
+                osx_free_string(result.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_safe_to_delete_cloud_null() {
+        unsafe {
+            let result = osx_is_safe_to_delete_cloud(std::ptr::null());
+            assert!(!result.success);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_is_safe_to_delete_cloud_local_path() {
+        use std::ffi::CString;
+        unsafe {
+            let path = CString::new("/tmp/test").unwrap();
+            let result = osx_is_safe_to_delete_cloud(path.as_ptr());
+            assert!(result.success);
+            if !result.data.is_null() {
+                let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+                assert!(data_str.contains("\"safe\":true"));
+                osx_free_string(result.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_icloud_path_null() {
+        unsafe {
+            // Null pointer should return false
+            assert!(!osx_is_icloud_path(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn test_is_icloud_path_valid() {
+        use std::ffi::CString;
+        unsafe {
+            // Test with iCloud path
+            let icloud_path =
+                CString::new("/Users/test/Library/Mobile Documents/com~apple~CloudDocs").unwrap();
+            assert!(osx_is_icloud_path(icloud_path.as_ptr()));
+
+            // Test with non-iCloud path
+            let local_path = CString::new("/tmp/test").unwrap();
+            assert!(!osx_is_icloud_path(local_path.as_ptr()));
+        }
+    }
+
+    #[test]
+    fn test_is_dropbox_path_null() {
+        unsafe {
+            // Null pointer should return false
+            assert!(!osx_is_dropbox_path(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn test_is_dropbox_path_valid() {
+        use std::ffi::CString;
+        unsafe {
+            // Test with Dropbox path
+            let dropbox_path = CString::new("/Users/test/Dropbox/file.txt").unwrap();
+            assert!(osx_is_dropbox_path(dropbox_path.as_ptr()));
+
+            // Test with non-Dropbox path
+            let local_path = CString::new("/tmp/test").unwrap();
+            assert!(!osx_is_dropbox_path(local_path.as_ptr()));
+        }
+    }
+
+    #[test]
+    fn test_is_onedrive_path_null() {
+        unsafe {
+            // Null pointer should return false
+            assert!(!osx_is_onedrive_path(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn test_is_onedrive_path_valid() {
+        use std::ffi::CString;
+        unsafe {
+            // Test with OneDrive path
+            let onedrive_path = CString::new("/Users/test/OneDrive/file.txt").unwrap();
+            assert!(osx_is_onedrive_path(onedrive_path.as_ptr()));
+
+            // Test with non-OneDrive path
+            let local_path = CString::new("/tmp/test").unwrap();
+            assert!(!osx_is_onedrive_path(local_path.as_ptr()));
+        }
+    }
+
+    #[test]
+    fn test_is_google_drive_path_null() {
+        unsafe {
+            // Null pointer should return false
+            assert!(!osx_is_google_drive_path(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn test_is_google_drive_path_valid() {
+        use std::ffi::CString;
+        unsafe {
+            // Test with Google Drive path
+            let gdrive_path = CString::new("/Users/test/Google Drive/file.txt").unwrap();
+            assert!(osx_is_google_drive_path(gdrive_path.as_ptr()));
+
+            // Test with non-Google Drive path
+            let local_path = CString::new("/tmp/test").unwrap();
+            assert!(!osx_is_google_drive_path(local_path.as_ptr()));
         }
     }
 }
