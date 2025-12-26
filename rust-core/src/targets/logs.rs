@@ -182,28 +182,33 @@ pub struct LogScanSummary {
 impl LogScanSummary {
     /// Create a new summary from log entries
     pub fn from_entries(entries: &[LogEntry]) -> Self {
-        let mut summary = Self::default();
+        let mut by_type = HashMap::new();
+        let mut by_source = HashMap::new();
+        let mut by_age = HashMap::new();
 
-        summary.total_count = entries.len();
-        summary.total_size = entries.iter().map(|e| e.size).sum();
-
-        // Group by type
+        // Group by type, source, and age
         for entry in entries {
-            let type_entry = summary.by_type.entry(entry.log_type).or_insert((0, 0));
+            let type_entry = by_type.entry(entry.log_type).or_insert((0, 0));
             type_entry.0 += 1;
             type_entry.1 += entry.size;
 
-            let source_entry = summary.by_source.entry(entry.source).or_insert((0, 0));
+            let source_entry = by_source.entry(entry.source).or_insert((0, 0));
             source_entry.0 += 1;
             source_entry.1 += entry.size;
 
             let age_key = Self::age_bucket(entry.age_days);
-            let age_entry = summary.by_age.entry(age_key).or_insert((0, 0));
+            let age_entry = by_age.entry(age_key).or_insert((0, 0));
             age_entry.0 += 1;
             age_entry.1 += entry.size;
         }
 
-        summary
+        Self {
+            total_count: entries.len(),
+            total_size: entries.iter().map(|e| e.size).sum(),
+            by_type,
+            by_source,
+            by_age,
+        }
     }
 
     fn age_bucket(days: u32) -> String {
