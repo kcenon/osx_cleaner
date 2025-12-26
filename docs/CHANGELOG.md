@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User documentation (INSTALLATION.md, USAGE.md, SAFETY.md, CONTRIBUTING.md)
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
+
+- **F05: Time Machine Snapshot Management** (#9)
+
+  - TimeMachineService for managing local APFS snapshots
+  - List local snapshots via `tmutil listlocalsnapshots`
+  - Delete individual snapshots by date
+  - Thin all snapshots to free disk space
+  - Query Time Machine status and last backup date
+  - CLI `snapshot` command with subcommands (list, status, delete, thin)
+  - Dry run support for safe preview of operations
+  - Comprehensive unit tests (13 tests)
+
 - **F01-7: Comprehensive Logging for Deletion Operations** (#27)
 
   - Structured DeletionLogEntry with timestamp, path, safety level, result, bytes freed
