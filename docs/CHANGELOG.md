@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cleanable space estimation by safety level
   - FFI bindings for Swift integration
 
+- **F04: Log and Crash Report Management** (#8)
+
+  - LogCleaner struct for managing logs and crash reports
+  - LogType classification (AppLog, CrashReport, SpinReport, HangReport, etc.)
+  - LogSource differentiation (User vs System logs)
+  - Age-based filtering with configurable retention period (default: 30 days)
+  - Safety-aware cleanup (system logs are read-only)
+  - Parallel file deletion using rayon
+  - Comprehensive test suite (14 unit tests)
+
 ### Testing
 - **F01-8: Comprehensive unit tests for safety module** (#28)
   - Edge case tests (symlinks, permissions, missing paths)
