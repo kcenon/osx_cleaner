@@ -22,7 +22,8 @@ pub use cloud::{
 };
 pub use level::{CleanupLevel, SafetyLevel};
 pub use paths::{
-    expand_home, PathCategory, CAUTION_PATHS, PROTECTED_PATHS, SAFE_PATHS, WARNING_PATHS,
+    categorize_path, expand_home, PathCategory, CAUTION_PATHS, PROTECTED_PATHS, SAFE_PATHS,
+    WARNING_PATHS,
 };
 pub use process::{
     check_related_app_running, get_processes_using_path, get_running_processes, is_app_running,
@@ -46,73 +47,19 @@ pub fn calculate_safety_level(path: &str) -> u8 {
     level as u8
 }
 
-/// Categorize a path for safety assessment
+/// Categorize a path for safety assessment (string version)
 ///
-/// # Deprecated
-/// Use `SafetyValidator::classify()` instead for more accurate results.
-#[deprecated(since = "0.2.0", note = "Use SafetyValidator::classify() instead")]
-pub fn categorize_path(path: &str) -> PathCategory {
-    let path_lower = path.to_lowercase();
-
-    // Check protected paths
-    for protected in PROTECTED_PATHS {
-        if path.starts_with(protected) || path_lower.contains(&protected.to_lowercase()) {
-            return PathCategory::SystemCritical;
-        }
-    }
-
-    // Check for user documents
-    if path_lower.contains("/documents/")
-        || path_lower.contains("/desktop/")
-        || path_lower.contains("/pictures/")
-        || path_lower.contains("/movies/")
-        || path_lower.contains("/music/")
-    {
-        return PathCategory::UserDocuments;
-    }
-
-    // Check for developer caches
-    if path_lower.contains("/deriveddata")
-        || path_lower.contains("/.gradle/")
-        || path_lower.contains("/.npm/")
-        || path_lower.contains("/.cargo/")
-        || path_lower.contains("/.pub-cache")
-        || path_lower.contains("/coresimulator/")
-    {
-        return PathCategory::DeveloperCache;
-    }
-
-    // Check for browser caches
-    if path_lower.contains("/chrome/")
-        || path_lower.contains("/firefox/")
-        || path_lower.contains("/safari/")
-        || path_lower.contains("/brave/")
-    {
-        return PathCategory::BrowserCache;
-    }
-
-    // Check for caches
-    if path_lower.contains("/caches/") || path_lower.contains("/cache/") {
-        return PathCategory::AppCache;
-    }
-
-    // Check for logs
-    if path_lower.contains("/logs/") || path_lower.contains(".log") {
-        return PathCategory::Logs;
-    }
-
-    // Check for temporary files
-    if path_lower.contains("/tmp/") || path_lower.contains("/temp/") || path_lower.contains("/.tmp")
-    {
-        return PathCategory::Temporary;
-    }
-
-    // Check for user configuration
-    if path_lower.contains("/preferences/") || path_lower.contains("/.config/") {
-        return PathCategory::UserCritical;
-    }
-
-    PathCategory::Unknown
+/// This is a convenience wrapper around `paths::categorize_path` that accepts
+/// a string path. For better type safety, use `paths::categorize_path` directly
+/// with a `&Path`.
+///
+/// # Arguments
+/// * `path` - The path string to categorize
+///
+/// # Returns
+/// The PathCategory for the given path
+pub fn categorize_path_str(path: &str) -> PathCategory {
+    categorize_path(Path::new(path))
 }
 
 /// Check if a path is safe to delete at the given safety level

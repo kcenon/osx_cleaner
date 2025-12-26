@@ -115,7 +115,7 @@ pub fn analyze_with_config(path: &str, config: &ScanConfig) -> Result<AnalysisRe
             }
 
             let path_str = e.path().to_string_lossy().to_string();
-            let category = categorize_path(&path_str);
+            let category = categorize_path(e.path());
 
             let modified = metadata
                 .modified()
@@ -141,8 +141,7 @@ pub fn analyze_with_config(path: &str, config: &ScanConfig) -> Result<AnalysisRe
     let mut category_map: HashMap<PathCategory, (u64, usize)> = HashMap::new();
     for entry in &entries {
         if entry.file_type().is_file() {
-            let path_str = entry.path().to_string_lossy();
-            let category = categorize_path(&path_str);
+            let category = categorize_path(entry.path());
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
 
             let entry = category_map.entry(category).or_insert((0, 0));
