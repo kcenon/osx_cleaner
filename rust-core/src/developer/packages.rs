@@ -510,11 +510,7 @@ mod tests {
         ];
 
         for tool in required_tools {
-            assert!(
-                tools.contains(&tool),
-                "Missing required tool: {:?}",
-                tool
-            );
+            assert!(tools.contains(&tool), "Missing required tool: {:?}", tool);
         }
     }
 
@@ -566,12 +562,7 @@ mod tests {
             // Create a mock target
             if !manager.cache_paths.is_empty() {
                 let path = manager.cache_paths[0].clone();
-                let target = cleaner.create_target(
-                    manager,
-                    path,
-                    "Test Target".to_string(),
-                    1024,
-                );
+                let target = cleaner.create_target(manager, path, "Test Target".to_string(), 1024);
 
                 // Verify cleanup method matches configuration
                 match (&manager.cleanup_command, &target.cleanup_method) {
