@@ -149,6 +149,36 @@ struct osx_FFIResult osx_estimate_cleanable(void);
 struct osx_FFIResult osx_full_analysis(void);
 
 /**
+ * Initialize the deletion logger with optional file output
+ *
+ * # Safety
+ * - `log_path` may be null for memory-only logging
+ * - If not null, must be a valid null-terminated C string
+ */
+struct osx_FFIResult osx_init_logger(const char *log_path);
+
+/**
+ * Get all deletion log entries as JSON
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ */
+struct osx_FFIResult osx_get_deletion_logs(void);
+
+/**
+ * Get deletion log statistics as JSON
+ *
+ * # Safety
+ * - The returned FFIResult must be freed with `osx_free_result`
+ */
+struct osx_FFIResult osx_get_log_stats(void);
+
+/**
+ * Clear all deletion logs from memory
+ */
+void osx_clear_logs(void);
+
+/**
  * Get system information as JSON
  *
  * # Safety
