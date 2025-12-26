@@ -185,7 +185,13 @@ impl XcodeCleaner {
 
         // Try xcrun devicectl (Xcode 15+)
         let output = Command::new("xcrun")
-            .args(["devicectl", "list", "devices", "--json-output", "/dev/stdout"])
+            .args([
+                "devicectl",
+                "list",
+                "devices",
+                "--json-output",
+                "/dev/stdout",
+            ])
             .output();
 
         if let Ok(output) = output {
