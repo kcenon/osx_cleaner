@@ -453,10 +453,17 @@ struct SimctlRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_simulator_cleaner_creation() {
         let cleaner = SimulatorCleaner::new();
+        assert_eq!(cleaner.tool(), DeveloperTool::Simulator);
+    }
+
+    #[test]
+    fn test_simulator_cleaner_default() {
+        let cleaner = SimulatorCleaner::default();
         assert_eq!(cleaner.tool(), DeveloperTool::Simulator);
     }
 
@@ -474,6 +481,24 @@ mod tests {
 
         assert_eq!(device.name, "iPhone 15");
         assert!(device.is_available);
+        assert_eq!(device.state, "Shutdown");
+        assert_eq!(device.udid, "abc-123");
+    }
+
+    #[test]
+    fn test_simulator_device_unavailable() {
+        let device = SimulatorDevice {
+            name: "iPhone 12".to_string(),
+            udid: "xyz-789".to_string(),
+            state: "Shutdown".to_string(),
+            runtime: "iOS 15.0".to_string(),
+            is_available: false,
+            path: PathBuf::from("/test/unavailable"),
+            size: 2048,
+        };
+
+        assert!(!device.is_available);
+        assert_eq!(device.size, 2048);
     }
 
     #[test]
@@ -488,5 +513,257 @@ mod tests {
 
         assert_eq!(runtime.version, "17.0");
         assert_eq!(runtime.platform, "iOS");
+        assert!(runtime.is_available);
+    }
+
+    #[test]
+    fn test_simulator_runtime_unavailable() {
+        let runtime = SimulatorRuntime {
+            identifier: "com.apple.CoreSimulator.SimRuntime.iOS-15-0".to_string(),
+            version: "15.0".to_string(),
+            platform: "iOS".to_string(),
+            is_available: false,
+            size: 500 * 1024 * 1024,
+        };
+
+        assert!(!runtime.is_available);
+        assert_eq!(runtime.size, 500 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_simctl_devices_output_parsing() {
+        let json = r#"{
+            "devices": {
+                "com.apple.CoreSimulator.SimRuntime.iOS-17-0": [
+                    {
+                        "name": "iPhone 15",
+                        "udid": "12345678-1234-1234-1234-123456789ABC",
+                        "state": "Shutdown",
+                        "isAvailable": true
+                    },
+                    {
+                        "name": "iPhone 14",
+                        "udid": "87654321-4321-4321-4321-CBA987654321",
+                        "state": "Booted",
+                        "isAvailable": false
+                    }
+                ],
+                "com.apple.CoreSimulator.SimRuntime.iOS-16-0": [
+                    {
+                        "name": "iPhone 13",
+                        "udid": "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+                        "state": "Shutdown",
+                        "isAvailable": true
+                    }
+                ]
+            }
+        }"#;
+
+        let parsed: SimctlDevicesOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.devices.len(), 2);
+
+        let ios17_devices = &parsed.devices["com.apple.CoreSimulator.SimRuntime.iOS-17-0"];
+        assert_eq!(ios17_devices.len(), 2);
+        assert_eq!(ios17_devices[0].name, "iPhone 15");
+        assert_eq!(ios17_devices[0].is_available, Some(true));
+        assert_eq!(ios17_devices[1].name, "iPhone 14");
+        assert_eq!(ios17_devices[1].is_available, Some(false));
+    }
+
+    #[test]
+    fn test_simctl_devices_output_missing_is_available() {
+        // Test graceful handling when isAvailable is missing
+        let json = r#"{
+            "devices": {
+                "com.apple.CoreSimulator.SimRuntime.iOS-17-0": [
+                    {
+                        "name": "iPhone 15",
+                        "udid": "12345678-1234-1234-1234-123456789ABC",
+                        "state": "Shutdown"
+                    }
+                ]
+            }
+        }"#;
+
+        let parsed: SimctlDevicesOutput = serde_json::from_str(json).unwrap();
+        let ios17_devices = &parsed.devices["com.apple.CoreSimulator.SimRuntime.iOS-17-0"];
+        assert_eq!(ios17_devices[0].is_available, None);
+    }
+
+    #[test]
+    fn test_simctl_runtimes_output_parsing() {
+        let json = r#"{
+            "runtimes": [
+                {
+                    "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-17-0",
+                    "version": "17.0",
+                    "platform": "iOS",
+                    "isAvailable": true,
+                    "sizeBytes": 5368709120
+                },
+                {
+                    "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-16-0",
+                    "version": "16.0",
+                    "platform": "iOS",
+                    "isAvailable": false,
+                    "sizeBytes": 4294967296
+                }
+            ]
+        }"#;
+
+        let parsed: SimctlRuntimesOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.runtimes.len(), 2);
+        assert_eq!(parsed.runtimes[0].version, "17.0");
+        assert_eq!(parsed.runtimes[0].is_available, Some(true));
+        assert_eq!(parsed.runtimes[0].size_bytes, Some(5368709120));
+        assert_eq!(parsed.runtimes[1].is_available, Some(false));
+    }
+
+    #[test]
+    fn test_simctl_runtimes_output_minimal() {
+        // Test parsing with minimal fields
+        let json = r#"{
+            "runtimes": [
+                {
+                    "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-17-0",
+                    "version": "17.0"
+                }
+            ]
+        }"#;
+
+        let parsed: SimctlRuntimesOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.runtimes.len(), 1);
+        assert_eq!(parsed.runtimes[0].platform, None);
+        assert_eq!(parsed.runtimes[0].is_available, None);
+        assert_eq!(parsed.runtimes[0].size_bytes, None);
+    }
+
+    #[test]
+    fn test_scan_caches_with_temp_directory() {
+        let temp = tempdir().unwrap();
+        let caches_path = temp.path().join("Caches");
+        fs::create_dir(&caches_path).unwrap();
+        fs::write(caches_path.join("cache_file.dat"), "test cache data").unwrap();
+
+        let cleaner = SimulatorCleaner {
+            devices_path: PathBuf::from("/nonexistent"),
+            caches_path,
+        };
+
+        let targets = cleaner.scan_caches();
+        assert!(!targets.is_empty());
+        assert!(targets[0].name.contains("Simulator Caches"));
+        assert_eq!(targets[0].safety_level, SafetyLevel::Safe);
+    }
+
+    #[test]
+    fn test_scan_caches_empty_directory() {
+        let temp = tempdir().unwrap();
+        let caches_path = temp.path().join("Caches");
+        fs::create_dir(&caches_path).unwrap();
+        // Empty directory - no files
+
+        let cleaner = SimulatorCleaner {
+            devices_path: PathBuf::from("/nonexistent"),
+            caches_path,
+        };
+
+        let targets = cleaner.scan_caches();
+        // Empty directory should not produce targets (size = 0)
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn test_scan_caches_nonexistent() {
+        let cleaner = SimulatorCleaner {
+            devices_path: PathBuf::from("/nonexistent"),
+            caches_path: PathBuf::from("/nonexistent/caches"),
+        };
+
+        let targets = cleaner.scan_caches();
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn test_simulator_error_display() {
+        let cmd_error = SimulatorError::CommandFailed("xcrun not found".to_string());
+        assert!(cmd_error.to_string().contains("Command failed"));
+
+        let parse_error = SimulatorError::ParseError("invalid JSON".to_string());
+        assert!(parse_error.to_string().contains("parse output"));
+    }
+
+    #[test]
+    fn test_simulator_list_struct() {
+        let list = SimulatorList {
+            devices: vec![
+                SimulatorDevice {
+                    name: "iPhone 15".to_string(),
+                    udid: "abc-123".to_string(),
+                    state: "Shutdown".to_string(),
+                    runtime: "iOS 17.0".to_string(),
+                    is_available: true,
+                    path: PathBuf::from("/test1"),
+                    size: 1024,
+                },
+                SimulatorDevice {
+                    name: "iPhone 14".to_string(),
+                    udid: "def-456".to_string(),
+                    state: "Booted".to_string(),
+                    runtime: "iOS 16.0".to_string(),
+                    is_available: false,
+                    path: PathBuf::from("/test2"),
+                    size: 2048,
+                },
+            ],
+        };
+
+        assert_eq!(list.devices.len(), 2);
+        assert!(list.devices[0].is_available);
+        assert!(!list.devices[1].is_available);
+    }
+
+    #[test]
+    fn test_cleanup_target_for_unavailable_simulator() {
+        let target = CleanupTarget::new_command(
+            "Unavailable Simulator: iPhone 12 (abc-123)",
+            "xcrun simctl delete abc-123",
+            SafetyLevel::Safe,
+        )
+        .with_size(1024 * 1024 * 1024)
+        .with_description("Simulator is unavailable and can be safely deleted");
+
+        assert!(target.name.contains("Unavailable Simulator"));
+        assert_eq!(target.safety_level, SafetyLevel::Safe);
+        assert_eq!(target.size, 1024 * 1024 * 1024);
+        assert!(target.description.is_some());
+    }
+
+    #[test]
+    fn test_cleanup_target_for_runtime() {
+        let target = CleanupTarget::new_command(
+            "Unavailable Runtime: com.apple.CoreSimulator.SimRuntime.iOS-15-0",
+            "xcrun simctl runtime delete com.apple.CoreSimulator.SimRuntime.iOS-15-0",
+            SafetyLevel::Caution,
+        )
+        .with_size(5 * 1024 * 1024 * 1024)
+        .with_description("iOS 15.0 - runtime is no longer available");
+
+        assert!(target.name.contains("Unavailable Runtime"));
+        assert_eq!(target.safety_level, SafetyLevel::Caution);
+    }
+
+    #[test]
+    fn test_get_unavailable_simulators_graceful_failure() {
+        // When xcrun is not available or fails, should return empty vec
+        let cleaner = SimulatorCleaner {
+            devices_path: PathBuf::from("/nonexistent"),
+            caches_path: PathBuf::from("/nonexistent"),
+        };
+
+        // This should not panic even if xcrun fails
+        let unavailable = cleaner.get_unavailable_simulators();
+        // Just verify it returns a vector (may be empty or have content depending on system)
+        assert!(unavailable.len() < 1000); // Reasonable upper bound
     }
 }
