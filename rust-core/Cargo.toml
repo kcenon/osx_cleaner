@@ -52,6 +52,11 @@ cbindgen = "0.26"
 
 [dev-dependencies]
 tempfile = "3.9"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "safety_benchmark"
+harness = false
 
 [profile.release]
 lto = true
