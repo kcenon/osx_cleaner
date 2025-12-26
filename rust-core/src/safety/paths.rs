@@ -218,9 +218,7 @@ pub fn categorize_path(path: &Path) -> PathCategory {
         }
 
         // Temporary files
-        if rel_str.starts_with(".Trash")
-            || rel_str.starts_with("Library/Caches/Temporary Items")
-        {
+        if rel_str.starts_with(".Trash") || rel_str.starts_with("Library/Caches/Temporary Items") {
             return PathCategory::Temporary;
         }
     }
@@ -327,7 +325,9 @@ mod tests {
     #[test]
     fn test_expand_home_preserves_subpath() {
         let expanded = expand_home("~/Documents/subfolder/file.txt");
-        assert!(expanded.to_string_lossy().contains("Documents/subfolder/file.txt"));
+        assert!(expanded
+            .to_string_lossy()
+            .contains("Documents/subfolder/file.txt"));
     }
 
     // ===== System Protected Paths Tests =====
