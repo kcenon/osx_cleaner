@@ -523,7 +523,10 @@ mod tests {
         assert_eq!(parse_size("0.5GB"), (0.5 * 1024.0 * 1024.0 * 1024.0) as u64);
         assert_eq!(parse_size("2.5MB"), (2.5 * 1024.0 * 1024.0) as u64);
         // With parenthetical info (Docker format)
-        assert_eq!(parse_size("1.2GB (75%)"), (1.2 * 1024.0 * 1024.0 * 1024.0) as u64);
+        assert_eq!(
+            parse_size("1.2GB (75%)"),
+            (1.2 * 1024.0 * 1024.0 * 1024.0) as u64
+        );
         // Zero
         assert_eq!(parse_size("0B"), 0);
         assert_eq!(parse_size("0"), 0);
@@ -593,7 +596,10 @@ mod tests {
         assert_eq!(daemon_error.to_string(), "Docker daemon is not running");
 
         let command_error = DockerError::CommandFailed("permission denied".to_string());
-        assert_eq!(command_error.to_string(), "Command failed: permission denied");
+        assert_eq!(
+            command_error.to_string(),
+            "Command failed: permission denied"
+        );
     }
 
     #[test]
@@ -655,11 +661,8 @@ mod tests {
     #[test]
     fn test_cleanup_target_safety_levels() {
         // Safe level for basic prune
-        let safe_target = CleanupTarget::new_command(
-            "Basic Prune",
-            "docker system prune -f",
-            SafetyLevel::Safe,
-        );
+        let safe_target =
+            CleanupTarget::new_command("Basic Prune", "docker system prune -f", SafetyLevel::Safe);
         assert_eq!(safe_target.safety_level, SafetyLevel::Safe);
 
         // Caution level for build cache
