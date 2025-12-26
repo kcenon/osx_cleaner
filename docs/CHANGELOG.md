@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
+- **F07: Automation Scheduling - Disk Monitoring** (#63, #64)
+  - NotificationService for macOS system notifications
+  - DiskThreshold enum for 85%/90%/95% warning levels
+  - Notification categories with action buttons (Run Cleanup, Retry, View Logs)
+  - DiskMonitoringService for periodic disk usage monitoring
+  - MonitoringConfig for customizable thresholds and auto-cleanup settings
+  - launchd integration for background monitoring
+  - CLI `monitor` command with subcommands:
+    - `monitor status`: Show disk usage and monitoring status
+    - `monitor enable`: Enable background monitoring
+    - `monitor disable`: Disable background monitoring
+    - `monitor check`: Perform immediate disk usage check
+  - 20 comprehensive unit tests for disk monitoring
+
 - **F02-2: XcodeCleaner Enhancement** (#33)
   - Add connected device detection using `xcrun devicectl` (Xcode 15+)
   - Implement AC-08: Preserve currently used iOS Device Support versions
