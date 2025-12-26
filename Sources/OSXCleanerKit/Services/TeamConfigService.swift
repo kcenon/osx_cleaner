@@ -223,10 +223,10 @@ public final class TeamConfigService {
         switch config.policies.cleanupLevel.lowercased() {
         case "light":
             level = .light
-        case "aggressive":
-            level = .aggressive
-        case "deep":
+        case "deep", "aggressive":
             level = .deep
+        case "system":
+            level = .system
         default:
             level = .normal
         }
