@@ -7,12 +7,14 @@
 //! - Browsers (Safari, Chrome, Firefox, Edge, Brave, Opera, Arc)
 //! - Cloud Services (iCloud, Dropbox, OneDrive, Google Drive)
 //! - General Application Caches
+//! - Logs and Crash Reports
 //!
 //! This module targets the most common cache accumulations affecting
 //! all macOS users, potentially saving 5-30GB of disk space.
 
 pub mod app_cache;
 pub mod browser;
+pub mod logs;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -20,6 +22,9 @@ use std::path::PathBuf;
 // Re-export main types for convenience
 pub use app_cache::AppCacheCleaner;
 pub use browser::BrowserCleaner;
+pub use logs::{
+    LogCleanupError, LogCleanupResult, LogCleaner, LogEntry, LogScanSummary, LogSource, LogType,
+};
 
 /// Supported browsers
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
