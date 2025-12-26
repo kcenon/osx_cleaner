@@ -115,34 +115,6 @@ public enum OutputFormat: String, CaseIterable, ExpressibleByArgument {
     }
 }
 
-// MARK: - ScheduleFrequency
-
-/// Frequency for scheduled cleanup operations
-public enum ScheduleFrequency: String, CaseIterable, ExpressibleByArgument {
-    case daily
-    case weekly
-    case monthly
-
-    public var description: String {
-        switch self {
-        case .daily:
-            return "Run daily at specified time"
-        case .weekly:
-            return "Run weekly on specified day"
-        case .monthly:
-            return "Run monthly on specified day"
-        }
-    }
-
-    public static var allValueStrings: [String] {
-        allCases.map { $0.rawValue }
-    }
-
-    public static var defaultCompletionKind: CompletionKind {
-        .list(allValueStrings)
-    }
-}
-
 // MARK: - Exit Codes
 
 /// Standard exit codes for CLI operations

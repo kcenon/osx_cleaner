@@ -226,7 +226,7 @@ extension MonitorCommand {
 
             let config = MonitoringConfig(
                 autoCleanupEnabled: autoCleanup,
-                autoCleanupLevel: level.rawValue,
+                autoCleanupLevel: level.stringValue,
                 checkIntervalSeconds: interval,
                 notificationsEnabled: !noNotifications,
                 warningThreshold: warning,
@@ -308,7 +308,7 @@ extension MonitorCommand {
             // Try to load saved config, or use defaults
             let config = MonitoringConfig(
                 autoCleanupEnabled: autoCleanup,
-                autoCleanupLevel: level.rawValue,
+                autoCleanupLevel: level.stringValue,
                 checkIntervalSeconds: 0,  // Not relevant for manual check
                 notificationsEnabled: !quiet
             )
@@ -324,7 +324,7 @@ extension MonitorCommand {
                 }
 
                 // Trigger auto-cleanup if enabled and threshold exceeded
-                if autoCleanup, let threshold = threshold, threshold >= .emergency {
+                if autoCleanup, let threshold = threshold, threshold >= DiskThreshold.emergency {
                     progressView.display(message: "")
                     progressView.display(message: "Auto-cleanup triggered at emergency threshold...")
 
