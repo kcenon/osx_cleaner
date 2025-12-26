@@ -1,0 +1,175 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2021-2025
+name: 'OSX Cleaner'
+description: 'Automated disk cleanup for macOS CI/CD environments'
+author: 'kcenon'
+
+branding:
+  icon: 'hard-drive'
+  color: 'blue'
+
+inputs:
+  level:
+    description: 'Cleanup level (light, normal, deep)'
+    required: false
+    default: 'normal'
+  target:
+    description: 'Cleanup target (browser, developer, logs, all)'
+    required: false
+    default: 'all'
+  min-space:
+    description: 'Minimum available space threshold in GB (cleanup triggers if below this)'
+    required: false
+  min-space-unit:
+    description: 'Unit for min-space (mb, gb, tb)'
+    required: false
+    default: 'gb'
+  dry-run:
+    description: 'Preview mode without actual deletion'
+    required: false
+    default: 'false'
+  version:
+    description: 'OSX Cleaner version to use (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  status:
+    description: 'Cleanup status (success, skipped, completed_with_errors)'
+    value: ${{ steps.cleanup.outputs.status }}
+  freed-space:
+    description: 'Amount of space freed in bytes'
+    value: ${{ steps.cleanup.outputs.freed_bytes }}
+  freed-formatted:
+    description: 'Amount of space freed in human readable format'
+    value: ${{ steps.cleanup.outputs.freed_formatted }}
+  files-removed:
+    description: 'Number of files removed'
+    value: ${{ steps.cleanup.outputs.files_removed }}
+  duration-ms:
+    description: 'Cleanup duration in milliseconds'
+    value: ${{ steps.cleanup.outputs.duration_ms }}
+  available-before:
+    description: 'Available disk space before cleanup in bytes'
+    value: ${{ steps.cleanup.outputs.available_before }}
+  available-after:
+    description: 'Available disk space after cleanup in bytes'
+    value: ${{ steps.cleanup.outputs.available_after }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install OSX Cleaner
+      id: install
+      shell: bash
+      run: |
+        echo "::group::Installing OSX Cleaner"
+
+        VERSION="${{ inputs.version }}"
+
+        if [ "$VERSION" = "latest" ]; then
+          # Get latest release version
+          VERSION=$(curl -s https://api.github.com/repos/kcenon/osx_cleaner/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "::warning::Could not determine latest version, building from source"
+            VERSION="source"
+          fi
+        fi
+
+        if [ "$VERSION" = "source" ]; then
+          # Build from source
+          echo "Building from source..."
+          git clone --depth 1 https://github.com/kcenon/osx_cleaner.git /tmp/osx_cleaner
+          cd /tmp/osx_cleaner
+          swift build -c release
+          sudo cp .build/release/osxcleaner /usr/local/bin/
+        else
+          # Download pre-built binary
+          echo "Downloading version $VERSION..."
+          DOWNLOAD_URL="https://github.com/kcenon/osx_cleaner/releases/download/${VERSION}/osxcleaner-macos.tar.gz"
+
+          if curl -sL --fail "$DOWNLOAD_URL" -o /tmp/osxcleaner.tar.gz; then
+            tar -xzf /tmp/osxcleaner.tar.gz -C /tmp
+            sudo cp /tmp/osxcleaner /usr/local/bin/
+          else
+            echo "::warning::Pre-built binary not available, building from source"
+            git clone --depth 1 --branch "$VERSION" https://github.com/kcenon/osx_cleaner.git /tmp/osx_cleaner || \
+            git clone --depth 1 https://github.com/kcenon/osx_cleaner.git /tmp/osx_cleaner
+            cd /tmp/osx_cleaner
+            swift build -c release
+            sudo cp .build/release/osxcleaner /usr/local/bin/
+          fi
+        fi
+
+        echo "OSX Cleaner installed successfully"
+        osxcleaner --version || true
+        echo "::endgroup::"
+
+    - name: Run Cleanup
+      id: cleanup
+      shell: bash
+      run: |
+        echo "::group::Running OSX Cleaner"
+
+        # Build command
+        CMD="osxcleaner clean --non-interactive --format json"
+        CMD="$CMD --level ${{ inputs.level }}"
+        CMD="$CMD --target ${{ inputs.target }}"
+
+        if [ -n "${{ inputs.min-space }}" ]; then
+          CMD="$CMD --min-space ${{ inputs.min-space }}"
+          CMD="$CMD --min-space-unit ${{ inputs.min-space-unit }}"
+        fi
+
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          CMD="$CMD --dry-run"
+        fi
+
+        echo "Executing: $CMD"
+
+        # Run cleanup and capture output
+        OUTPUT=$($CMD 2>&1 || true)
+
+        # Extract JSON from output (last line that starts with {)
+        JSON_OUTPUT=$(echo "$OUTPUT" | grep '^{' | tail -1)
+
+        if [ -z "$JSON_OUTPUT" ]; then
+          echo "::error::Failed to get JSON output from OSX Cleaner"
+          echo "$OUTPUT"
+          exit 1
+        fi
+
+        echo "Raw output:"
+        echo "$OUTPUT"
+        echo ""
+        echo "JSON result:"
+        echo "$JSON_OUTPUT" | jq . 2>/dev/null || echo "$JSON_OUTPUT"
+
+        # Parse JSON and set outputs
+        STATUS=$(echo "$JSON_OUTPUT" | jq -r '.status // "unknown"')
+        FREED_BYTES=$(echo "$JSON_OUTPUT" | jq -r '.freed_bytes // 0')
+        FREED_FORMATTED=$(echo "$JSON_OUTPUT" | jq -r '.freed_formatted // "0 bytes"')
+        FILES_REMOVED=$(echo "$JSON_OUTPUT" | jq -r '.files_removed // 0')
+        DURATION_MS=$(echo "$JSON_OUTPUT" | jq -r '.duration_ms // 0')
+        AVAILABLE_BEFORE=$(echo "$JSON_OUTPUT" | jq -r '.before.available // 0')
+        AVAILABLE_AFTER=$(echo "$JSON_OUTPUT" | jq -r '.after.available // 0')
+
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "freed_bytes=$FREED_BYTES" >> $GITHUB_OUTPUT
+        echo "freed_formatted=$FREED_FORMATTED" >> $GITHUB_OUTPUT
+        echo "files_removed=$FILES_REMOVED" >> $GITHUB_OUTPUT
+        echo "duration_ms=$DURATION_MS" >> $GITHUB_OUTPUT
+        echo "available_before=$AVAILABLE_BEFORE" >> $GITHUB_OUTPUT
+        echo "available_after=$AVAILABLE_AFTER" >> $GITHUB_OUTPUT
+
+        echo "::endgroup::"
+
+        # Summary
+        echo "### OSX Cleaner Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Status | $STATUS |" >> $GITHUB_STEP_SUMMARY
+        echo "| Space Freed | $FREED_FORMATTED |" >> $GITHUB_STEP_SUMMARY
+        echo "| Files Removed | $FILES_REMOVED |" >> $GITHUB_STEP_SUMMARY
+        echo "| Duration | ${DURATION_MS}ms |" >> $GITHUB_STEP_SUMMARY
