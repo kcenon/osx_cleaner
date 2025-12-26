@@ -278,6 +278,74 @@ struct osx_FFIResult osx_get_processes_using_path(const char *path);
 struct osx_FFIResult osx_get_app_cache_paths(const char *app_name);
 
 /**
+ * Detect which cloud service (if any) a path belongs to
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON: {"service": "iCloud"|"Dropbox"|"OneDrive"|"Google Drive"|null, "is_cloud_path": bool}
+ */
+struct osx_FFIResult osx_detect_cloud_service(const char *path);
+
+/**
+ * Get detailed cloud sync information for a path
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON: {"service": "...", "status": "...", "path": "...", "is_cloud_path": bool}
+ * - Status can be: "Synced", "Syncing", "Pending", "CloudOnly", "LocalOnly", "Error", "NotApplicable"
+ */
+struct osx_FFIResult osx_get_cloud_sync_info(const char *path);
+
+/**
+ * Check if a path is safe to delete from a cloud sync perspective
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON: {"safe": bool, "warning": "..." or null}
+ * - If not safe, warning explains why (e.g., "File is currently syncing to iCloud")
+ */
+struct osx_FFIResult osx_is_safe_to_delete_cloud(const char *path);
+
+/**
+ * Check if a path is within an iCloud synced location
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - Returns true if the path is in an iCloud location, false otherwise
+ */
+bool osx_is_icloud_path(const char *path);
+
+/**
+ * Check if a path is within a Dropbox synced location
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - Returns true if the path is in a Dropbox location, false otherwise
+ */
+bool osx_is_dropbox_path(const char *path);
+
+/**
+ * Check if a path is within a OneDrive synced location
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - Returns true if the path is in a OneDrive location, false otherwise
+ */
+bool osx_is_onedrive_path(const char *path);
+
+/**
+ * Check if a path is within a Google Drive synced location
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - Returns true if the path is in a Google Drive location, false otherwise
+ */
+bool osx_is_google_drive_path(const char *path);
+
+/**
  * Get system information as JSON
  *
  * # Safety

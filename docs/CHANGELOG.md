@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `osx_get_app_cache_paths`: Get cache paths for an application
   - Comprehensive FFI unit tests (10 test cases)
 
+- **F01-6: Cloud Sync Status Detection FFI Bindings** (#26)
+  - `osx_detect_cloud_service`: Detect cloud service (iCloud, Dropbox, OneDrive, Google Drive)
+  - `osx_get_cloud_sync_info`: Get detailed sync status information
+  - `osx_is_safe_to_delete_cloud`: Check if safe to delete from cloud perspective
+  - `osx_is_icloud_path`: Check if path is in iCloud location
+  - `osx_is_dropbox_path`: Check if path is in Dropbox location
+  - `osx_is_onedrive_path`: Check if path is in OneDrive location
+  - `osx_is_google_drive_path`: Check if path is in Google Drive location
+  - Comprehensive FFI unit tests (16 test cases)
+
 - **F05: Time Machine Snapshot Management** (#9)
 
   - TimeMachineService for managing local APFS snapshots
