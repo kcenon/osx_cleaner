@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 
+- **F04-1: Log Cleanup CLI Integration** (#69)
+  - Integrate Rust LogCleaner module into CLI interface
+  - Add `includeLogsCaches` field to CleanerConfiguration
+  - Add `logs` category to CleanTarget for cleanup targeting
+  - Implement `logsCacheTargets()` for user logs and crash reports cleanup
+  - Wire up `--target logs` option in clean command
+  - Target paths: `~/Library/Logs/`, `~/Library/Logs/DiagnosticReports/`
+  - 2 new unit tests for log cleanup configuration
+
 - **F07: Automation Scheduling - Complete Implementation** (#11)
   - SchedulerService for managing launchd-based cleanup schedules
   - ScheduleConfig, ScheduleInfo, ScheduleFrequency types for schedule management

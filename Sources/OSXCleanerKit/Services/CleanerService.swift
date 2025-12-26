@@ -214,6 +214,10 @@ public final class CleanerService {
             targets.append(contentsOf: browserCacheTargets())
         }
 
+        if config.includeLogsCaches {
+            targets.append(contentsOf: logsCacheTargets())
+        }
+
         for path in config.specificPaths {
             targets.append(CleanTarget(path: path, category: .custom))
         }
@@ -258,6 +262,20 @@ public final class CleanerService {
         ]
     }
 
+    private func logsCacheTargets() -> [CleanTarget] {
+        let home = fileManager.homeDirectoryForCurrentUser.path
+        return [
+            CleanTarget(
+                path: "\(home)/Library/Logs",
+                category: .logs
+            ),
+            CleanTarget(
+                path: "\(home)/Library/Logs/DiagnosticReports",
+                category: .logs
+            )
+        ]
+    }
+
     private func calculateSize(at path: String) throws -> UInt64 {
         var totalSize: UInt64 = 0
 
@@ -286,6 +304,7 @@ struct CleanTarget {
         case systemCache
         case developerCache
         case browserCache
+        case logs
         case custom
     }
 }

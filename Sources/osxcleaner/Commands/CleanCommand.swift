@@ -85,8 +85,7 @@ struct CleanCommand: AsyncParsableCommand {
         let includeSystem = target == .all
         let includeDeveloper = target == .developer || target == .all
         let includeBrowser = target == .browser || target == .all
-        // Note: includeLogs will be used when CleanerConfiguration adds log cleanup support
-        _ = target == .logs || target == .all
+        let includeLogs = target == .logs || target == .all
 
         return CleanerConfiguration(
             cleanupLevel: level,
@@ -94,6 +93,7 @@ struct CleanCommand: AsyncParsableCommand {
             includeSystemCaches: includeSystem,
             includeDeveloperCaches: includeDeveloper,
             includeBrowserCaches: includeBrowser,
+            includeLogsCaches: includeLogs,
             specificPaths: paths
         )
     }
