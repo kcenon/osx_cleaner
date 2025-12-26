@@ -14,12 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive user guide with CLI examples
 - Safety classification documentation
 - **F06: Disk Usage Analysis** (#10)
+
   - DiskSpace query with total/used/available information
   - Home directory analysis with Top N by size
   - Application cache analysis (~/Library/Caches)
   - Developer component analysis (~/Library/Developer)
   - Cleanable space estimation by safety level
   - FFI bindings for Swift integration
+
+### Testing
+- **F01-8: Comprehensive unit tests for safety module** (#28)
+  - Edge case tests (symlinks, permissions, missing paths)
+  - Unicode and special character path handling tests
+  - Very long path and path traversal tests
+  - Thread safety tests for concurrent validator access
+  - Performance tests (10,000+ paths classification)
+  - Criterion benchmark suite for safety module
 
 ---
 
