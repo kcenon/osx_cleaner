@@ -114,6 +114,186 @@ pub unsafe extern "C" fn osx_calculate_safety(path: *const c_char) -> i32 {
     safety::calculate_safety_level(path_str) as i32
 }
 
+// ============================================================================
+// Safety Validator FFI Functions
+// ============================================================================
+
+/// Check if a path is protected (DANGER level - never delete)
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - Returns true if the path is protected, false otherwise
+#[no_mangle]
+pub unsafe extern "C" fn osx_is_protected(path: *const c_char) -> bool {
+    if path.is_null() {
+        return true; // Treat null paths as protected for safety
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return true, // Treat invalid paths as protected for safety
+    };
+
+    let validator = safety::SafetyValidator::new();
+    validator.is_protected(std::path::Path::new(path_str))
+}
+
+/// Classify a path and return detailed information as JSON
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON: {"path": "...", "level": "...", "level_value": N, "reason": "...", "is_deletable": bool}
+#[no_mangle]
+pub unsafe extern "C" fn osx_classify_path(path: *const c_char) -> FFIResult {
+    if path.is_null() {
+        return FFIResult::err("Path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
+    };
+
+    let validator = safety::SafetyValidator::new();
+    let path_obj = std::path::Path::new(path_str);
+    let level = validator.classify(path_obj);
+
+    #[derive(serde::Serialize)]
+    struct ClassifyResult {
+        path: String,
+        level: String,
+        level_value: u8,
+        reason: String,
+        is_deletable: bool,
+        requires_confirmation: bool,
+    }
+
+    let result = ClassifyResult {
+        path: path_str.to_string(),
+        level: level.to_string(),
+        level_value: level as u8,
+        reason: level.description().to_string(),
+        is_deletable: level.is_deletable(),
+        requires_confirmation: level.requires_confirmation(),
+    };
+
+    let json = serde_json::to_string(&result).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Validate multiple paths in batch
+///
+/// # Safety
+/// - `paths_json` must be a valid null-terminated C string containing a JSON array of paths
+/// - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
+/// - The returned FFIResult must be freed with `osx_free_result`
+/// - Returns JSON array of validation results
+#[no_mangle]
+pub unsafe extern "C" fn osx_validate_batch(
+    paths_json: *const c_char,
+    cleanup_level: i32,
+) -> FFIResult {
+    if paths_json.is_null() {
+        return FFIResult::err("Paths JSON is null".to_string());
+    }
+
+    let paths_str = match CStr::from_ptr(paths_json).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in paths JSON".to_string()),
+    };
+
+    let paths: Vec<String> = match serde_json::from_str(paths_str) {
+        Ok(p) => p,
+        Err(e) => return FFIResult::err(format!("Invalid JSON: {}", e)),
+    };
+
+    let cleanup = safety::CleanupLevel::from(cleanup_level as u8);
+    let path_refs: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
+
+    let results = safety::validate_batch(&path_refs, cleanup);
+
+    #[derive(serde::Serialize)]
+    struct BatchResult {
+        path: String,
+        success: bool,
+        level: Option<String>,
+        level_value: Option<u8>,
+        error: Option<String>,
+    }
+
+    let batch_results: Vec<BatchResult> = paths
+        .iter()
+        .zip(results.iter())
+        .map(|(path, result)| match result {
+            Ok(level) => BatchResult {
+                path: path.clone(),
+                success: true,
+                level: Some(level.to_string()),
+                level_value: Some(*level as u8),
+                error: None,
+            },
+            Err(e) => BatchResult {
+                path: path.clone(),
+                success: false,
+                level: None,
+                level_value: None,
+                error: Some(e.to_string()),
+            },
+        })
+        .collect();
+
+    let json = serde_json::to_string(&batch_results).unwrap_or_default();
+    FFIResult::ok(Some(json))
+}
+
+/// Validate a single cleanup operation
+///
+/// # Safety
+/// - `path` must be a valid null-terminated C string
+/// - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
+/// - The returned FFIResult must be freed with `osx_free_result`
+#[no_mangle]
+pub unsafe extern "C" fn osx_validate_cleanup(
+    path: *const c_char,
+    cleanup_level: i32,
+) -> FFIResult {
+    if path.is_null() {
+        return FFIResult::err("Path is null".to_string());
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return FFIResult::err("Invalid UTF-8 in path".to_string()),
+    };
+
+    let cleanup = safety::CleanupLevel::from(cleanup_level as u8);
+
+    match safety::validate_cleanup(path_str, cleanup) {
+        Ok(()) => {
+            let validator = safety::SafetyValidator::new();
+            let level = validator.classify(std::path::Path::new(path_str));
+
+            #[derive(serde::Serialize)]
+            struct ValidateResult {
+                valid: bool,
+                level: String,
+                level_value: u8,
+            }
+
+            let result = ValidateResult {
+                valid: true,
+                level: level.to_string(),
+                level_value: level as u8,
+            };
+
+            let json = serde_json::to_string(&result).unwrap_or_default();
+            FFIResult::ok(Some(json))
+        }
+        Err(e) => FFIResult::err(e.to_string()),
+    }
+}
+
 /// Clean a path with the specified cleanup level
 ///
 /// # Safety

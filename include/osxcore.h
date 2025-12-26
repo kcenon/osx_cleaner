@@ -66,6 +66,48 @@ struct osx_FFIResult osx_analyze_path(const char *path);
 int32_t osx_calculate_safety(const char *path);
 
 /**
+ * Check if a path is protected (DANGER level - never delete)
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - Returns true if the path is protected, false otherwise
+ */
+bool osx_is_protected(const char *path);
+
+/**
+ * Classify a path and return detailed information as JSON
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON: {"path": "...", "level": "...", "level_value": N, "reason": "...", "is_deletable": bool}
+ */
+struct osx_FFIResult osx_classify_path(const char *path);
+
+/**
+ * Validate multiple paths in batch
+ *
+ * # Safety
+ * - `paths_json` must be a valid null-terminated C string containing a JSON array of paths
+ * - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
+ * - The returned FFIResult must be freed with `osx_free_result`
+ * - Returns JSON array of validation results
+ */
+struct osx_FFIResult osx_validate_batch(const char *paths_json,
+                                        int32_t cleanup_level);
+
+/**
+ * Validate a single cleanup operation
+ *
+ * # Safety
+ * - `path` must be a valid null-terminated C string
+ * - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
+ * - The returned FFIResult must be freed with `osx_free_result`
+ */
+struct osx_FFIResult osx_validate_cleanup(const char *path,
+                                          int32_t cleanup_level);
+
+/**
  * Clean a path with the specified cleanup level
  *
  * # Safety
