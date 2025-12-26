@@ -660,11 +660,15 @@ Cleans:
 osxcleaner clean --target logs
 ```
 
-Cleans:
-- System logs
-- User logs
-- Crash reports
-- Diagnostic reports
+Cleans user-level logs and diagnostic data:
+- User application logs (`~/Library/Logs/`)
+- Crash reports (`~/Library/Logs/DiagnosticReports/*.crash`)
+- Spin reports (unresponsive apps, `*.spin`)
+- Hang reports (frozen apps, `*.hang`)
+- Diagnostic reports (`*.diag`)
+
+**Note:** System logs (`/var/log/`) are read-only and managed by macOS `newsyslog`.
+Refer to `SRS-FR-F04-001` and `SRS-FR-F04-002` for detailed requirements.
 
 ---
 
