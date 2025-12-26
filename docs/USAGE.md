@@ -8,6 +8,7 @@
 
 - [Getting Started](#getting-started)
 - [Commands Overview](#commands-overview)
+- [Interactive Command](#interactive-command)
 - [Analyze Command](#analyze-command)
 - [Clean Command](#clean-command)
 - [Snapshot Command](#snapshot-command)
@@ -43,6 +44,7 @@ osxcleaner clean --level light
 
 | Command | Description | Common Use |
 |---------|-------------|------------|
+| `interactive` | Launch interactive TUI | Easy navigation |
 | `analyze` | Analyze disk usage | Before cleanup |
 | `clean` | Clean specified targets | Regular maintenance |
 | `snapshot` | Manage Time Machine snapshots | Free snapshot space |
@@ -58,6 +60,79 @@ osxcleaner clean --level light
 | `--help` | Show help |
 | `--verbose` | Detailed output |
 | `--quiet` | Minimal output |
+
+---
+
+## Interactive Command
+
+The `interactive` command launches a terminal-based user interface for easy navigation.
+
+### Basic Usage
+
+```bash
+# Launch interactive mode
+osxcleaner interactive
+```
+
+### Features
+
+- **Visual disk usage display** with colored progress bar
+- **Menu-driven navigation** using number keys
+- **Quick access** to all cleanup operations
+- **Real-time status** messages and feedback
+
+### Main Menu Options
+
+| Key | Option | Description |
+|-----|--------|-------------|
+| 1 | Analyze Disk Usage | View disk space analysis |
+| 2 | Quick Clean (Light) | Safe cleanup of caches |
+| 3 | Normal Clean | Standard cleanup |
+| 4 | Deep Clean | Thorough cleanup |
+| 5 | Manage Schedules | Setup automated cleanup |
+| 6 | Time Machine Snapshots | Manage local snapshots |
+| 7 | Configuration | App settings |
+| 8 | Monitoring Status | Disk monitoring |
+| h | Help | Show help information |
+| q | Quit | Exit the application |
+
+### Navigation
+
+- Press **number keys (1-9)** to select menu items
+- Press **b** to go back to previous menu
+- Press **q** to quit the application
+- Press **h** for help at any time
+
+### Sample Interface
+
+```
+┌──────────────────────────────────────────────────────────┐
+│              OSX Cleaner v0.1.0                          │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│   Disk Usage: 385GB / 512GB (75.2%)                     │
+│   ████████████████████░░░░░░░░                          │
+│                                                          │
+│   Main Menu:                                             │
+│                                                          │
+│   [1] 📊 Analyze Disk Usage                             │
+│   [2] 🧹 Quick Clean (Light)                            │
+│   [3] 🔧 Normal Clean                                   │
+│   [4] 💪 Deep Clean                                     │
+│   [5] ⏰ Manage Schedules                               │
+│   [6] 📸 Time Machine Snapshots                         │
+│   [7] ⚙️  Configuration                                 │
+│   [8] 📈 Monitoring Status                              │
+│   [h] ❓ Help                                           │
+│                                                          │
+│          Press [q] to quit, [h] for help                │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Requirements
+
+- Must be run in a terminal (TTY)
+- Not supported in non-interactive environments (CI/CD)
 
 ---
 
