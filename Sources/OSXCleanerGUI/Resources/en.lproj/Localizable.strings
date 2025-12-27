@@ -1,0 +1,200 @@
+/*
+  Localizable.strings (English)
+  OSX Cleaner
+
+  SPDX-License-Identifier: BSD-3-Clause
+  Copyright (c) 2021-2025
+*/
+
+// MARK: - App & Navigation
+
+"app.title" = "OSX Cleaner";
+"nav.dashboard" = "Dashboard";
+"nav.clean" = "Clean";
+"nav.schedule" = "Schedule";
+"nav.settings" = "Settings";
+
+// MARK: - Dashboard
+
+"dashboard.title" = "Dashboard";
+"dashboard.refresh" = "Refresh";
+"dashboard.diskUsage" = "Disk Usage";
+"dashboard.macintoshHD" = "Macintosh HD";
+"dashboard.analyzing" = "Analyzing disk...";
+"dashboard.used" = "Used";
+"dashboard.available" = "Available";
+"dashboard.total" = "Total";
+
+// MARK: - Quick Actions
+
+"quickActions.title" = "Quick Actions";
+"quickActions.lightClean" = "Light Clean";
+"quickActions.lightClean.subtitle" = "Safe items only";
+"quickActions.normalClean" = "Normal Clean";
+"quickActions.normalClean.subtitle" = "Includes caches";
+"quickActions.deepClean" = "Deep Clean";
+"quickActions.deepClean.subtitle" = "Developer caches";
+
+// MARK: - Cleanup Opportunities
+
+"cleanupOpportunities.title" = "Cleanup Opportunities";
+"cleanupOpportunities.analyzing" = "Analyzing...";
+
+// MARK: - Cleanup Result
+
+"cleanupResult.title" = "Cleanup Complete";
+"cleanupResult.ok" = "OK";
+"cleanupResult.message" = "Freed %@ by removing %d files.";
+
+// MARK: - Safety Levels
+
+"safety.safe" = "Safe to delete";
+"safety.caution" = "Requires rebuild";
+"safety.warning" = "Re-download needed";
+"safety.danger" = "Do not delete";
+
+// MARK: - Clean View
+
+"clean.title" = "Clean";
+"clean.scan" = "Scan";
+"clean.cleanButton" = "Clean";
+"clean.scanning" = "Scanning...";
+"clean.noResults" = "No Scan Results";
+"clean.noResults.description" = "Click 'Scan' to find items to clean up.";
+"clean.items" = "%d items";
+"clean.total" = "Total: %@";
+
+// MARK: - Cleanup Levels
+
+"cleanupLevel.title" = "Cleanup Level";
+"cleanupLevel.light" = "Light";
+"cleanupLevel.light.description" = "Safe items only (trash, browser cache)";
+"cleanupLevel.normal" = "Normal";
+"cleanupLevel.normal.description" = "Includes user caches and old logs";
+"cleanupLevel.deep" = "Deep";
+"cleanupLevel.deep.description" = "Developer caches and unused data";
+
+// MARK: - Cleanup Targets
+
+"cleanupTargets.title" = "Targets";
+"cleanupTargets.all" = "All";
+"cleanupTargets.browser" = "Browser";
+"cleanupTargets.developer" = "Developer";
+"cleanupTargets.logs" = "Logs";
+"cleanupTargets.system" = "System";
+
+// MARK: - Confirm Cleanup
+
+"confirmCleanup.title" = "Confirm Cleanup";
+"confirmCleanup.message" = "This will delete %d items. This action cannot be undone.";
+"confirmCleanup.cancel" = "Cancel";
+"confirmCleanup.clean" = "Clean";
+
+// MARK: - Schedule View
+
+"schedule.title" = "Schedule";
+"schedule.addSchedule" = "Add Schedule";
+"schedule.loading" = "Loading schedules...";
+"schedule.noSchedules" = "No Schedules";
+"schedule.noSchedules.description" = "Set up automated cleanup schedules to keep your Mac running smoothly.";
+"schedule.dailyAt" = "Daily at %@";
+"schedule.weeklyAt" = "%@ at %@";
+"schedule.monthlyAt" = "Day %d at %@";
+
+// MARK: - Add Schedule Sheet
+
+"addSchedule.title" = "Add Schedule";
+"addSchedule.details" = "Schedule Details";
+"addSchedule.name" = "Name";
+"addSchedule.frequency" = "Frequency";
+"addSchedule.cleanupLevel" = "Cleanup Level";
+"addSchedule.time" = "Time";
+"addSchedule.hour" = "Hour: %d";
+"addSchedule.minute" = "Minute: %d";
+"addSchedule.weekday" = "Weekday";
+"addSchedule.dayOfMonth" = "Day of Month: %d";
+"addSchedule.cancel" = "Cancel";
+"addSchedule.add" = "Add";
+
+// MARK: - Schedule Frequencies
+
+"frequency.daily" = "Daily";
+"frequency.weekly" = "Weekly";
+"frequency.monthly" = "Monthly";
+
+// MARK: - Weekdays
+
+"weekday.sunday" = "Sunday";
+"weekday.monday" = "Monday";
+"weekday.tuesday" = "Tuesday";
+"weekday.wednesday" = "Wednesday";
+"weekday.thursday" = "Thursday";
+"weekday.friday" = "Friday";
+"weekday.saturday" = "Saturday";
+
+// MARK: - Settings View
+
+"settings.title" = "Settings";
+
+// General Section
+"settings.general" = "General";
+"settings.showNotifications" = "Show notifications";
+"settings.confirmBeforeCleanup" = "Confirm before cleanup";
+"settings.keepLogsFor" = "Keep logs for";
+"settings.days" = "%d days";
+
+// Disk Monitoring Section
+"settings.diskMonitoring" = "Disk Monitoring";
+"settings.enableDiskMonitoring" = "Enable disk monitoring";
+"settings.warningThreshold" = "Warning threshold";
+"settings.notifyWhenExceeds" = "Notify when disk usage exceeds %d%%";
+
+// Automatic Cleanup Section
+"settings.automaticCleanup" = "Automatic Cleanup";
+"settings.enableAutomaticCleanup" = "Enable automatic cleanup";
+"settings.cleanupLevel" = "Cleanup level";
+"settings.autoCleanupNote" = "Automatic cleanup runs when disk usage exceeds 95%";
+
+// Protected Paths Section
+"settings.protectedPaths" = "Protected Paths";
+"settings.protectedPaths.description" = "The following paths are always protected from deletion:";
+"settings.protectedReason.system" = "System files";
+"settings.protectedReason.applications" = "Applications";
+"settings.protectedReason.documents" = "User documents";
+"settings.protectedReason.desktop" = "Desktop files";
+"settings.protectedReason.ssh" = "SSH keys";
+"settings.protectedReason.keychains" = "Security credentials";
+
+// About Section
+"settings.about" = "About";
+"settings.version" = "Version";
+"settings.build" = "Build";
+"settings.buildPhase" = "Phase 3 Preview";
+"settings.github" = "GitHub Repository";
+"settings.reportIssue" = "Report an Issue";
+
+// Alerts
+"settings.saved" = "Settings Saved";
+"settings.error" = "Error";
+
+// MARK: - Language Settings
+
+"settings.language" = "Language";
+"settings.language.auto" = "System Default";
+"settings.language.english" = "English";
+"settings.language.korean" = "Korean";
+"settings.language.japanese" = "Japanese";
+"settings.language.description" = "Select your preferred language";
+
+// MARK: - Menu Commands
+
+"menu.checkForUpdates" = "Check for Updates...";
+
+// MARK: - Common
+
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.delete" = "Delete";
+"common.save" = "Save";
+"common.loading" = "Loading...";
+"common.error" = "Error";
