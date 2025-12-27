@@ -79,39 +79,77 @@ struct ScheduleView: View {
         isLoading = true
         defer { isLoading = false }
 
-        // TODO: Load actual schedules from SchedulerService
-        // Simulated data for now
-        schedules = [
+        let infos = appState.schedulerService.listSchedules()
+        schedules = infos.map { info in
             ScheduleItem(
-                name: "Daily Light Cleanup",
-                frequency: .daily,
-                level: .light,
-                hour: 3,
-                minute: 0,
-                isEnabled: true
-            ),
-            ScheduleItem(
-                name: "Weekly Normal Cleanup",
-                frequency: .weekly,
-                level: .normal,
-                hour: 2,
-                minute: 30,
-                weekday: .sunday,
-                isEnabled: false
+                name: "\(info.frequency.capitalized) Cleanup",
+                frequency: GUIScheduleFrequency(rawValue: info.frequency.capitalized) ?? .daily,
+                level: CleanupLevel.from(string: info.level) ?? .normal,
+                hour: parseHour(from: info.timeDescription),
+                minute: parseMinute(from: info.timeDescription),
+                weekday: parseWeekday(from: info.timeDescription),
+                dayOfMonth: parseDay(from: info.timeDescription),
+                isEnabled: info.enabled
             )
-        ]
+        }
     }
 
     private func toggleSchedule(_ schedule: ScheduleItem) {
-        if let index = schedules.firstIndex(where: { $0.id == schedule.id }) {
+        guard let index = schedules.firstIndex(where: { $0.id == schedule.id }) else { return }
+
+        do {
+            let frequency = schedule.frequency.toBackendFrequency()
+            if schedule.isEnabled {
+                try appState.schedulerService.disableSchedule(frequency)
+            } else {
+                try appState.schedulerService.enableSchedule(frequency)
+            }
             schedules[index].isEnabled.toggle()
-            // TODO: Update actual schedule via SchedulerService
+        } catch {
+            appState.lastError = error.localizedDescription
         }
     }
 
     private func deleteSchedule(_ schedule: ScheduleItem) {
-        schedules.removeAll { $0.id == schedule.id }
-        // TODO: Delete actual schedule via SchedulerService
+        do {
+            let frequency = schedule.frequency.toBackendFrequency()
+            try appState.schedulerService.removeSchedule(frequency)
+            schedules.removeAll { $0.id == schedule.id }
+        } catch {
+            appState.lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Parse Helpers
+
+    private func parseHour(from timeDesc: String) -> Int {
+        let components = timeDesc.components(separatedBy: ":")
+        guard let hour = components.first, let hourInt = Int(hour) else { return 0 }
+        return hourInt
+    }
+
+    private func parseMinute(from timeDesc: String) -> Int {
+        let components = timeDesc.components(separatedBy: ":")
+        guard components.count > 1 else { return 0 }
+        let minutePart = components[1].prefix(2)
+        return Int(minutePart) ?? 0
+    }
+
+    private func parseWeekday(from timeDesc: String) -> Weekday? {
+        for weekday in Weekday.allCases {
+            if timeDesc.contains(weekday.rawValue) {
+                return weekday
+            }
+        }
+        return nil
+    }
+
+    private func parseDay(from timeDesc: String) -> Int? {
+        if let range = timeDesc.range(of: "on day ") {
+            let dayPart = timeDesc[range.upperBound...]
+            return Int(dayPart.prefix(2).trimmingCharacters(in: .whitespaces))
+        }
+        return nil
     }
 }
 
@@ -120,7 +158,7 @@ struct ScheduleView: View {
 struct ScheduleItem: Identifiable {
     let id = UUID()
     var name: String
-    var frequency: ScheduleFrequency
+    var frequency: GUIScheduleFrequency
     var level: CleanupLevel
     var hour: Int
     var minute: Int
@@ -144,10 +182,19 @@ struct ScheduleItem: Identifiable {
     }
 }
 
-enum ScheduleFrequency: String, CaseIterable {
+/// GUI-specific schedule frequency that maps to backend ScheduleFrequency
+enum GUIScheduleFrequency: String, CaseIterable {
     case daily = "Daily"
     case weekly = "Weekly"
     case monthly = "Monthly"
+
+    func toBackendFrequency() -> ScheduleFrequency {
+        switch self {
+        case .daily: return .daily
+        case .weekly: return .weekly
+        case .monthly: return .monthly
+        }
+    }
 }
 
 enum Weekday: String, CaseIterable {
@@ -158,6 +205,18 @@ enum Weekday: String, CaseIterable {
     case thursday = "Thursday"
     case friday = "Friday"
     case saturday = "Saturday"
+
+    var weekdayNumber: Int {
+        switch self {
+        case .sunday: return 0
+        case .monday: return 1
+        case .tuesday: return 2
+        case .wednesday: return 3
+        case .thursday: return 4
+        case .friday: return 5
+        case .saturday: return 6
+        }
+    }
 }
 
 // MARK: - Schedule Row
@@ -206,14 +265,16 @@ struct ScheduleRow: View {
 
 struct AddScheduleSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
 
     @State private var name = ""
-    @State private var frequency: ScheduleFrequency = .daily
+    @State private var frequency: GUIScheduleFrequency = .daily
     @State private var level: CleanupLevel = .light
     @State private var hour = 3
     @State private var minute = 0
     @State private var weekday: Weekday = .sunday
     @State private var dayOfMonth = 1
+    @State private var errorMessage: String?
 
     let onAdd: (ScheduleItem) -> Void
 
@@ -224,7 +285,7 @@ struct AddScheduleSheet: View {
                     TextField("Name", text: $name)
 
                     Picker("Frequency", selection: $frequency) {
-                        ForEach(ScheduleFrequency.allCases, id: \.self) { freq in
+                        ForEach(GUIScheduleFrequency.allCases, id: \.self) { freq in
                             Text(freq.rawValue).tag(freq)
                         }
                     }
@@ -252,6 +313,13 @@ struct AddScheduleSheet: View {
                         Stepper("Day of Month: \(dayOfMonth)", value: $dayOfMonth, in: 1...28)
                     }
                 }
+
+                if let error = errorMessage {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                    }
+                }
             }
             .formStyle(.grouped)
             .navigationTitle("Add Schedule")
@@ -263,23 +331,43 @@ struct AddScheduleSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let newSchedule = ScheduleItem(
-                            name: name.isEmpty ? "Cleanup Schedule" : name,
-                            frequency: frequency,
-                            level: level,
-                            hour: hour,
-                            minute: minute,
-                            weekday: frequency == .weekly ? weekday : nil,
-                            dayOfMonth: frequency == .monthly ? dayOfMonth : nil,
-                            isEnabled: true
-                        )
-                        onAdd(newSchedule)
-                        dismiss()
+                        createSchedule()
                     }
                 }
             }
         }
         .frame(minWidth: 400, minHeight: 350)
+    }
+
+    private func createSchedule() {
+        do {
+            let config = ScheduleConfig(
+                frequency: frequency.toBackendFrequency(),
+                level: level,
+                hour: hour,
+                minute: minute,
+                weekday: frequency == .weekly ? weekday.weekdayNumber : nil,
+                day: frequency == .monthly ? dayOfMonth : nil
+            )
+
+            try appState.schedulerService.createSchedule(config)
+            try appState.schedulerService.enableSchedule(frequency.toBackendFrequency())
+
+            let newSchedule = ScheduleItem(
+                name: name.isEmpty ? "\(frequency.rawValue) Cleanup" : name,
+                frequency: frequency,
+                level: level,
+                hour: hour,
+                minute: minute,
+                weekday: frequency == .weekly ? weekday : nil,
+                dayOfMonth: frequency == .monthly ? dayOfMonth : nil,
+                isEnabled: true
+            )
+            onAdd(newSchedule)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
