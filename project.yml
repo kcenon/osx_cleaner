@@ -100,6 +100,8 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.files.downloads.read-write: true
         com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.files.bookmarks.app-scope: true
 
   osxcleaner:
     type: tool
