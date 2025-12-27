@@ -9,6 +9,10 @@ struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
     @State private var diskInfo: DiskSpaceInfo?
     @State private var isAnalyzing = false
+    @State private var isCleaning = false
+    @State private var cleanupOpportunities: [CleanupOpportunity] = []
+    @State private var showCleanupResult = false
+    @State private var lastCleanResult: CleanResult?
 
     var body: some View {
         ScrollView {
@@ -106,30 +110,40 @@ struct DashboardView: View {
                     title: "Light Clean",
                     subtitle: "Safe items only",
                     icon: "sparkles",
-                    color: .green
+                    color: .green,
+                    isLoading: isCleaning
                 ) {
-                    // TODO: Perform light clean
+                    Task { await performCleanup(.light) }
                 }
 
                 QuickActionButton(
                     title: "Normal Clean",
                     subtitle: "Includes caches",
                     icon: "wind",
-                    color: .orange
+                    color: .orange,
+                    isLoading: isCleaning
                 ) {
-                    // TODO: Perform normal clean
+                    Task { await performCleanup(.normal) }
                 }
 
                 QuickActionButton(
                     title: "Deep Clean",
                     subtitle: "Developer caches",
                     icon: "tornado",
-                    color: .red
+                    color: .red,
+                    isLoading: isCleaning
                 ) {
-                    // TODO: Perform deep clean
+                    Task { await performCleanup(.deep) }
                 }
             }
             .padding(.vertical, 8)
+        }
+        .alert("Cleanup Complete", isPresented: $showCleanupResult) {
+            Button("OK") {}
+        } message: {
+            if let result = lastCleanResult {
+                Text("Freed \(result.formattedFreedSpace) by removing \(result.filesRemoved) files.")
+            }
         }
     }
 
@@ -138,26 +152,24 @@ struct DashboardView: View {
     private var cleanupOpportunitiesSection: some View {
         GroupBox("Cleanup Opportunities") {
             VStack(alignment: .leading, spacing: 12) {
-                CleanupOpportunityRow(
-                    category: "Browser Caches",
-                    icon: "globe",
-                    size: "2.3 GB",
-                    safety: .safe
-                )
-                Divider()
-                CleanupOpportunityRow(
-                    category: "Application Caches",
-                    icon: "app.badge",
-                    size: "5.1 GB",
-                    safety: .caution
-                )
-                Divider()
-                CleanupOpportunityRow(
-                    category: "Developer Tools",
-                    icon: "hammer",
-                    size: "12.7 GB",
-                    safety: .warning
-                )
+                if cleanupOpportunities.isEmpty {
+                    Text("Analyzing...")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else {
+                    ForEach(cleanupOpportunities) { opportunity in
+                        CleanupOpportunityRow(
+                            category: opportunity.category,
+                            icon: opportunity.icon,
+                            size: opportunity.formattedSize,
+                            safety: opportunity.safety
+                        )
+                        if opportunity.id != cleanupOpportunities.last?.id {
+                            Divider()
+                        }
+                    }
+                }
             }
             .padding(.vertical, 8)
         }
@@ -169,9 +181,92 @@ struct DashboardView: View {
         isAnalyzing = true
         defer { isAnalyzing = false }
 
-        // Small delay to show loading state
-        try? await Task.sleep(for: .milliseconds(300))
+        // Get disk space info
         diskInfo = appState.getDiskSpace()
+
+        // Analyze cleanup opportunities
+        do {
+            let config = AnalyzerConfiguration(
+                targetPath: "~",
+                minSize: 10_000_000, // Minimum 10MB
+                verbose: false,
+                includeHidden: false
+            )
+            let result = try await appState.analyzerService.analyze(with: config)
+
+            cleanupOpportunities = result.categories.map { category in
+                CleanupOpportunity(
+                    category: category.name,
+                    icon: iconForCategory(category.name),
+                    size: category.size,
+                    safety: safetyForCategory(category.name)
+                )
+            }.filter { $0.size > 0 }
+        } catch {
+            appState.lastError = error.localizedDescription
+        }
+    }
+
+    private func performCleanup(_ level: CleanupLevel) async {
+        isCleaning = true
+        defer { isCleaning = false }
+
+        do {
+            let config = CleanerConfiguration(
+                cleanupLevel: level,
+                dryRun: false,
+                includeSystemCaches: level == .deep || level == .system,
+                includeDeveloperCaches: level == .deep || level == .system,
+                includeBrowserCaches: true,
+                includeLogsCaches: level != .light,
+                specificPaths: []
+            )
+
+            let result = try await appState.cleanerService.clean(with: config)
+            lastCleanResult = result
+            showCleanupResult = true
+
+            // Refresh data after cleanup
+            await refreshData()
+        } catch {
+            appState.lastError = error.localizedDescription
+        }
+    }
+
+    private func iconForCategory(_ name: String) -> String {
+        switch name.lowercased() {
+        case let n where n.contains("browser"): return "globe"
+        case let n where n.contains("developer"): return "hammer"
+        case let n where n.contains("system"): return "gearshape.2"
+        case let n where n.contains("log"): return "doc.text"
+        case let n where n.contains("download"): return "arrow.down.circle"
+        default: return "app.badge"
+        }
+    }
+
+    private func safetyForCategory(_ name: String) -> SafetyLevel {
+        switch name.lowercased() {
+        case let n where n.contains("browser"): return .safe
+        case let n where n.contains("developer"): return .caution
+        case let n where n.contains("system"): return .warning
+        case let n where n.contains("log"): return .safe
+        case let n where n.contains("download"): return .danger
+        default: return .caution
+        }
+    }
+}
+
+// MARK: - Cleanup Opportunity Model
+
+struct CleanupOpportunity: Identifiable {
+    let id = UUID()
+    let category: String
+    let icon: String
+    let size: UInt64
+    let safety: SafetyLevel
+
+    var formattedSize: String {
+        ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
 }
 
@@ -229,14 +324,21 @@ struct QuickActionButton: View {
     let subtitle: String
     let icon: String
     let color: Color
+    var isLoading: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title)
-                    .foregroundStyle(color)
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .frame(height: 28)
+                } else {
+                    Image(systemName: icon)
+                        .font(.title)
+                        .foregroundStyle(color)
+                }
                 Text(title)
                     .font(.headline)
                 Text(subtitle)
@@ -248,6 +350,7 @@ struct QuickActionButton: View {
             .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .disabled(isLoading)
     }
 }
 
