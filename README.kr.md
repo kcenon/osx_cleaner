@@ -333,6 +333,65 @@ OSX Cleaner는 CI/CD 파이프라인에 통합하여 빌드 중 디스크 공간
     target: 'developer'
 ```
 
+자세한 사용법은 [GitHub Action README](.github/actions/osxcleaner/README.md)를 참조하세요.
+
+### Jenkins Pipeline
+
+Jenkins Pipeline Shared Library를 사용하여 Jenkins 빌드에서 자동 정리를 수행합니다:
+
+```groovy
+@Library('osxcleaner') _
+
+pipeline {
+    agent { label 'macos' }
+
+    stages {
+        stage('빌드 전 정리') {
+            steps {
+                osxcleanerPreBuild(minSpace: 25)
+            }
+        }
+
+        stage('빌드') {
+            steps {
+                sh 'xcodebuild -scheme MyApp'
+            }
+        }
+    }
+
+    post {
+        always {
+            osxcleanerPostBuild()
+        }
+    }
+}
+```
+
+설정 및 자세한 사용법은 [Jenkins 통합 README](integrations/jenkins/README.md)를 참조하세요.
+
+### Fastlane
+
+OSX Cleaner 플러그인을 Fastlane 설정에 추가합니다:
+
+```ruby
+# Fastfile에서
+lane :build do
+  # 20GB 임계값으로 빌드 전 정리
+  osxcleaner(
+    level: "normal",
+    target: "developer",
+    min_space: 20
+  )
+
+  gym(scheme: "MyApp")
+
+  # 빌드 후 깊은 정리
+  osxcleaner(level: "deep")
+end
+```
+
+설치 및 자세한 사용법은 [Fastlane 플러그인 README](integrations/fastlane/README.md)를 참조하세요.
+
 ### CI/CD용 CLI 사용법
 
 ```bash
@@ -379,8 +438,6 @@ osxcleaner clean --level deep --dry-run --format json
 | 2 | 공간 부족 (정리가 필요했으나 실패) |
 | 3 | 권한 거부 |
 | 4 | 설정 오류 |
-
-자세한 사용법은 [GitHub Action README](.github/actions/osxcleaner/README.md)를 참조하세요.
 
 ---
 
@@ -432,6 +489,9 @@ osxcleaner/
 │       │   └── paths.rs        # 버전별 경로 해결
 │       └── fs/                 # 파일시스템 유틸
 ├── include/                    # 생성된 C 헤더
+├── integrations/               # CI/CD 플랫폼 통합
+│   ├── jenkins/                # Jenkins Pipeline Shared Library
+│   └── fastlane/               # Fastlane 플러그인
 ├── scripts/                    # 셸 스크립트
 │   ├── install.sh
 │   ├── uninstall.sh
