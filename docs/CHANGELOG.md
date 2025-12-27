@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **F15: MDM Integration** (#116)
+  - MDMConnector protocol for MDM platform integration:
+    - Base protocol with connect, disconnect, syncPolicies, reportStatus methods
+    - MDMProvider enum supporting Jamf Pro, Mosyle, and Kandji
+    - MDMConfiguration for server connection settings
+    - MDMCredentials supporting API token, OAuth2, and basic auth
+    - MDMCommand and MDMCommandResult for remote command execution
+    - MDMCleanupStatus and MDMComplianceReport for status reporting
+    - MDMPolicy for cleanup policies from MDM platforms
+  - JamfConnector implementation:
+    - OAuth 2.0 Client Credentials authentication
+    - Basic auth with token generation
+    - Policy sync via Jamf Pro REST API
+    - Status reporting via Extension Attributes
+    - Remote command execution support
+  - MosyleConnector implementation:
+    - API token and basic auth authentication
+    - Profile sync from Mosyle API
+    - Custom attribute status reporting
+    - Compliance status reporting
+    - Command queue integration
+  - KandjiConnector implementation:
+    - API token authentication
+    - Blueprint sync from Kandji API
+    - Custom script command execution
+    - Device status and compliance reporting
+  - MDMService for unified MDM management:
+    - Connector factory for provider selection
+    - Policy conversion to internal format
+    - Auto-sync with configurable interval
+    - Command execution and result reporting
+  - MDMCommand CLI subcommands:
+    - `mdm status`: Show MDM connection status
+    - `mdm connect <provider> <url>`: Connect to MDM platform
+    - `mdm disconnect`: Disconnect from MDM
+    - `mdm sync`: Sync policies from MDM
+    - `mdm policies`: List MDM policies
+    - `mdm compliance`: Show/report compliance status
+    - `mdm commands`: Fetch and execute pending commands
+  - 23 comprehensive unit tests for MDM types and mock connector
+
 ### Changed
 - **Code Quality Improvements** (#111)
   - Add SwiftLint configuration (.swiftlint.yml) for consistent code style
