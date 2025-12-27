@@ -67,52 +67,89 @@ struct CleanCommand: AsyncParsableCommand {
         let startTime = Date()
         let diskMonitor = DiskMonitoringService.shared
 
-        // Get disk space before cleanup
-        let diskInfoBefore: DiskSpaceInfo
+        let diskInfoBefore = try getDiskSpaceBefore(output: output, diskMonitor: diskMonitor)
+
+        if try checkMinSpaceThreshold(diskInfoBefore: diskInfoBefore, output: output) {
+            return
+        }
+
+        displayStartupInfo(output: output)
+
+        try await performCleanup(
+            output: output,
+            diskMonitor: diskMonitor,
+            diskInfoBefore: diskInfoBefore,
+            startTime: startTime
+        )
+    }
+
+    private func getDiskSpaceBefore(
+        output: OutputHandler,
+        diskMonitor: DiskMonitoringService
+    ) throws -> DiskSpaceInfo {
         do {
-            diskInfoBefore = try diskMonitor.getDiskSpace()
+            return try diskMonitor.getDiskSpace()
         } catch {
             output.displayError(error)
             throw ExitCode.generalError
         }
+    }
 
-        // Check min-space threshold
-        if let threshold = minSpace {
-            let thresholdBytes = threshold * minSpaceUnit.bytesMultiplier
-            if diskInfoBefore.availableSpace >= thresholdBytes {
-                let skippedResult = CleanResultJSON(
-                    status: "skipped",
-                    dryRun: dryRun,
-                    freedBytes: 0,
-                    freedFormatted: "0 bytes",
-                    filesRemoved: 0,
-                    directoriesRemoved: 0,
-                    errorCount: 0,
-                    before: DiskSpaceJSON(from: diskInfoBefore),
-                    after: DiskSpaceJSON(from: diskInfoBefore),
-                    durationMs: 0
-                )
+    private func checkMinSpaceThreshold(
+        diskInfoBefore: DiskSpaceInfo,
+        output: OutputHandler
+    ) throws -> Bool {
+        guard let threshold = minSpace else { return false }
 
-                if format == .json {
-                    if let jsonData = try? JSONEncoder().encode(skippedResult),
-                       let jsonString = String(data: jsonData, encoding: .utf8) {
-                        print(jsonString)
-                    }
-                } else {
-                    output.display(
-                        message: "Cleanup skipped: available space (\(diskInfoBefore.formattedAvailable)) >= threshold (\(threshold) \(minSpaceUnit.rawValue.uppercased()))",
-                        level: .normal
-                    )
-                }
-                return
+        let thresholdBytes = threshold * minSpaceUnit.bytesMultiplier
+
+        if diskInfoBefore.availableSpace >= thresholdBytes {
+            displaySkippedResult(diskInfoBefore: diskInfoBefore, threshold: threshold, output: output)
+            return true
+        }
+
+        let msg = "Available space (\(diskInfoBefore.formattedAvailable)) < threshold"
+        output.display(
+            message: "\(msg) (\(threshold) \(minSpaceUnit.rawValue.uppercased())), proceeding with cleanup",
+            level: .normal
+        )
+        return false
+    }
+
+    private func displaySkippedResult(
+        diskInfoBefore: DiskSpaceInfo,
+        threshold: UInt64,
+        output: OutputHandler
+    ) {
+        let skippedResult = CleanResultJSON(
+            status: "skipped",
+            dryRun: dryRun,
+            freedBytes: 0,
+            freedFormatted: "0 bytes",
+            filesRemoved: 0,
+            directoriesRemoved: 0,
+            errorCount: 0,
+            before: DiskSpaceJSON(from: diskInfoBefore),
+            after: DiskSpaceJSON(from: diskInfoBefore),
+            durationMs: 0
+        )
+
+        if format == .json {
+            if let jsonData = try? JSONEncoder().encode(skippedResult),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
             }
-
+        } else {
+            let available = diskInfoBefore.formattedAvailable
+            let unit = minSpaceUnit.rawValue.uppercased()
             output.display(
-                message: "Available space (\(diskInfoBefore.formattedAvailable)) < threshold (\(threshold) \(minSpaceUnit.rawValue.uppercased())), proceeding with cleanup",
+                message: "Cleanup skipped: available space (\(available)) >= threshold (\(threshold) \(unit))",
                 level: .normal
             )
         }
+    }
 
+    private func displayStartupInfo(output: OutputHandler) {
         output.display(message: "Starting cleanup...", level: .normal)
         output.display(message: "Cleanup level: \(level.description)", level: .verbose)
         output.display(message: "Target: \(target.description)", level: .verbose)
@@ -120,20 +157,22 @@ struct CleanCommand: AsyncParsableCommand {
         if dryRun {
             output.display(message: "[DRY RUN] No files will be deleted", level: .normal)
         }
+    }
 
+    private func performCleanup(
+        output: OutputHandler,
+        diskMonitor: DiskMonitoringService,
+        diskInfoBefore: DiskSpaceInfo,
+        startTime: Date
+    ) async throws {
         let config = buildConfiguration()
         let service = CleanerService()
-
-        // Determine trigger type based on execution mode
         let triggerType: CleanupSession.TriggerType = nonInteractive ? .scheduled : .manual
 
         do {
             let result = try await service.clean(with: config, triggerType: triggerType)
-
-            // Get disk space after cleanup
             let diskInfoAfter = try diskMonitor.getDiskSpace()
-            let endTime = Date()
-            let durationMs = Int(endTime.timeIntervalSince(startTime) * 1000)
+            let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
 
             displayResult(
                 result,
