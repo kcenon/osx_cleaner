@@ -41,11 +41,15 @@ final class AppState: ObservableObject {
     let cleanerService: CleanerService
     let analyzerService: AnalyzerService
     let diskMonitoringService: DiskMonitoringService
+    let schedulerService: SchedulerService
+    let configurationService: ConfigurationService
 
     init() {
         self.cleanerService = CleanerService()
         self.analyzerService = AnalyzerService()
         self.diskMonitoringService = DiskMonitoringService.shared
+        self.schedulerService = SchedulerService()
+        self.configurationService = ConfigurationService()
     }
 
     func getDiskSpace() -> DiskSpaceInfo? {

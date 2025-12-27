@@ -8,12 +8,14 @@ import OSXCleanerKit
 struct CleanView: View {
     @EnvironmentObject private var appState: AppState
 
-    @State private var selectedLevel: CleanupLevel = .normal
+    @State private var selectedLevel: GUICleanupLevel = .normal
     @State private var selectedTargets: Set<CleanupTarget> = [.all]
     @State private var isScanning = false
     @State private var isCleaning = false
     @State private var scanResults: [CleanupItem] = []
     @State private var showConfirmation = false
+    @State private var cleanupProgress: Double = 0
+    @State private var lastCleanResult: CleanResult?
 
     var body: some View {
         HSplitView {
@@ -60,7 +62,7 @@ struct CleanView: View {
                 // Cleanup Level
                 GroupBox("Cleanup Level") {
                     VStack(alignment: .leading, spacing: 12) {
-                        ForEach(CleanupLevel.allCases, id: \.self) { level in
+                        ForEach(GUICleanupLevel.allCases, id: \.self) { level in
                             CleanupLevelRow(
                                 level: level,
                                 isSelected: selectedLevel == level
@@ -138,23 +140,73 @@ struct CleanView: View {
         isScanning = true
         defer { isScanning = false }
 
-        // TODO: Implement actual scanning using CleanerService
-        // Simulated results for now
-        try? await Task.sleep(for: .seconds(1))
-        scanResults = [
-            CleanupItem(name: "Browser Cache", path: "~/Library/Caches/com.apple.Safari", size: 1_500_000_000, safety: .safe),
-            CleanupItem(name: "Xcode DerivedData", path: "~/Library/Developer/Xcode/DerivedData", size: 8_000_000_000, safety: .caution),
-            CleanupItem(name: "npm Cache", path: "~/.npm/_cacache", size: 2_000_000_000, safety: .safe)
-        ]
+        do {
+            let config = AnalyzerConfiguration(
+                targetPath: "~",
+                minSize: 1_000_000, // Minimum 1MB
+                verbose: false,
+                includeHidden: false
+            )
+
+            let result = try await appState.analyzerService.analyze(with: config)
+
+            // Convert analysis results to cleanup items
+            scanResults = result.categories.flatMap { category in
+                category.topItems.map { item in
+                    CleanupItem(
+                        name: item.path.components(separatedBy: "/").last ?? item.path,
+                        path: item.path,
+                        size: item.size,
+                        safety: safetyLevel(for: category.name)
+                    )
+                }
+            }
+        } catch {
+            appState.lastError = error.localizedDescription
+            scanResults = []
+        }
     }
 
     private func performCleanup() async {
         isCleaning = true
-        defer { isCleaning = false }
+        cleanupProgress = 0
+        defer {
+            isCleaning = false
+            cleanupProgress = 0
+        }
 
-        // TODO: Implement actual cleanup using CleanerService
-        try? await Task.sleep(for: .seconds(2))
-        scanResults.removeAll()
+        do {
+            let config = CleanerConfiguration(
+                cleanupLevel: selectedLevel.toBackendLevel(),
+                dryRun: false,
+                includeSystemCaches: selectedTargets.contains(.system) || selectedTargets.contains(.all),
+                includeDeveloperCaches: selectedTargets.contains(.developer) || selectedTargets.contains(.all),
+                includeBrowserCaches: selectedTargets.contains(.browser) || selectedTargets.contains(.all),
+                includeLogsCaches: selectedTargets.contains(.logs) || selectedTargets.contains(.all),
+                specificPaths: []
+            )
+
+            let result = try await appState.cleanerService.clean(with: config)
+            lastCleanResult = result
+            scanResults.removeAll()
+        } catch {
+            appState.lastError = error.localizedDescription
+        }
+    }
+
+    private func safetyLevel(for categoryName: String) -> SafetyLevel {
+        switch categoryName.lowercased() {
+        case let name where name.contains("browser"):
+            return .safe
+        case let name where name.contains("developer"):
+            return .caution
+        case let name where name.contains("system"):
+            return .warning
+        case let name where name.contains("log"):
+            return .safe
+        default:
+            return .caution
+        }
     }
 
     private func formatTotalSize() -> String {
@@ -167,7 +219,8 @@ struct CleanView: View {
 
 // MARK: - Supporting Types
 
-enum CleanupLevel: String, CaseIterable {
+/// GUI-specific cleanup level that maps to backend CleanupLevel
+enum GUICleanupLevel: String, CaseIterable {
     case light = "Light"
     case normal = "Normal"
     case deep = "Deep"
@@ -185,6 +238,15 @@ enum CleanupLevel: String, CaseIterable {
         case .light: return .green
         case .normal: return .orange
         case .deep: return .red
+        }
+    }
+
+    /// Convert to backend CleanupLevel
+    func toBackendLevel() -> CleanupLevel {
+        switch self {
+        case .light: return .light
+        case .normal: return .normal
+        case .deep: return .deep
         }
     }
 }
@@ -220,7 +282,7 @@ struct CleanupItem: Identifiable {
 // MARK: - Supporting Views
 
 struct CleanupLevelRow: View {
-    let level: CleanupLevel
+    let level: GUICleanupLevel
     let isSelected: Bool
     let action: () -> Void
 

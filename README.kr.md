@@ -517,7 +517,7 @@ osxcleaner/
   - [x] 정리 레벨 선택 정리 뷰
   - [x] 자동화 관리 스케줄 뷰
   - [x] 앱 설정 설정 뷰
-  - [ ] 전체 서비스 통합
+  - [x] 전체 서비스 통합 (CleanerService, AnalyzerService, SchedulerService, DiskMonitoringService)
   - [ ] 앱 아이콘 및 브랜딩
   - [ ] App Store 준비
 - [x] CI/CD 통합 (F08)
