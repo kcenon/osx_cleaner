@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "osxcleaner",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -34,7 +35,10 @@ let package = Package(
             dependencies: [
                 "OSXCleanerKit"
             ],
-            path: "Sources/OSXCleanerGUI"
+            path: "Sources/OSXCleanerGUI",
+            resources: [
+                .process("Resources")
+            ]
         ),
         // Rust Core C Bridge
         .systemLibrary(

@@ -38,11 +38,11 @@ struct Sidebar: View {
     var body: some View {
         List(AppTab.allCases, selection: $appState.selectedTab) { tab in
             NavigationLink(value: tab) {
-                Label(tab.rawValue, systemImage: tab.icon)
+                Label(tab.displayName, systemImage: tab.icon)
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("OSX Cleaner")
+        .navigationTitle(L("app.title"))
         .frame(minWidth: 180)
     }
 }

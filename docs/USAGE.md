@@ -1000,6 +1000,63 @@ osxcleaner analyze --format json | jq '.categories[] | select(.size_gb > 1)'
 
 ---
 
+## GUI Application
+
+OSX Cleaner also provides a native macOS GUI application.
+
+### Launching the GUI
+
+```bash
+# Build and run the GUI
+swift run OSXCleanerGUI
+
+# Or build and launch separately
+swift build --product OSXCleanerGUI
+open .build/debug/OSXCleanerGUI.app
+```
+
+### GUI Features
+
+- **Dashboard** - View disk usage overview and quick actions
+- **Clean** - Select cleanup targets and levels with scan preview
+- **Schedule** - Manage automated cleanup schedules
+- **Settings** - Configure preferences and monitoring
+
+### Localization Support
+
+The GUI application supports multiple languages:
+
+| Language | Code | Status |
+|----------|------|--------|
+| English | `en` | Default |
+| Korean | `ko` | Complete |
+| Japanese | `ja` | Complete |
+
+#### Changing Language
+
+1. Open the GUI application
+2. Navigate to **Settings**
+3. Select your preferred language from the **Language** picker
+4. The interface will update immediately
+
+#### System Language Detection
+
+By default, the application uses your macOS system language. If your system language is Korean or Japanese, the app will automatically display in that language.
+
+To override this behavior, select a specific language in Settings instead of "System Default".
+
+### Adding New Translations
+
+To contribute a new language translation:
+
+1. Create a new `.lproj` folder in `Sources/OSXCleanerGUI/Resources/`
+2. Copy `en.lproj/Localizable.strings` as a template
+3. Translate all string values
+4. Update `AppLanguage` enum in `Localization/Localization.swift`
+5. Submit a pull request
+
+---
+
 ## See Also
 
 - [Installation Guide](INSTALLATION.md)

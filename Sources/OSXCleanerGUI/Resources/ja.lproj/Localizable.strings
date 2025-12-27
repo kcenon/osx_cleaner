@@ -1,0 +1,200 @@
+/*
+  Localizable.strings (Japanese)
+  OSX Cleaner
+
+  SPDX-License-Identifier: BSD-3-Clause
+  Copyright (c) 2021-2025
+*/
+
+// MARK: - App & Navigation
+
+"app.title" = "OSX クリーナー";
+"nav.dashboard" = "ダッシュボード";
+"nav.clean" = "クリーン";
+"nav.schedule" = "スケジュール";
+"nav.settings" = "設定";
+
+// MARK: - Dashboard
+
+"dashboard.title" = "ダッシュボード";
+"dashboard.refresh" = "更新";
+"dashboard.diskUsage" = "ディスク使用状況";
+"dashboard.macintoshHD" = "Macintosh HD";
+"dashboard.analyzing" = "ディスクを分析中...";
+"dashboard.used" = "使用中";
+"dashboard.available" = "空き";
+"dashboard.total" = "合計";
+
+// MARK: - Quick Actions
+
+"quickActions.title" = "クイックアクション";
+"quickActions.lightClean" = "軽いクリーン";
+"quickActions.lightClean.subtitle" = "安全な項目のみ";
+"quickActions.normalClean" = "通常クリーン";
+"quickActions.normalClean.subtitle" = "キャッシュを含む";
+"quickActions.deepClean" = "ディープクリーン";
+"quickActions.deepClean.subtitle" = "開発者キャッシュ";
+
+// MARK: - Cleanup Opportunities
+
+"cleanupOpportunities.title" = "クリーンアップの機会";
+"cleanupOpportunities.analyzing" = "分析中...";
+
+// MARK: - Cleanup Result
+
+"cleanupResult.title" = "クリーンアップ完了";
+"cleanupResult.ok" = "OK";
+"cleanupResult.message" = "%d個のファイルを削除し、%@を解放しました。";
+
+// MARK: - Safety Levels
+
+"safety.safe" = "削除しても安全";
+"safety.caution" = "再ビルドが必要";
+"safety.warning" = "再ダウンロードが必要";
+"safety.danger" = "削除禁止";
+
+// MARK: - Clean View
+
+"clean.title" = "クリーン";
+"clean.scan" = "スキャン";
+"clean.cleanButton" = "クリーン";
+"clean.scanning" = "スキャン中...";
+"clean.noResults" = "スキャン結果なし";
+"clean.noResults.description" = "「スキャン」をクリックしてクリーンアップする項目を見つけてください。";
+"clean.items" = "%d 項目";
+"clean.total" = "合計: %@";
+
+// MARK: - Cleanup Levels
+
+"cleanupLevel.title" = "クリーンアップレベル";
+"cleanupLevel.light" = "軽い";
+"cleanupLevel.light.description" = "安全な項目のみ（ゴミ箱、ブラウザキャッシュ）";
+"cleanupLevel.normal" = "通常";
+"cleanupLevel.normal.description" = "ユーザーキャッシュと古いログを含む";
+"cleanupLevel.deep" = "ディープ";
+"cleanupLevel.deep.description" = "開発者キャッシュと未使用データ";
+
+// MARK: - Cleanup Targets
+
+"cleanupTargets.title" = "対象";
+"cleanupTargets.all" = "すべて";
+"cleanupTargets.browser" = "ブラウザ";
+"cleanupTargets.developer" = "開発者";
+"cleanupTargets.logs" = "ログ";
+"cleanupTargets.system" = "システム";
+
+// MARK: - Confirm Cleanup
+
+"confirmCleanup.title" = "クリーンアップの確認";
+"confirmCleanup.message" = "%d個の項目が削除されます。この操作は元に戻せません。";
+"confirmCleanup.cancel" = "キャンセル";
+"confirmCleanup.clean" = "クリーン";
+
+// MARK: - Schedule View
+
+"schedule.title" = "スケジュール";
+"schedule.addSchedule" = "スケジュールを追加";
+"schedule.loading" = "スケジュールを読み込み中...";
+"schedule.noSchedules" = "スケジュールなし";
+"schedule.noSchedules.description" = "自動クリーンアップスケジュールを設定して、Macをスムーズに保ちましょう。";
+"schedule.dailyAt" = "毎日 %@";
+"schedule.weeklyAt" = "毎週%@ %@";
+"schedule.monthlyAt" = "毎月%d日 %@";
+
+// MARK: - Add Schedule Sheet
+
+"addSchedule.title" = "スケジュールを追加";
+"addSchedule.details" = "スケジュール詳細";
+"addSchedule.name" = "名前";
+"addSchedule.frequency" = "頻度";
+"addSchedule.cleanupLevel" = "クリーンアップレベル";
+"addSchedule.time" = "時刻";
+"addSchedule.hour" = "時: %d";
+"addSchedule.minute" = "分: %d";
+"addSchedule.weekday" = "曜日";
+"addSchedule.dayOfMonth" = "日: %d";
+"addSchedule.cancel" = "キャンセル";
+"addSchedule.add" = "追加";
+
+// MARK: - Schedule Frequencies
+
+"frequency.daily" = "毎日";
+"frequency.weekly" = "毎週";
+"frequency.monthly" = "毎月";
+
+// MARK: - Weekdays
+
+"weekday.sunday" = "日曜日";
+"weekday.monday" = "月曜日";
+"weekday.tuesday" = "火曜日";
+"weekday.wednesday" = "水曜日";
+"weekday.thursday" = "木曜日";
+"weekday.friday" = "金曜日";
+"weekday.saturday" = "土曜日";
+
+// MARK: - Settings View
+
+"settings.title" = "設定";
+
+// General Section
+"settings.general" = "一般";
+"settings.showNotifications" = "通知を表示";
+"settings.confirmBeforeCleanup" = "クリーンアップ前に確認";
+"settings.keepLogsFor" = "ログの保持期間";
+"settings.days" = "%d日";
+
+// Disk Monitoring Section
+"settings.diskMonitoring" = "ディスク監視";
+"settings.enableDiskMonitoring" = "ディスク監視を有効にする";
+"settings.warningThreshold" = "警告しきい値";
+"settings.notifyWhenExceeds" = "ディスク使用率が%d%%を超えたら通知";
+
+// Automatic Cleanup Section
+"settings.automaticCleanup" = "自動クリーンアップ";
+"settings.enableAutomaticCleanup" = "自動クリーンアップを有効にする";
+"settings.cleanupLevel" = "クリーンアップレベル";
+"settings.autoCleanupNote" = "ディスク使用率が95%を超えると自動クリーンアップが実行されます";
+
+// Protected Paths Section
+"settings.protectedPaths" = "保護されたパス";
+"settings.protectedPaths.description" = "以下のパスは常に削除から保護されます:";
+"settings.protectedReason.system" = "システムファイル";
+"settings.protectedReason.applications" = "アプリケーション";
+"settings.protectedReason.documents" = "ユーザードキュメント";
+"settings.protectedReason.desktop" = "デスクトップファイル";
+"settings.protectedReason.ssh" = "SSHキー";
+"settings.protectedReason.keychains" = "セキュリティ資格情報";
+
+// About Section
+"settings.about" = "情報";
+"settings.version" = "バージョン";
+"settings.build" = "ビルド";
+"settings.buildPhase" = "Phase 3 プレビュー";
+"settings.github" = "GitHubリポジトリ";
+"settings.reportIssue" = "問題を報告";
+
+// Alerts
+"settings.saved" = "設定を保存しました";
+"settings.error" = "エラー";
+
+// MARK: - Language Settings
+
+"settings.language" = "言語";
+"settings.language.auto" = "システムのデフォルト";
+"settings.language.english" = "英語";
+"settings.language.korean" = "韓国語";
+"settings.language.japanese" = "日本語";
+"settings.language.description" = "ご希望の言語を選択してください";
+
+// MARK: - Menu Commands
+
+"menu.checkForUpdates" = "アップデートを確認...";
+
+// MARK: - Common
+
+"common.ok" = "OK";
+"common.cancel" = "キャンセル";
+"common.delete" = "削除";
+"common.save" = "保存";
+"common.loading" = "読み込み中...";
+"common.error" = "エラー";

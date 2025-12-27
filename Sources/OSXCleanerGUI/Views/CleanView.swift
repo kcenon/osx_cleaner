@@ -26,31 +26,31 @@ struct CleanView: View {
             // Right panel: Results
             resultsPanel
         }
-        .navigationTitle("Clean")
+        .navigationTitle(L("clean.title"))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     Task { await scanForCleanup() }
                 } label: {
-                    Label("Scan", systemImage: "magnifyingglass")
+                    Label(L("clean.scan"), systemImage: "magnifyingglass")
                 }
                 .disabled(isScanning || isCleaning)
 
                 Button {
                     showConfirmation = true
                 } label: {
-                    Label("Clean", systemImage: "trash")
+                    Label(L("clean.cleanButton"), systemImage: "trash")
                 }
                 .disabled(scanResults.isEmpty || isCleaning)
             }
         }
-        .alert("Confirm Cleanup", isPresented: $showConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clean", role: .destructive) {
+        .alert(L("confirmCleanup.title"), isPresented: $showConfirmation) {
+            Button(L("confirmCleanup.cancel"), role: .cancel) {}
+            Button(L("confirmCleanup.clean"), role: .destructive) {
                 Task { await performCleanup() }
             }
         } message: {
-            Text("This will delete \(scanResults.count) items. This action cannot be undone.")
+            Text(L("confirmCleanup.message", scanResults.count))
         }
     }
 
@@ -60,7 +60,7 @@ struct CleanView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Cleanup Level
-                GroupBox("Cleanup Level") {
+                GroupBox(L("cleanupLevel.title")) {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(GUICleanupLevel.allCases, id: \.self) { level in
                             CleanupLevelRow(
@@ -75,7 +75,7 @@ struct CleanView: View {
                 }
 
                 // Cleanup Targets
-                GroupBox("Targets") {
+                GroupBox(L("cleanupTargets.title")) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(CleanupTarget.allCases, id: \.self) { target in
                             Toggle(isOn: Binding(
@@ -107,13 +107,13 @@ struct CleanView: View {
     private var resultsPanel: some View {
         VStack {
             if isScanning {
-                ProgressView("Scanning...")
+                ProgressView(L("clean.scanning"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if scanResults.isEmpty {
                 ContentUnavailableView(
-                    "No Scan Results",
+                    L("clean.noResults"),
                     systemImage: "doc.text.magnifyingglass",
-                    description: Text("Click 'Scan' to find items to clean up.")
+                    description: Text(L("clean.noResults.description"))
                 )
             } else {
                 List(scanResults) { item in
@@ -123,9 +123,9 @@ struct CleanView: View {
 
                 // Summary
                 HStack {
-                    Text("\(scanResults.count) items")
+                    Text(L("clean.items", scanResults.count))
                     Spacer()
-                    Text("Total: \(formatTotalSize())")
+                    Text(L("clean.total", formatTotalSize()))
                         .fontWeight(.semibold)
                 }
                 .padding()
@@ -221,15 +221,23 @@ struct CleanView: View {
 
 /// GUI-specific cleanup level that maps to backend CleanupLevel
 enum GUICleanupLevel: String, CaseIterable {
-    case light = "Light"
-    case normal = "Normal"
-    case deep = "Deep"
+    case light
+    case normal
+    case deep
+
+    var displayName: String {
+        switch self {
+        case .light: return L("cleanupLevel.light")
+        case .normal: return L("cleanupLevel.normal")
+        case .deep: return L("cleanupLevel.deep")
+        }
+    }
 
     var description: String {
         switch self {
-        case .light: return "Safe items only (trash, browser cache)"
-        case .normal: return "Includes user caches and old logs"
-        case .deep: return "Developer caches and unused data"
+        case .light: return L("cleanupLevel.light.description")
+        case .normal: return L("cleanupLevel.normal.description")
+        case .deep: return L("cleanupLevel.deep.description")
         }
     }
 
@@ -252,13 +260,21 @@ enum GUICleanupLevel: String, CaseIterable {
 }
 
 enum CleanupTarget: String, CaseIterable {
-    case all = "All"
-    case browser = "Browser"
-    case developer = "Developer"
-    case logs = "Logs"
-    case system = "System"
+    case all
+    case browser
+    case developer
+    case logs
+    case system
 
-    var displayName: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .all: return L("cleanupTargets.all")
+        case .browser: return L("cleanupTargets.browser")
+        case .developer: return L("cleanupTargets.developer")
+        case .logs: return L("cleanupTargets.logs")
+        case .system: return L("cleanupTargets.system")
+        }
+    }
 
     var icon: String {
         switch self {
@@ -293,7 +309,7 @@ struct CleanupLevelRow: View {
                     .foregroundStyle(isSelected ? level.color : .secondary)
 
                 VStack(alignment: .leading) {
-                    Text(level.rawValue)
+                    Text(level.displayName)
                         .fontWeight(isSelected ? .semibold : .regular)
                     Text(level.description)
                         .font(.caption)

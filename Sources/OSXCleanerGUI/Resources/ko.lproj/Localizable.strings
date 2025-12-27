@@ -1,0 +1,200 @@
+/*
+  Localizable.strings (Korean)
+  OSX Cleaner
+
+  SPDX-License-Identifier: BSD-3-Clause
+  Copyright (c) 2021-2025
+*/
+
+// MARK: - App & Navigation
+
+"app.title" = "OSX 클리너";
+"nav.dashboard" = "대시보드";
+"nav.clean" = "정리";
+"nav.schedule" = "예약";
+"nav.settings" = "설정";
+
+// MARK: - Dashboard
+
+"dashboard.title" = "대시보드";
+"dashboard.refresh" = "새로고침";
+"dashboard.diskUsage" = "디스크 사용량";
+"dashboard.macintoshHD" = "Macintosh HD";
+"dashboard.analyzing" = "디스크 분석 중...";
+"dashboard.used" = "사용 중";
+"dashboard.available" = "사용 가능";
+"dashboard.total" = "전체";
+
+// MARK: - Quick Actions
+
+"quickActions.title" = "빠른 작업";
+"quickActions.lightClean" = "가벼운 정리";
+"quickActions.lightClean.subtitle" = "안전한 항목만";
+"quickActions.normalClean" = "일반 정리";
+"quickActions.normalClean.subtitle" = "캐시 포함";
+"quickActions.deepClean" = "심층 정리";
+"quickActions.deepClean.subtitle" = "개발자 캐시";
+
+// MARK: - Cleanup Opportunities
+
+"cleanupOpportunities.title" = "정리 가능 항목";
+"cleanupOpportunities.analyzing" = "분석 중...";
+
+// MARK: - Cleanup Result
+
+"cleanupResult.title" = "정리 완료";
+"cleanupResult.ok" = "확인";
+"cleanupResult.message" = "%d개 파일을 삭제하여 %@를 확보했습니다.";
+
+// MARK: - Safety Levels
+
+"safety.safe" = "삭제해도 안전함";
+"safety.caution" = "재빌드 필요";
+"safety.warning" = "재다운로드 필요";
+"safety.danger" = "삭제 금지";
+
+// MARK: - Clean View
+
+"clean.title" = "정리";
+"clean.scan" = "검색";
+"clean.cleanButton" = "정리";
+"clean.scanning" = "검색 중...";
+"clean.noResults" = "검색 결과 없음";
+"clean.noResults.description" = "'검색'을 클릭하여 정리할 항목을 찾으세요.";
+"clean.items" = "%d개 항목";
+"clean.total" = "총계: %@";
+
+// MARK: - Cleanup Levels
+
+"cleanupLevel.title" = "정리 수준";
+"cleanupLevel.light" = "가벼움";
+"cleanupLevel.light.description" = "안전한 항목만 (휴지통, 브라우저 캐시)";
+"cleanupLevel.normal" = "보통";
+"cleanupLevel.normal.description" = "사용자 캐시 및 오래된 로그 포함";
+"cleanupLevel.deep" = "심층";
+"cleanupLevel.deep.description" = "개발자 캐시 및 미사용 데이터";
+
+// MARK: - Cleanup Targets
+
+"cleanupTargets.title" = "대상";
+"cleanupTargets.all" = "전체";
+"cleanupTargets.browser" = "브라우저";
+"cleanupTargets.developer" = "개발자";
+"cleanupTargets.logs" = "로그";
+"cleanupTargets.system" = "시스템";
+
+// MARK: - Confirm Cleanup
+
+"confirmCleanup.title" = "정리 확인";
+"confirmCleanup.message" = "%d개 항목이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.";
+"confirmCleanup.cancel" = "취소";
+"confirmCleanup.clean" = "정리";
+
+// MARK: - Schedule View
+
+"schedule.title" = "예약";
+"schedule.addSchedule" = "예약 추가";
+"schedule.loading" = "예약 불러오는 중...";
+"schedule.noSchedules" = "예약 없음";
+"schedule.noSchedules.description" = "자동 정리 예약을 설정하여 Mac을 원활하게 유지하세요.";
+"schedule.dailyAt" = "매일 %@";
+"schedule.weeklyAt" = "매주 %@ %@";
+"schedule.monthlyAt" = "매월 %d일 %@";
+
+// MARK: - Add Schedule Sheet
+
+"addSchedule.title" = "예약 추가";
+"addSchedule.details" = "예약 상세";
+"addSchedule.name" = "이름";
+"addSchedule.frequency" = "빈도";
+"addSchedule.cleanupLevel" = "정리 수준";
+"addSchedule.time" = "시간";
+"addSchedule.hour" = "시: %d";
+"addSchedule.minute" = "분: %d";
+"addSchedule.weekday" = "요일";
+"addSchedule.dayOfMonth" = "일: %d";
+"addSchedule.cancel" = "취소";
+"addSchedule.add" = "추가";
+
+// MARK: - Schedule Frequencies
+
+"frequency.daily" = "매일";
+"frequency.weekly" = "매주";
+"frequency.monthly" = "매월";
+
+// MARK: - Weekdays
+
+"weekday.sunday" = "일요일";
+"weekday.monday" = "월요일";
+"weekday.tuesday" = "화요일";
+"weekday.wednesday" = "수요일";
+"weekday.thursday" = "목요일";
+"weekday.friday" = "금요일";
+"weekday.saturday" = "토요일";
+
+// MARK: - Settings View
+
+"settings.title" = "설정";
+
+// General Section
+"settings.general" = "일반";
+"settings.showNotifications" = "알림 표시";
+"settings.confirmBeforeCleanup" = "정리 전 확인";
+"settings.keepLogsFor" = "로그 보관 기간";
+"settings.days" = "%d일";
+
+// Disk Monitoring Section
+"settings.diskMonitoring" = "디스크 모니터링";
+"settings.enableDiskMonitoring" = "디스크 모니터링 활성화";
+"settings.warningThreshold" = "경고 임계값";
+"settings.notifyWhenExceeds" = "디스크 사용량이 %d%%를 초과하면 알림";
+
+// Automatic Cleanup Section
+"settings.automaticCleanup" = "자동 정리";
+"settings.enableAutomaticCleanup" = "자동 정리 활성화";
+"settings.cleanupLevel" = "정리 수준";
+"settings.autoCleanupNote" = "디스크 사용량이 95%를 초과하면 자동 정리 실행";
+
+// Protected Paths Section
+"settings.protectedPaths" = "보호된 경로";
+"settings.protectedPaths.description" = "다음 경로는 항상 삭제로부터 보호됩니다:";
+"settings.protectedReason.system" = "시스템 파일";
+"settings.protectedReason.applications" = "응용 프로그램";
+"settings.protectedReason.documents" = "사용자 문서";
+"settings.protectedReason.desktop" = "데스크탑 파일";
+"settings.protectedReason.ssh" = "SSH 키";
+"settings.protectedReason.keychains" = "보안 자격 증명";
+
+// About Section
+"settings.about" = "정보";
+"settings.version" = "버전";
+"settings.build" = "빌드";
+"settings.buildPhase" = "Phase 3 미리보기";
+"settings.github" = "GitHub 저장소";
+"settings.reportIssue" = "문제 신고";
+
+// Alerts
+"settings.saved" = "설정 저장됨";
+"settings.error" = "오류";
+
+// MARK: - Language Settings
+
+"settings.language" = "언어";
+"settings.language.auto" = "시스템 기본";
+"settings.language.english" = "영어";
+"settings.language.korean" = "한국어";
+"settings.language.japanese" = "일본어";
+"settings.language.description" = "원하는 언어를 선택하세요";
+
+// MARK: - Menu Commands
+
+"menu.checkForUpdates" = "업데이트 확인...";
+
+// MARK: - Common
+
+"common.ok" = "확인";
+"common.cancel" = "취소";
+"common.delete" = "삭제";
+"common.save" = "저장";
+"common.loading" = "로딩 중...";
+"common.error" = "오류";

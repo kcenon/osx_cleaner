@@ -15,7 +15,7 @@ struct ScheduleView: View {
     var body: some View {
         VStack(spacing: 0) {
             if isLoading {
-                ProgressView("Loading schedules...")
+                ProgressView(L("schedule.loading"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if schedules.isEmpty {
                 emptyStateView
@@ -23,13 +23,13 @@ struct ScheduleView: View {
                 scheduleList
             }
         }
-        .navigationTitle("Schedule")
+        .navigationTitle(L("schedule.title"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showAddSheet = true
                 } label: {
-                    Label("Add Schedule", systemImage: "plus")
+                    Label(L("schedule.addSchedule"), systemImage: "plus")
                 }
             }
         }
@@ -47,11 +47,11 @@ struct ScheduleView: View {
 
     private var emptyStateView: some View {
         ContentUnavailableView {
-            Label("No Schedules", systemImage: "calendar.badge.clock")
+            Label(L("schedule.noSchedules"), systemImage: "calendar.badge.clock")
         } description: {
-            Text("Set up automated cleanup schedules to keep your Mac running smoothly.")
+            Text(L("schedule.noSchedules.description"))
         } actions: {
-            Button("Add Schedule") {
+            Button(L("schedule.addSchedule")) {
                 showAddSheet = true
             }
             .buttonStyle(.borderedProminent)
@@ -173,20 +173,28 @@ struct ScheduleItem: Identifiable {
     var scheduleDescription: String {
         switch frequency {
         case .daily:
-            return "Daily at \(timeString)"
+            return L("schedule.dailyAt", timeString)
         case .weekly:
-            return "\(weekday?.rawValue ?? "Sunday") at \(timeString)"
+            return L("schedule.weeklyAt", weekday?.displayName ?? L("weekday.sunday"), timeString)
         case .monthly:
-            return "Day \(dayOfMonth ?? 1) at \(timeString)"
+            return L("schedule.monthlyAt", dayOfMonth ?? 1, timeString)
         }
     }
 }
 
 /// GUI-specific schedule frequency that maps to backend ScheduleFrequency
 enum GUIScheduleFrequency: String, CaseIterable {
-    case daily = "Daily"
-    case weekly = "Weekly"
-    case monthly = "Monthly"
+    case daily
+    case weekly
+    case monthly
+
+    var displayName: String {
+        switch self {
+        case .daily: return L("frequency.daily")
+        case .weekly: return L("frequency.weekly")
+        case .monthly: return L("frequency.monthly")
+        }
+    }
 
     func toBackendFrequency() -> ScheduleFrequency {
         switch self {
@@ -198,13 +206,25 @@ enum GUIScheduleFrequency: String, CaseIterable {
 }
 
 enum Weekday: String, CaseIterable {
-    case sunday = "Sunday"
-    case monday = "Monday"
-    case tuesday = "Tuesday"
-    case wednesday = "Wednesday"
-    case thursday = "Thursday"
-    case friday = "Friday"
-    case saturday = "Saturday"
+    case sunday
+    case monday
+    case tuesday
+    case wednesday
+    case thursday
+    case friday
+    case saturday
+
+    var displayName: String {
+        switch self {
+        case .sunday: return L("weekday.sunday")
+        case .monday: return L("weekday.monday")
+        case .tuesday: return L("weekday.tuesday")
+        case .wednesday: return L("weekday.wednesday")
+        case .thursday: return L("weekday.thursday")
+        case .friday: return L("weekday.friday")
+        case .saturday: return L("weekday.saturday")
+        }
+    }
 
     var weekdayNumber: Int {
         switch self {
@@ -281,36 +301,36 @@ struct AddScheduleSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Schedule Details") {
-                    TextField("Name", text: $name)
+                Section(L("addSchedule.details")) {
+                    TextField(L("addSchedule.name"), text: $name)
 
-                    Picker("Frequency", selection: $frequency) {
+                    Picker(L("addSchedule.frequency"), selection: $frequency) {
                         ForEach(GUIScheduleFrequency.allCases, id: \.self) { freq in
-                            Text(freq.rawValue).tag(freq)
+                            Text(freq.displayName).tag(freq)
                         }
                     }
 
-                    Picker("Cleanup Level", selection: $level) {
+                    Picker(L("addSchedule.cleanupLevel"), selection: $level) {
                         ForEach(CleanupLevel.allCases, id: \.self) { level in
                             Text(level.displayName).tag(level)
                         }
                     }
                 }
 
-                Section("Time") {
-                    Stepper("Hour: \(hour)", value: $hour, in: 0...23)
-                    Stepper("Minute: \(minute)", value: $minute, in: 0...59)
+                Section(L("addSchedule.time")) {
+                    Stepper(L("addSchedule.hour", hour), value: $hour, in: 0...23)
+                    Stepper(L("addSchedule.minute", minute), value: $minute, in: 0...59)
 
                     if frequency == .weekly {
-                        Picker("Weekday", selection: $weekday) {
+                        Picker(L("addSchedule.weekday"), selection: $weekday) {
                             ForEach(Weekday.allCases, id: \.self) { day in
-                                Text(day.rawValue).tag(day)
+                                Text(day.displayName).tag(day)
                             }
                         }
                     }
 
                     if frequency == .monthly {
-                        Stepper("Day of Month: \(dayOfMonth)", value: $dayOfMonth, in: 1...28)
+                        Stepper(L("addSchedule.dayOfMonth", dayOfMonth), value: $dayOfMonth, in: 1...28)
                     }
                 }
 
@@ -322,15 +342,15 @@ struct AddScheduleSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Add Schedule")
+            .navigationTitle(L("addSchedule.title"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(L("addSchedule.cancel")) {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                    Button(L("addSchedule.add")) {
                         createSchedule()
                     }
                 }
@@ -354,7 +374,7 @@ struct AddScheduleSheet: View {
             try appState.schedulerService.enableSchedule(frequency.toBackendFrequency())
 
             let newSchedule = ScheduleItem(
-                name: name.isEmpty ? "\(frequency.rawValue) Cleanup" : name,
+                name: name.isEmpty ? "\(frequency.displayName) Cleanup" : name,
                 frequency: frequency,
                 level: level,
                 hour: hour,
