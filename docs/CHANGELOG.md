@@ -19,6 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F14-3: Policy Distribution System** (#125)
+  - PolicyDistributor actor for distributing policies to fleet agents
+  - DistributionTarget enum for flexible agent targeting:
+    - all: Target all registered agents
+    - agents: Target specific agents by ID
+    - tags: Target agents with specific tags
+    - capabilities: Target agents with specific capabilities
+    - filter: Custom filtering with required tags, capabilities, exclusions
+    - combined: Union of multiple targets
+  - DistributionFilter for advanced agent selection criteria
+  - DistributionStatus for tracking distribution progress
+  - AgentDistributionStatus for per-agent distribution tracking
+  - PolicyDistributorDelegate for distribution event notifications
+  - Retry mechanism for failed agent distributions
+  - Rollback support for completed distributions
+  - Distribution history tracking
+  - Policy version management
+  - 24 comprehensive unit tests for policy distribution
+
 - **F14-2: Agent Registration & Heartbeat** (#124)
   - AgentRegistry actor for centralized agent tracking with token management
   - RegisteredAgent model with authentication and status information
