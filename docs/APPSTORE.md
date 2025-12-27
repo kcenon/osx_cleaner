@@ -6,9 +6,53 @@ This document describes how to build, sign, notarize, and distribute OSX Cleaner
 
 - macOS 14.0 or later
 - Xcode 15.0 or later
+- XcodeGen (`brew install xcodegen`)
 - Apple Developer Program membership ($99/year)
 - Required certificates (see [Code Signing Setup](#code-signing-setup))
 - App-specific password for notarization
+
+## Xcode Project Generation
+
+This project uses XcodeGen to generate the Xcode project from `project.yml`. The generated `.xcodeproj` is not tracked in git.
+
+### Quick Start
+
+```bash
+# Generate Xcode project
+./scripts/appstore/generate-xcode-project.sh
+
+# Clean and regenerate
+./scripts/appstore/generate-xcode-project.sh --clean
+
+# Generate and open in Xcode
+./scripts/appstore/generate-xcode-project.sh --open
+```
+
+### Project Structure
+
+| File | Purpose |
+|------|---------|
+| `project.yml` | XcodeGen project specification |
+| `Supporting/Info.plist` | App metadata and configuration |
+| `Supporting/OSXCleanerGUI.entitlements` | GUI app entitlements (sandboxed) |
+| `Supporting/osxcleaner.entitlements` | CLI tool entitlements |
+
+### Available Schemes
+
+| Scheme | Purpose |
+|--------|---------|
+| `OSXCleanerGUI` | Development builds (Debug configuration) |
+| `OSXCleanerGUI-AppStore` | App Store builds (Release configuration) |
+| `osxcleaner` | CLI tool builds |
+| `OSXCleanerKit` | Library builds |
+
+### Regenerating After Changes
+
+Always regenerate the Xcode project after modifying `project.yml`:
+
+```bash
+./scripts/appstore/generate-xcode-project.sh --clean
+```
 
 ## Code Signing Setup
 

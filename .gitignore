@@ -24,6 +24,9 @@ DerivedData/
 *.mode2v3
 *.perspectivev3
 
+# XcodeGen generated project (regenerate with: ./scripts/appstore/generate-xcode-project.sh)
+*.xcodeproj/
+
 # =============================================================================
 # Swift
 # =============================================================================
