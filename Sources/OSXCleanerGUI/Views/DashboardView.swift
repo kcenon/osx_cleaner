@@ -28,13 +28,13 @@ struct DashboardView: View {
             }
             .padding()
         }
-        .navigationTitle("Dashboard")
+        .navigationTitle(L("dashboard.title"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await refreshData() }
                 } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                    Label(L("dashboard.refresh"), systemImage: "arrow.clockwise")
                 }
                 .disabled(isAnalyzing)
             }
@@ -54,9 +54,9 @@ struct DashboardView: View {
                         .font(.title)
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading) {
-                        Text("Disk Usage")
+                        Text(L("dashboard.diskUsage"))
                             .font(.headline)
-                        Text("Macintosh HD")
+                        Text(L("dashboard.macintoshHD"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -75,25 +75,25 @@ struct DashboardView: View {
 
                     HStack {
                         UsageLabel(
-                            title: "Used",
+                            title: L("dashboard.used"),
                             value: info.formattedUsed,
                             color: .blue
                         )
                         Spacer()
                         UsageLabel(
-                            title: "Available",
+                            title: L("dashboard.available"),
                             value: info.formattedAvailable,
                             color: .green
                         )
                         Spacer()
                         UsageLabel(
-                            title: "Total",
+                            title: L("dashboard.total"),
                             value: info.formattedTotal,
                             color: .secondary
                         )
                     }
                 } else {
-                    Text("Analyzing disk...")
+                    Text(L("dashboard.analyzing"))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -104,11 +104,11 @@ struct DashboardView: View {
     // MARK: - Quick Actions
 
     private var quickActionsSection: some View {
-        GroupBox("Quick Actions") {
+        GroupBox(L("quickActions.title")) {
             HStack(spacing: 16) {
                 QuickActionButton(
-                    title: "Light Clean",
-                    subtitle: "Safe items only",
+                    title: L("quickActions.lightClean"),
+                    subtitle: L("quickActions.lightClean.subtitle"),
                     icon: "sparkles",
                     color: .green,
                     isLoading: isCleaning
@@ -117,8 +117,8 @@ struct DashboardView: View {
                 }
 
                 QuickActionButton(
-                    title: "Normal Clean",
-                    subtitle: "Includes caches",
+                    title: L("quickActions.normalClean"),
+                    subtitle: L("quickActions.normalClean.subtitle"),
                     icon: "wind",
                     color: .orange,
                     isLoading: isCleaning
@@ -127,8 +127,8 @@ struct DashboardView: View {
                 }
 
                 QuickActionButton(
-                    title: "Deep Clean",
-                    subtitle: "Developer caches",
+                    title: L("quickActions.deepClean"),
+                    subtitle: L("quickActions.deepClean.subtitle"),
                     icon: "tornado",
                     color: .red,
                     isLoading: isCleaning
@@ -138,11 +138,11 @@ struct DashboardView: View {
             }
             .padding(.vertical, 8)
         }
-        .alert("Cleanup Complete", isPresented: $showCleanupResult) {
-            Button("OK") {}
+        .alert(L("cleanupResult.title"), isPresented: $showCleanupResult) {
+            Button(L("cleanupResult.ok")) {}
         } message: {
             if let result = lastCleanResult {
-                Text("Freed \(result.formattedFreedSpace) by removing \(result.filesRemoved) files.")
+                Text(L("cleanupResult.message", result.formattedFreedSpace, result.filesRemoved))
             }
         }
     }
@@ -150,10 +150,10 @@ struct DashboardView: View {
     // MARK: - Cleanup Opportunities
 
     private var cleanupOpportunitiesSection: some View {
-        GroupBox("Cleanup Opportunities") {
+        GroupBox(L("cleanupOpportunities.title")) {
             VStack(alignment: .leading, spacing: 12) {
                 if cleanupOpportunities.isEmpty {
-                    Text("Analyzing...")
+                    Text(L("cleanupOpportunities.analyzing"))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -393,10 +393,10 @@ enum SafetyLevel {
 
     var displayText: String {
         switch self {
-        case .safe: return "✅ Safe to delete"
-        case .caution: return "⚠️ Requires rebuild"
-        case .warning: return "⚠️⚠️ Re-download needed"
-        case .danger: return "❌ Do not delete"
+        case .safe: return "✅ " + L("safety.safe")
+        case .caution: return "⚠️ " + L("safety.caution")
+        case .warning: return "⚠️⚠️ " + L("safety.warning")
+        case .danger: return "❌ " + L("safety.danger")
         }
     }
 

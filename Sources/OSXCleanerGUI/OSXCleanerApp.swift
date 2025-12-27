@@ -18,7 +18,7 @@ struct OSXCleanerApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
-                Button("Check for Updates...") {
+                Button(L("menu.checkForUpdates")) {
                     // Future: Check for updates
                 }
             }
@@ -59,12 +59,21 @@ final class AppState: ObservableObject {
 
 /// App navigation tabs
 enum AppTab: String, CaseIterable, Identifiable {
-    case dashboard = "Dashboard"
-    case clean = "Clean"
-    case schedule = "Schedule"
-    case settings = "Settings"
+    case dashboard
+    case clean
+    case schedule
+    case settings
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .dashboard: return L("nav.dashboard")
+        case .clean: return L("nav.clean")
+        case .schedule: return L("nav.schedule")
+        case .settings: return L("nav.settings")
+        }
+    }
 
     var icon: String {
         switch self {
