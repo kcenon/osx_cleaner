@@ -19,6 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F13: Policy Engine** (#114)
+  - Policy model with versioned JSON schema for enterprise cleanup rules
+  - PolicyTarget, PolicyAction, PolicySchedule enums for flexible configuration
+  - PolicyCondition for conditional execution (age, disk space, time)
+  - PolicyValidator with comprehensive validation and error messages
+  - PolicyStore for file-based policy management with caching
+  - PolicyEngine actor for thread-safe policy execution
+  - Compliance checking with detailed reports
+  - Sample policies (personal, developer, aggressive, enterprise)
+  - CLI `policy` command with subcommands:
+    - `policy list`: List installed policies
+    - `policy show`: Display policy details
+    - `policy add`: Import policy from JSON file
+    - `policy remove`: Remove a policy
+    - `policy apply`: Execute a policy (with dry-run support)
+    - `policy validate`: Validate policy JSON file
+    - `policy compliance`: Check compliance status
+    - `policy export`: Export policy to file
+    - `policy create`: Create from template
+  - Integration with AuditLogger for audit trail
+  - 37 comprehensive unit tests for policy functionality
+
 - **F12: Enterprise Audit Logging System** (#113)
   - AuditEvent model with categories (cleanup, policy, security, system, user)
   - AuditEventStore with SQLite persistence for long-term retention
