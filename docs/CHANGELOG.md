@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F14-2: Agent Registration & Heartbeat** (#124)
+  - AgentRegistry actor for centralized agent tracking with token management
+  - RegisteredAgent model with authentication and status information
+  - RegistrationService with multiple approval policies:
+    - auto-approve: Automatically approve all registrations
+    - manual-approve: Require manual approval for all registrations
+    - whitelist-only: Auto-approve if agent is in whitelist
+    - hostname-pattern: Auto-approve based on hostname regex patterns
+  - HeartbeatMonitor for detecting offline agents with configurable thresholds
+  - RegistryStatistics for fleet-wide monitoring metrics
+  - MonitoringSummary for real-time system status
+  - 32 comprehensive unit tests for registration and heartbeat functionality
+
 - **F14-1: Server Foundation & Agent Protocol** (#123)
   - AgentIdentity model for unique agent identification with system metadata
   - AgentStatus for tracking agent connection state and health
