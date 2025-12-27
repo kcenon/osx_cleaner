@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F14-6: Server & Fleet CLI Commands** (#115)
+  - ServerCommand for agent-side server connection management:
+    - `server status`: Display current server connection status
+    - `server connect <url>`: Configure connection to management server
+    - `server disconnect`: Disconnect and clear registration
+    - `server register`: Register agent with the configured server
+    - `server heartbeat`: Send manual heartbeat to server
+  - FleetCommand for administrator-side fleet management:
+    - `fleet agents`: List all registered agents with filtering by state, tag, or capability
+    - `fleet status`: Show fleet-wide statistics and health overview
+    - `fleet deploy <policy>`: Deploy policies to agents with target selection (--all, --tag, --agents)
+    - `fleet compliance`: Generate fleet compliance report with export to JSON/CSV
+    - `fleet audit`: Show audit log summary for configurable time periods
+  - AppConfiguration extended with server connection settings:
+    - serverURL, serverTimeout, agentId, authToken, tokenExpiresAt, lastHeartbeat
+  - JSON output support for all commands (--json flag)
+  - 17 comprehensive unit tests for CLI-related functionality
+
 - **F14-5: Role-Based Access Control (RBAC)** (#127)
   - Role enum with three-tier hierarchy:
     - Admin: Full access to all features including user management
