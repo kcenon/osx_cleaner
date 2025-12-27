@@ -561,6 +561,7 @@ osxcleaner/
 | [Installation Guide](docs/INSTALLATION.md) | System requirements, installation methods, troubleshooting |
 | [Usage Guide](docs/USAGE.md) | CLI commands, examples, CI/CD integration |
 | [Safety Guide](docs/SAFETY.md) | Safety classification, protected paths, FAQ |
+| [App Store Guide](docs/APPSTORE.md) | Build, sign, notarize, and distribute for App Store |
 | [Contributing Guide](docs/CONTRIBUTING.md) | How to contribute, coding standards |
 | [Changelog](docs/CHANGELOG.md) | Version history and release notes |
 
