@@ -139,15 +139,67 @@ security find-identity -v -p codesigning
 
 ### CI/CD Integration
 
-For GitHub Actions setup, see [.signing/CI-SIGNING.md](../.signing/CI-SIGNING.md).
+The project includes automated GitHub Actions workflows for building, signing, and notarizing the GUI app.
 
-Required GitHub Secrets:
-- `CERTIFICATE_BASE64` - Base64-encoded .p12 certificate
-- `CERTIFICATE_PASSWORD` - .p12 password
-- `DEVELOPMENT_TEAM` - Team ID
-- `APPLE_ID` - Apple ID email
-- `APPLE_TEAM_ID` - Team ID
-- `APPLE_APP_SPECIFIC_PASSWORD` - App-specific password
+#### Available Workflows
+
+| Workflow | File | Purpose |
+|----------|------|---------|
+| Release GUI App | `.github/workflows/release-gui.yml` | Build, sign, notarize, and release GUI app |
+| Release (CLI) | `.github/workflows/release.yml` | Build and release CLI tool |
+| CI | `.github/workflows/ci.yml` | Run tests on push/PR |
+
+#### Automatic Release Workflow
+
+The `release-gui.yml` workflow is triggered by:
+- **Tag push**: Push a tag like `v1.0.0` to trigger a full release
+- **Manual dispatch**: Run manually from GitHub Actions with custom version
+
+```bash
+# Create and push a release tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+#### Workflow Features
+
+1. **Secure Code Signing**: Uses temporary keychain for certificate management
+2. **Notarization**: Automatically submits to Apple and waits for approval
+3. **Stapling**: Attaches notarization ticket to app and DMG
+4. **Version Management**: Extracts version from tag or uses manual input
+5. **Artifact Upload**: Uploads signed DMG as GitHub Release asset
+
+#### Required GitHub Secrets
+
+Configure these secrets in your repository settings (Settings > Secrets and variables > Actions):
+
+| Secret | Description | How to Get |
+|--------|-------------|------------|
+| `CERTIFICATE_BASE64` | Base64-encoded .p12 certificate | `base64 -i cert.p12 \| pbcopy` |
+| `CERTIFICATE_PASSWORD` | Password for .p12 file | Password you set when exporting |
+| `DEVELOPMENT_TEAM` | Apple Developer Team ID | Apple Developer Portal |
+| `APPLE_ID` | Apple ID email | Your Apple ID |
+| `APPLE_TEAM_ID` | Team ID for notarization | Same as DEVELOPMENT_TEAM |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password | [appleid.apple.com](https://appleid.apple.com) |
+
+#### Setting Up App-Specific Password
+
+1. Go to [Apple ID](https://appleid.apple.com)
+2. Sign in and go to Security > App-Specific Passwords
+3. Click "Generate Password"
+4. Name it "GitHub Actions OSX Cleaner"
+5. Copy the generated password to GitHub Secrets
+
+#### Manual Workflow Dispatch
+
+You can trigger the workflow manually for testing:
+
+1. Go to Actions > Release GUI App
+2. Click "Run workflow"
+3. Optionally set version and skip notarization for testing
+4. Click "Run workflow"
+
+For detailed certificate setup, see [.signing/CI-SIGNING.md](../.signing/CI-SIGNING.md).
 
 ## Build Process
 
