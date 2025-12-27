@@ -18,6 +18,7 @@
 - [Monitor Command](#monitor-command)
 - [Metrics Command](#metrics-command)
 - [Audit Command](#audit-command)
+- [Policy Command](#policy-command)
 - [Cleanup Logging](#cleanup-logging)
 - [Cleanup Levels](#cleanup-levels)
 - [Cleanup Targets](#cleanup-targets)
@@ -57,6 +58,7 @@ osxcleaner clean --level light
 | `monitor` | Monitor disk usage | Disk alerts |
 | `metrics` | Prometheus metrics endpoint | Remote monitoring |
 | `audit` | View and export audit logs | Compliance reporting |
+| `policy` | Manage cleanup policies | Enterprise deployment |
 
 ### Global Options
 
@@ -834,6 +836,179 @@ osxcleaner audit info
 | `failure` | Operation failed |
 | `warning` | Operation completed with warnings |
 | `skipped` | Operation was skipped |
+
+---
+
+## Policy Command
+
+The `policy` command enables JSON-based cleanup policy management for enterprise environments.
+
+### List Policies
+
+```bash
+# List all installed policies
+osxcleaner policy list
+
+# List only enabled policies
+osxcleaner policy list --enabled
+
+# Filter by tag
+osxcleaner policy list --tag developer
+
+# JSON output
+osxcleaner policy list --json
+```
+
+### Show Policy Details
+
+```bash
+# Show detailed policy information
+osxcleaner policy show developer-standard
+
+# JSON output
+osxcleaner policy show developer-standard --json
+```
+
+### Add Policy
+
+```bash
+# Import policy from JSON file
+osxcleaner policy add /path/to/policy.json
+
+# Overwrite existing policy
+osxcleaner policy add /path/to/policy.json --overwrite
+```
+
+### Remove Policy
+
+```bash
+# Remove a policy (requires --force)
+osxcleaner policy remove my-policy --force
+```
+
+### Apply Policy
+
+```bash
+# Execute a policy
+osxcleaner policy apply developer-standard
+
+# Dry run (preview without making changes)
+osxcleaner policy apply developer-standard --dry-run
+
+# Apply all enabled policies
+osxcleaner policy apply all
+
+# JSON output
+osxcleaner policy apply developer-standard --json
+```
+
+### Validate Policy
+
+```bash
+# Validate a policy file before importing
+osxcleaner policy validate /path/to/policy.json
+
+# JSON output
+osxcleaner policy validate /path/to/policy.json --json
+```
+
+### Check Compliance
+
+```bash
+# Check compliance for all policies
+osxcleaner policy compliance
+
+# Check specific policy
+osxcleaner policy compliance developer-standard
+
+# JSON output
+osxcleaner policy compliance --json
+```
+
+### Export Policy
+
+```bash
+# Export policy to file
+osxcleaner policy export developer-standard
+
+# Export to specific path
+osxcleaner policy export developer-standard --output /path/to/backup.json
+```
+
+### Create Policy from Template
+
+```bash
+# Create from personal template
+osxcleaner policy create my-policy --template personal
+
+# Create from developer template
+osxcleaner policy create my-policy --template developer
+
+# Available templates: personal, developer, aggressive, enterprise
+```
+
+### Policy Schema
+
+Policies are defined in JSON format:
+
+```json
+{
+  "version": "1.0",
+  "name": "my-policy",
+  "displayName": "My Custom Policy",
+  "description": "Custom cleanup policy",
+  "rules": [
+    {
+      "id": "cache-cleanup",
+      "target": "system-caches",
+      "action": "clean",
+      "schedule": "weekly",
+      "conditions": {
+        "olderThan": "7d",
+        "minFreeSpace": "10GB"
+      },
+      "enabled": true,
+      "description": "Clean system caches older than 7 days"
+    }
+  ],
+  "exclusions": ["~/Projects/*"],
+  "notifications": true,
+  "priority": "normal",
+  "enabled": true,
+  "tags": ["developer"]
+}
+```
+
+### Policy Targets
+
+| Target | Description |
+|--------|-------------|
+| `system-caches` | System and library caches |
+| `app-caches` | Application caches |
+| `developer-caches` | Xcode, CocoaPods, Carthage caches |
+| `package-caches` | npm, pip, brew caches |
+| `browser-caches` | Safari, Chrome, Firefox caches |
+| `system-logs` | System logs |
+| `app-logs` | Application logs |
+| `trash` | Trash contents |
+| `temp-files` | Temporary files |
+| `all` | All targets |
+
+### Policy Schedules
+
+| Schedule | Description |
+|----------|-------------|
+| `daily` | Run every day |
+| `weekly` | Run every week |
+| `monthly` | Run every month |
+| `manual` | Run only when triggered manually |
+| `low-disk-space` | Run when disk space is low |
+
+### Condition Formats
+
+- **Duration**: `7d` (7 days), `2w` (2 weeks), `1m` (1 month), `1y` (1 year)
+- **Size**: `100MB`, `10GB`, `1TB`
+- **Hour Range**: `{"start": 9, "end": 17}` (9 AM to 5 PM)
 
 ---
 
