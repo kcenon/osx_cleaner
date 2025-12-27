@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    Export Options for Developer ID Distribution (Notarization)
+
+    Usage with xcodebuild:
+    xcodebuild -exportArchive \
+        -archivePath "OSXCleaner.xcarchive" \
+        -exportPath "export" \
+        -exportOptionsPlist ".signing/exportOptions-developer-id.plist"
+    -->
+
+    <!-- Distribution method -->
+    <key>method</key>
+    <string>developer-id</string>
+
+    <!-- Team ID - Replace with your Team ID -->
+    <key>teamID</key>
+    <string>${DEVELOPMENT_TEAM}</string>
+
+    <!-- Signing style -->
+    <key>signingStyle</key>
+    <string>automatic</string>
+
+    <!-- Upload symbols for crash reports -->
+    <key>uploadSymbols</key>
+    <true/>
+
+    <!--
+    For manual signing, uncomment and configure:
+
+    <key>signingStyle</key>
+    <string>manual</string>
+
+    <key>signingCertificate</key>
+    <string>Developer ID Application</string>
+
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.kcenon.osxcleaner</key>
+        <string>OSX Cleaner Developer ID Profile</string>
+    </dict>
+    -->
+</dict>
+</plist>

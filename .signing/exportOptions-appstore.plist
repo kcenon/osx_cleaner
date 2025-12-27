@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    Export Options for Mac App Store Distribution
+
+    Usage with xcodebuild:
+    xcodebuild -exportArchive \
+        -archivePath "OSXCleaner.xcarchive" \
+        -exportPath "export" \
+        -exportOptionsPlist ".signing/exportOptions-appstore.plist"
+    -->
+
+    <!-- Distribution method -->
+    <key>method</key>
+    <string>app-store</string>
+
+    <!-- Team ID - Replace with your Team ID -->
+    <key>teamID</key>
+    <string>${DEVELOPMENT_TEAM}</string>
+
+    <!-- Upload to App Store Connect -->
+    <key>destination</key>
+    <string>upload</string>
+
+    <!-- Signing style -->
+    <key>signingStyle</key>
+    <string>automatic</string>
+
+    <!-- Upload symbols for crash reports -->
+    <key>uploadSymbols</key>
+    <true/>
+
+    <!-- Generate App Store submission report -->
+    <key>generateAppStoreInformation</key>
+    <true/>
+
+    <!--
+    For manual signing, uncomment and configure:
+
+    <key>signingStyle</key>
+    <string>manual</string>
+
+    <key>signingCertificate</key>
+    <string>Apple Distribution</string>
+
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.kcenon.osxcleaner</key>
+        <string>OSX Cleaner App Store Profile</string>
+    </dict>
+    -->
+</dict>
+</plist>
