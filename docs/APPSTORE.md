@@ -6,10 +6,104 @@ This document describes how to build, sign, notarize, and distribute OSX Cleaner
 
 - macOS 14.0 or later
 - Xcode 15.0 or later
-- Apple Developer account with:
-  - Developer ID Application certificate
-  - Developer ID Installer certificate (for pkg distribution)
+- Apple Developer Program membership ($99/year)
+- Required certificates (see [Code Signing Setup](#code-signing-setup))
 - App-specific password for notarization
+
+## Code Signing Setup
+
+### Quick Start
+
+```bash
+# Check current signing configuration
+./scripts/appstore/setup-signing.sh --check
+
+# List available signing identities
+./scripts/appstore/setup-signing.sh --list-identities
+
+# Export environment template
+./scripts/appstore/setup-signing.sh --export-env > .env.signing.local
+```
+
+### Required Certificates
+
+| Distribution Type | Certificate | Purpose |
+|-------------------|-------------|---------|
+| App Store | Apple Distribution | App Store submission |
+| Direct Download | Developer ID Application | Notarized distribution outside App Store |
+| Development | Mac Developer | Local testing |
+
+### Setting Up Certificates
+
+1. **Create Certificate Signing Request (CSR)**
+   - Open Keychain Access > Certificate Assistant > Request a Certificate from a Certificate Authority
+   - Save the CSR file
+
+2. **Generate Certificate on Apple Developer Portal**
+   - Go to [Certificates](https://developer.apple.com/account/resources/certificates/list)
+   - Click "+" and select the appropriate certificate type
+   - Upload your CSR and download the certificate
+
+3. **Install Certificate**
+   - Double-click the downloaded certificate to install in Keychain
+
+### Environment Configuration
+
+Create `.env.signing.local` from the template:
+
+```bash
+cp .signing/env.template .env.signing.local
+```
+
+Required variables:
+
+```bash
+# Apple Developer Team ID
+export DEVELOPMENT_TEAM="YOUR_TEAM_ID"
+
+# Signing identity (full name from keychain)
+export SIGNING_IDENTITY="Developer ID Application: Your Name (TEAM_ID)"
+
+# For notarization
+export APPLE_ID="your@email.com"
+export APPLE_TEAM_ID="YOUR_TEAM_ID"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+```
+
+### Provisioning Profiles (App Store Only)
+
+For App Store distribution:
+
+1. Go to [Profiles](https://developer.apple.com/account/resources/profiles/list)
+2. Create new "Mac App Store" profile
+3. Select App ID: `com.kcenon.osxcleaner`
+4. Select your "Apple Distribution" certificate
+5. Download and double-click to install
+
+### Verifying Configuration
+
+```bash
+# Verify installed certificates
+security find-identity -v -p codesigning
+
+# Check complete configuration
+./scripts/appstore/setup-signing.sh --check
+
+# Verify signed app
+./scripts/appstore/setup-signing.sh --verify .build/appstore/OSX\ Cleaner.app
+```
+
+### CI/CD Integration
+
+For GitHub Actions setup, see [.signing/CI-SIGNING.md](../.signing/CI-SIGNING.md).
+
+Required GitHub Secrets:
+- `CERTIFICATE_BASE64` - Base64-encoded .p12 certificate
+- `CERTIFICATE_PASSWORD` - .p12 password
+- `DEVELOPMENT_TEAM` - Team ID
+- `APPLE_ID` - Apple ID email
+- `APPLE_TEAM_ID` - Team ID
+- `APPLE_APP_SPECIFIC_PASSWORD` - App-specific password
 
 ## Build Process
 

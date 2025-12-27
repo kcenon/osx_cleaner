@@ -30,6 +30,13 @@ settings:
     HEADER_SEARCH_PATHS:
       - "$(PROJECT_DIR)/include"
     CLANG_ENABLE_MODULES: YES
+  configs:
+    Debug:
+      CODE_SIGN_IDENTITY: "Apple Development"
+      PROVISIONING_PROFILE_SPECIFIER: ""
+    Release:
+      CODE_SIGN_IDENTITY: ${CODE_SIGN_IDENTITY:-Apple Distribution}
+      PROVISIONING_PROFILE_SPECIFIER: ${PROVISIONING_PROFILE_SPECIFIER:-}
 
 packages:
   ArgumentParser:
