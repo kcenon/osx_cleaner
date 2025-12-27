@@ -82,10 +82,44 @@ The GUI app runs with App Sandbox enabled. The following entitlements are config
 
 | Entitlement | Purpose |
 |-------------|---------|
-| `com.apple.security.app-sandbox` | Required for App Store |
-| `com.apple.security.files.user-selected.read-write` | Access user-selected files |
-| `com.apple.security.files.downloads.read-write` | Access Downloads folder |
-| `com.apple.security.network.client` | Outgoing network connections |
+| `com.apple.security.app-sandbox` | Required for App Store distribution |
+| `com.apple.security.files.user-selected.read-write` | Access folders selected by user via Open dialog |
+| `com.apple.security.files.downloads.read-write` | Access Downloads folder for default operations |
+| `com.apple.security.files.bookmarks.app-scope` | Persist folder access across app restarts |
+| `com.apple.security.network.client` | Outgoing network connections (updates check) |
+| `com.apple.security.network.server` | Local server for Prometheus metrics endpoint |
+
+### Sandbox Compliance Testing
+
+Run the sandbox compliance test before building:
+
+```bash
+./scripts/appstore/test-sandbox.sh
+```
+
+This verifies:
+- All required entitlements are present
+- Entitlements file format is valid
+- project.yml is synchronized
+- Hardened Runtime is enabled
+
+### Sandbox Considerations
+
+Due to App Sandbox restrictions, the GUI app has different capabilities than the CLI tool:
+
+1. **File Access**: The app can only access:
+   - Files/folders explicitly selected by the user
+   - Downloads folder
+   - App's container directory
+
+2. **Cleanup Workflow**: Users must grant access by:
+   - Opening folders via NSOpenPanel
+   - The app stores security-scoped bookmarks for persistent access
+
+3. **Metrics Server**: Prometheus metrics run on localhost only (127.0.0.1:9090)
+
+4. **Configuration Storage**: Settings are stored in the app's sandboxed container:
+   - `~/Library/Containers/com.kcenon.osxcleaner/Data/Library/Application Support/`
 
 ## Directory Structure
 
