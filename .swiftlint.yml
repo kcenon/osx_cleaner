@@ -1,0 +1,98 @@
+# SwiftLint Configuration for OSX Cleaner
+# https://github.com/realm/SwiftLint
+
+# Directories to exclude from linting
+excluded:
+  - .build
+  - .swiftpm
+  - Package.swift
+  - rust-core
+
+# Rules configuration
+disabled_rules:
+  - todo  # Allow TODO comments during development
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - last_where
+  - legacy_random
+  - modifier_order
+  - overridden_super_call
+  - private_action
+  - private_outlet
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unavailable_function
+  - unowned_variable_capture
+  - unused_declaration
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# Rule configurations
+line_length:
+  warning: 120
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: false
+  ignores_interpolated_strings: true
+
+file_length:
+  warning: 400
+  error: 600
+  ignore_comment_only_lines: true
+
+type_body_length:
+  warning: 250
+  error: 400
+
+function_body_length:
+  warning: 50
+  error: 100
+
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+
+nesting:
+  type_level: 2
+  function_level: 3
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 60
+    error: 80
+  excluded:
+    - id
+    - x
+    - y
+    - z
+    - i
+    - j
+    - k
+    - w
+    - c
+    - e
+    - mb
+    - gb
+    - tb
+    - ok
+
+trailing_whitespace:
+  ignores_empty_lines: true
+
+vertical_whitespace:
+  max_empty_lines: 2
+
+# Reporter type (xcode, json, csv, checkstyle, junit, html, emoji, sonarqube, markdown, github-actions-logging)
+reporter: "xcode"
