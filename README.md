@@ -495,7 +495,7 @@ osxcleaner/
 
 ## Roadmap
 
-### Phase 1: MVP (v0.1) - Core Features
+### Phase 1: MVP (v0.1) - Core Features ✅
 - [x] CLI-based cleanup tool
 - [x] Safety classification system implementation (F01)
 - [x] macOS version optimization (F10)
@@ -503,28 +503,38 @@ osxcleaner/
   - Architecture detection (Intel/Apple Silicon)
   - Rosetta 2 status detection
   - Version-specific path resolution
-- [ ] Basic cleanup levels (Level 1-2)
+- [x] Basic cleanup levels (Level 1-2)
 
-### Phase 2: Developer Features (v0.5)
-- [x] Developer tool cache management (F02) ✅
+### Phase 2: Developer Features (v0.5) ✅
+- [x] Developer tool cache management (F02)
   - Xcode (DerivedData, Archives, Device Support)
   - iOS Simulators (via xcrun simctl)
   - Package managers (npm, yarn, pip, brew, cargo, gradle, etc.)
   - Docker (images, containers, volumes, build cache)
-- [x] Browser/App cache cleanup (F03) ✅
+- [x] Browser/App cache cleanup (F03)
   - Browser caches (Safari, Chrome, Firefox, Edge, Brave, Opera, Arc)
   - Cloud service caches (iCloud, Dropbox, OneDrive, Google Drive)
   - General application cache cleanup
-- [ ] Level 3 cleanup support
-- [ ] Automation scheduling (F07)
+- [x] Level 3 cleanup support (deep cleanup)
+- [x] Automation scheduling (F07)
+  - launchd-based scheduling (daily/weekly/monthly)
+  - Disk monitoring with threshold alerts
+  - macOS native notifications
+- [x] Log and crash report management (F04)
+- [x] Time Machine snapshot management (F05)
+- [x] Disk usage analysis (F06)
+- [x] Interactive terminal UI (F11)
 
 ### Phase 3: Complete (v1.0)
-- [ ] GUI interface
-- [x] CI/CD integration (F08) ✅
+- [ ] GUI interface (SwiftUI)
+- [x] CI/CD integration (F08)
   - CLI non-interactive mode with JSON output
   - `--min-space` option for conditional cleanup
   - GitHub Action for automated workflows
-- [ ] Team environment management (F09)
+- [x] Team environment management (F09)
+  - YAML-based team configuration
+  - Shared cleanup policies
+  - Remote configuration sync
 
 ---
 

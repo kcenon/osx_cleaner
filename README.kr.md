@@ -480,7 +480,7 @@ osxcleaner/
 
 ## 로드맵
 
-### Phase 1: MVP (v0.1) - 핵심 기능
+### Phase 1: MVP (v0.1) - 핵심 기능 ✅
 - [x] CLI 기반 정리 도구
 - [x] 안전 등급 시스템 구현 (F01)
 - [x] macOS 버전 최적화 (F10)
@@ -488,20 +488,38 @@ osxcleaner/
   - 아키텍처 감지 (Intel/Apple Silicon)
   - Rosetta 2 상태 감지
   - 버전별 경로 해결
-- [ ] 기본 정리 레벨 (Level 1-2)
+- [x] 기본 정리 레벨 (Level 1-2)
 
-### Phase 2: 개발자 기능 (v0.5)
-- [ ] 개발 도구 캐시 관리 (F02)
-- [ ] Level 3 정리 지원
-- [ ] 자동화 스케줄링 (F07)
+### Phase 2: 개발자 기능 (v0.5) ✅
+- [x] 개발 도구 캐시 관리 (F02)
+  - Xcode (DerivedData, Archives, Device Support)
+  - iOS 시뮬레이터 (xcrun simctl)
+  - 패키지 매니저 (npm, yarn, pip, brew, cargo, gradle 등)
+  - Docker (이미지, 컨테이너, 볼륨, 빌드 캐시)
+- [x] 브라우저/앱 캐시 정리 (F03)
+  - 브라우저 캐시 (Safari, Chrome, Firefox, Edge, Brave, Opera, Arc)
+  - 클라우드 서비스 캐시 (iCloud, Dropbox, OneDrive, Google Drive)
+  - 일반 앱 캐시 정리
+- [x] Level 3 정리 지원 (심층 정리)
+- [x] 자동화 스케줄링 (F07)
+  - launchd 기반 스케줄링 (일간/주간/월간)
+  - 임계값 경고와 함께 디스크 모니터링
+  - macOS 네이티브 알림
+- [x] 로그 및 크래시 리포트 관리 (F04)
+- [x] Time Machine 스냅샷 관리 (F05)
+- [x] 디스크 사용량 분석 (F06)
+- [x] 대화형 터미널 UI (F11)
 
 ### Phase 3: 완성 (v1.0)
-- [ ] GUI 인터페이스
-- [x] CI/CD 통합 (F08) ✅
+- [ ] GUI 인터페이스 (SwiftUI)
+- [x] CI/CD 통합 (F08)
   - CLI 비대화형 모드 및 JSON 출력
   - `--min-space` 조건부 정리 옵션
   - 자동화 워크플로우용 GitHub Action
-- [ ] 팀 환경 관리 (F09)
+- [x] 팀 환경 관리 (F09)
+  - YAML 기반 팀 설정
+  - 공유 정리 정책
+  - 원격 설정 동기화
 
 ---
 
