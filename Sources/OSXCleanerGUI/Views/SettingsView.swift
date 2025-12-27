@@ -15,6 +15,10 @@ struct SettingsView: View {
     @AppStorage("confirmBeforeCleanup") private var confirmBeforeCleanup = true
     @AppStorage("keepRecentLogs") private var keepRecentLogs = 30
 
+    @State private var monitoringEnabled = false
+    @State private var showSaveAlert = false
+    @State private var errorMessage: String?
+
     var body: some View {
         Form {
             // General Settings
@@ -33,6 +37,11 @@ struct SettingsView: View {
 
             // Disk Monitoring
             Section("Disk Monitoring") {
+                Toggle("Enable disk monitoring", isOn: $monitoringEnabled)
+                    .onChange(of: monitoringEnabled) { _, newValue in
+                        toggleMonitoring(enabled: newValue)
+                    }
+
                 Slider(
                     value: Binding(
                         get: { Double(diskThreshold) },
@@ -56,11 +65,17 @@ struct SettingsView: View {
             // Auto Cleanup
             Section("Automatic Cleanup") {
                 Toggle("Enable automatic cleanup", isOn: $autoCleanupEnabled)
+                    .onChange(of: autoCleanupEnabled) { _, _ in
+                        updateMonitoringConfig()
+                    }
 
                 if autoCleanupEnabled {
                     Picker("Cleanup level", selection: $autoCleanupLevel) {
                         Text("Light").tag("light")
                         Text("Normal").tag("normal")
+                    }
+                    .onChange(of: autoCleanupLevel) { _, _ in
+                        updateMonitoringConfig()
                     }
 
                     Text("Automatic cleanup runs when disk usage exceeds 95%")
@@ -105,6 +120,73 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .frame(minWidth: 500)
+        .onAppear {
+            loadCurrentSettings()
+        }
+        .alert("Settings Saved", isPresented: $showSaveAlert) {
+            Button("OK") {}
+        }
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            if let error = errorMessage {
+                Text(error)
+            }
+        }
+    }
+
+    // MARK: - Settings Management
+
+    private func loadCurrentSettings() {
+        let status = appState.diskMonitoringService.getStatus()
+        monitoringEnabled = status.isEnabled
+
+        if let config = status.config {
+            autoCleanupEnabled = config.autoCleanupEnabled
+            autoCleanupLevel = config.autoCleanupLevel
+        }
+    }
+
+    private func toggleMonitoring(enabled: Bool) {
+        do {
+            if enabled {
+                let config = MonitoringConfig(
+                    autoCleanupEnabled: autoCleanupEnabled,
+                    autoCleanupLevel: autoCleanupLevel,
+                    checkIntervalSeconds: 3600,
+                    notificationsEnabled: showNotifications,
+                    warningThreshold: diskThreshold,
+                    criticalThreshold: 90,
+                    emergencyThreshold: 95
+                )
+                try appState.diskMonitoringService.enableMonitoring(config)
+            } else {
+                try appState.diskMonitoringService.disableMonitoring()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            monitoringEnabled = !enabled // Revert
+        }
+    }
+
+    private func updateMonitoringConfig() {
+        guard monitoringEnabled else { return }
+
+        let config = MonitoringConfig(
+            autoCleanupEnabled: autoCleanupEnabled,
+            autoCleanupLevel: autoCleanupLevel,
+            checkIntervalSeconds: 3600,
+            notificationsEnabled: showNotifications,
+            warningThreshold: diskThreshold,
+            criticalThreshold: 90,
+            emergencyThreshold: 95
+        )
+
+        do {
+            try appState.diskMonitoringService.enableMonitoring(config)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
