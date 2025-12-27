@@ -19,6 +19,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F14-5: Role-Based Access Control (RBAC)** (#127)
+  - Role enum with three-tier hierarchy:
+    - Admin: Full access to all features including user management
+    - Operator: Can manage policies and view reports
+    - Viewer: Read-only access to reports and status
+  - Permission enum with 20 granular permissions across 6 categories:
+    - Agents: view, register, unregister, command
+    - Policies: view, create, update, delete, deploy
+    - Reports: view, export
+    - Audit: view, export
+    - Users: view, create, update, delete, manage roles
+    - System: view config, update config
+  - User model with permission checking methods
+  - JWTProvider actor for token management:
+    - Access/refresh token pair generation
+    - HMAC-SHA256 signing with Base64URL encoding
+    - Token validation and revocation
+    - Configurable token expiration
+  - AccessController actor for access validation:
+    - Pattern-based access policies with wildcard support
+    - Automatic audit logging for all access attempts
+    - Session caching for performance
+    - 25 default API endpoint policies
+  - 34 comprehensive unit tests for RBAC functionality
+
 - **F14-4: Compliance Reporting** (#126)
   - ComplianceReporter actor for generating fleet-wide compliance reports
   - ComplianceScore model with weighted scoring:
