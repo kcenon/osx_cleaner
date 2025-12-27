@@ -6,10 +6,11 @@ import PackageDescription
 let package = Package(
     name: "osxcleaner",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         .executable(name: "osxcleaner", targets: ["osxcleaner"]),
+        .executable(name: "OSXCleanerGUI", targets: ["OSXCleanerGUI"]),
         .library(name: "OSXCleanerKit", targets: ["OSXCleanerKit"])
     ],
     dependencies: [
@@ -26,6 +27,14 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             path: "Sources/osxcleaner"
+        ),
+        // SwiftUI GUI Application
+        .executableTarget(
+            name: "OSXCleanerGUI",
+            dependencies: [
+                "OSXCleanerKit"
+            ],
+            path: "Sources/OSXCleanerGUI"
         ),
         // Rust Core C Bridge
         .systemLibrary(

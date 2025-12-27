@@ -526,7 +526,15 @@ osxcleaner/
 - [x] Interactive terminal UI (F11)
 
 ### Phase 3: Complete (v1.0)
-- [ ] GUI interface (SwiftUI)
+- [ ] GUI interface (SwiftUI) - 🚧 In Progress
+  - [x] Project structure setup (OSXCleanerGUI target)
+  - [x] Dashboard view with disk usage visualization
+  - [x] Clean view with cleanup level selection
+  - [x] Schedule view for automation management
+  - [x] Settings view for app configuration
+  - [ ] Full service integration
+  - [ ] App icon and branding
+  - [ ] App Store preparation
 - [x] CI/CD integration (F08)
   - CLI non-interactive mode with JSON output
   - `--min-space` option for conditional cleanup
