@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F14-1: Server Foundation & Agent Protocol** (#123)
+  - AgentIdentity model for unique agent identification with system metadata
+  - AgentStatus for tracking agent connection state and health
+  - ProtocolVersion for server-agent communication protocol versioning
+  - ServerMessage types for structured agent-server communication
+  - ManagementServerProtocol for server abstraction
+  - ServerClient actor for HTTP-based server communication
+  - Registration, heartbeat, policy fetch, and command execution flows
+  - ServerCommunicationError for comprehensive error handling
+  - 31 unit tests for server foundation components
+
 - **F13: Policy Engine** (#114)
   - Policy model with versioned JSON schema for enterprise cleanup rules
   - PolicyTarget, PolicyAction, PolicySchedule enums for flexible configuration
