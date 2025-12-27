@@ -288,7 +288,7 @@ public struct AgentComplianceReport: Codable, Sendable {
     public let policyHistory: [PolicyExecutionRecord]
 
     /// Cleanup statistics
-    public let cleanupStats: CleanupStatistics
+    public let cleanupStats: AgentCleanupStats
 
     /// Report generation timestamp
     public let generatedAt: Date
@@ -305,7 +305,7 @@ public struct AgentComplianceReport: Codable, Sendable {
         healthStatus: AgentHealthStatus,
         activePolicies: [String] = [],
         policyHistory: [PolicyExecutionRecord] = [],
-        cleanupStats: CleanupStatistics,
+        cleanupStats: AgentCleanupStats,
         generatedAt: Date = Date()
     ) {
         self.id = id
@@ -363,8 +363,8 @@ public enum PolicyExecutionStatus: String, Codable, Sendable {
     case skipped
 }
 
-/// Cleanup operation statistics
-public struct CleanupStatistics: Codable, Sendable {
+/// Agent cleanup operation statistics for compliance reporting
+public struct AgentCleanupStats: Codable, Sendable {
     /// Total bytes freed
     public let totalBytesFreed: UInt64
 
@@ -862,7 +862,7 @@ public actor ComplianceReporter {
 
         let score = try await calculateScore(for: agentId)
 
-        let cleanupStats = CleanupStatistics(
+        let cleanupStats = AgentCleanupStats(
             totalBytesFreed: agent.latestStatus?.totalFreedBytes ?? 0,
             operationCount: agent.latestStatus?.cleanupCount ?? 0,
             lastCleanupAt: nil
