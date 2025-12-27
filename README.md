@@ -333,6 +333,65 @@ OSX Cleaner can be integrated into CI/CD pipelines to prevent disk space issues 
     target: 'developer'
 ```
 
+See [GitHub Action README](.github/actions/osxcleaner/README.md) for detailed usage.
+
+### Jenkins Pipeline
+
+Use the Jenkins Pipeline Shared Library for automated cleanup in Jenkins builds:
+
+```groovy
+@Library('osxcleaner') _
+
+pipeline {
+    agent { label 'macos' }
+
+    stages {
+        stage('Pre-build Cleanup') {
+            steps {
+                osxcleanerPreBuild(minSpace: 25)
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'xcodebuild -scheme MyApp'
+            }
+        }
+    }
+
+    post {
+        always {
+            osxcleanerPostBuild()
+        }
+    }
+}
+```
+
+See [Jenkins Integration README](integrations/jenkins/README.md) for setup and detailed usage.
+
+### Fastlane
+
+Add the OSX Cleaner plugin to your Fastlane setup:
+
+```ruby
+# In your Fastfile
+lane :build do
+  # Pre-build cleanup with 20GB threshold
+  osxcleaner(
+    level: "normal",
+    target: "developer",
+    min_space: 20
+  )
+
+  gym(scheme: "MyApp")
+
+  # Post-build deep cleanup
+  osxcleaner(level: "deep")
+end
+```
+
+See [Fastlane Plugin README](integrations/fastlane/README.md) for installation and detailed usage.
+
 ### CLI Usage for CI/CD
 
 ```bash
@@ -379,8 +438,6 @@ The `--format json` flag outputs machine-readable results for CI/CD integration:
 | 2 | Insufficient space (cleanup needed but failed) |
 | 3 | Permission denied |
 | 4 | Configuration error |
-
-See [GitHub Action README](.github/actions/osxcleaner/README.md) for detailed usage.
 
 ---
 
@@ -447,6 +504,9 @@ osxcleaner/
 │       │   └── paths.rs        # Version-specific path resolution
 │       └── fs/                 # Filesystem utilities
 ├── include/                    # Generated C headers
+├── integrations/               # CI/CD platform integrations
+│   ├── jenkins/                # Jenkins Pipeline Shared Library
+│   └── fastlane/               # Fastlane plugin
 ├── scripts/                    # Shell scripts
 │   ├── install.sh
 │   ├── uninstall.sh
