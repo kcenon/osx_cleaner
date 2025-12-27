@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F14-4: Compliance Reporting** (#126)
+  - ComplianceReporter actor for generating fleet-wide compliance reports
+  - ComplianceScore model with weighted scoring:
+    - Policy compliance score (40% weight)
+    - Health compliance score (30% weight)
+    - Connectivity compliance score (30% weight)
+  - ComplianceLevel enum for categorizing compliance states (compliant, partially-compliant, non-compliant, critical)
+  - FleetOverviewReport for fleet-wide statistics and metrics
+  - AgentComplianceReport for individual agent compliance tracking
+  - PolicyExecutionReport for policy distribution tracking
+  - AuditLogSummary for audit log aggregation
+  - Report export functionality supporting JSON and CSV formats
+  - Audit log recording and querying
+  - 36 comprehensive unit tests for compliance reporting functionality
+
 - **F14-3: Policy Distribution System** (#125)
   - PolicyDistributor actor for distributing policies to fleet agents
   - DistributionTarget enum for flexible agent targeting:
