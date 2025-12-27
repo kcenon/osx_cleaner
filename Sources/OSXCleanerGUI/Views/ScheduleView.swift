@@ -176,7 +176,7 @@ struct ScheduleRow: View {
                 HStack(spacing: 8) {
                     Label(schedule.scheduleDescription, systemImage: "clock")
                     Text("•")
-                    Label(schedule.level.rawValue, systemImage: "sparkles")
+                    Label(schedule.level.displayName, systemImage: "sparkles")
                         .foregroundStyle(schedule.level.color)
                 }
                 .font(.caption)
@@ -231,7 +231,7 @@ struct AddScheduleSheet: View {
 
                     Picker("Cleanup Level", selection: $level) {
                         ForEach(CleanupLevel.allCases, id: \.self) { level in
-                            Text(level.rawValue).tag(level)
+                            Text(level.displayName).tag(level)
                         }
                     }
                 }
