@@ -27,6 +27,42 @@ struct LogsCommand: AsyncParsableCommand {
     )
 }
 
+// MARK: - JSON Output Types
+
+private struct CrashReportJSONOutput: Encodable {
+    let totalReports: Int
+    let totalSize: UInt64
+    let totalSizeFormatted: String
+    let reportsOlderThan30Days: Int
+    let sizeOlderThan30Days: UInt64
+    let apps: [AppSummaryJSON]
+
+    enum CodingKeys: String, CodingKey {
+        case totalReports = "total_reports"
+        case totalSize = "total_size"
+        case totalSizeFormatted = "total_size_formatted"
+        case reportsOlderThan30Days = "reports_older_than_30_days"
+        case sizeOlderThan30Days = "size_older_than_30_days"
+        case apps
+    }
+}
+
+private struct AppSummaryJSON: Encodable {
+    let name: String
+    let reportCount: Int
+    let latestCrashDate: Date
+    let totalSize: UInt64
+    let hasRepeatedCrashes: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case reportCount = "report_count"
+        case latestCrashDate = "latest_crash_date"
+        case totalSize = "total_size"
+        case hasRepeatedCrashes = "has_repeated_crashes"
+    }
+}
+
 // MARK: - Analyze Logs
 
 extension LogsCommand {
@@ -73,8 +109,13 @@ extension LogsCommand {
                 return
             }
 
-            // Display app summaries
-            for summary in analysis.summaries {
+            displayAppSummaries(analysis.summaries)
+            displayAnalysisSummary(analysis)
+            displayRecommendations(analysis)
+        }
+
+        private func displayAppSummaries(_ summaries: [AppCrashSummary]) {
+            for summary in summaries {
                 let warningIcon = summary.hasRepeatedCrashes ? " ⚠️ Repeated crashes" : ""
                 print("  \(summary.appName): \(summary.reportCount) reports (latest: \(summary.latestCrashRelative))\(warningIcon)")
 
@@ -82,18 +123,22 @@ extension LogsCommand {
                     print("    Size: \(summary.formattedSize)")
                 }
             }
+        }
 
+        private func displayAnalysisSummary(_ analysis: CrashReportAnalysis) {
             print("")
             print("─────────────────────────────────────────")
             print("  Total: \(analysis.totalReports) reports (\(analysis.formattedTotalSize))")
 
             if analysis.reportsOlderThan30Days > 0 {
-                print("  Reports older than 30 days: \(analysis.reportsOlderThan30Days) reports (\(analysis.formattedOlderSize))")
+                let olderMsg = "  Reports older than 30 days: \(analysis.reportsOlderThan30Days) reports"
+                print("\(olderMsg) (\(analysis.formattedOlderSize))")
             }
 
             print("")
+        }
 
-            // Show recommendations
+        private func displayRecommendations(_ analysis: CrashReportAnalysis) {
             let appsWithRepeatedCrashes = analysis.summaries.filter { $0.hasRepeatedCrashes }
             if !appsWithRepeatedCrashes.isEmpty {
                 print("💡 Recommendation:")
@@ -115,48 +160,14 @@ extension LogsCommand {
         }
 
         private func displayJSONAnalysis(_ analysis: CrashReportAnalysis) {
-            struct JSONOutput: Encodable {
-                let totalReports: Int
-                let totalSize: UInt64
-                let totalSizeFormatted: String
-                let reportsOlderThan30Days: Int
-                let sizeOlderThan30Days: UInt64
-                let apps: [AppSummaryJSON]
-
-                struct AppSummaryJSON: Encodable {
-                    let name: String
-                    let reportCount: Int
-                    let latestCrashDate: Date
-                    let totalSize: UInt64
-                    let hasRepeatedCrashes: Bool
-
-                    enum CodingKeys: String, CodingKey {
-                        case name
-                        case reportCount = "report_count"
-                        case latestCrashDate = "latest_crash_date"
-                        case totalSize = "total_size"
-                        case hasRepeatedCrashes = "has_repeated_crashes"
-                    }
-                }
-
-                enum CodingKeys: String, CodingKey {
-                    case totalReports = "total_reports"
-                    case totalSize = "total_size"
-                    case totalSizeFormatted = "total_size_formatted"
-                    case reportsOlderThan30Days = "reports_older_than_30_days"
-                    case sizeOlderThan30Days = "size_older_than_30_days"
-                    case apps
-                }
-            }
-
-            let output = JSONOutput(
+            let output = CrashReportJSONOutput(
                 totalReports: analysis.totalReports,
                 totalSize: analysis.totalSize,
                 totalSizeFormatted: analysis.formattedTotalSize,
                 reportsOlderThan30Days: analysis.reportsOlderThan30Days,
                 sizeOlderThan30Days: analysis.sizeOlderThan30Days,
                 apps: analysis.summaries.map { summary in
-                    JSONOutput.AppSummaryJSON(
+                    AppSummaryJSON(
                         name: summary.appName,
                         reportCount: summary.reportCount,
                         latestCrashDate: summary.latestCrashDate,
@@ -209,7 +220,6 @@ extension LogsCommand {
             let output = OutputHandler(format: format, quiet: false, verbose: verbose)
             let analysisService = CrashReportAnalysisService.shared
 
-            // First show analysis
             let analysis = try await analysisService.analyze()
 
             if analysis.totalReports == 0 {
@@ -217,97 +227,155 @@ extension LogsCommand {
                 return
             }
 
-            // Show what will be cleaned
+            displayCleanupPreview(analysis, output: output)
+
+            guard shouldProceedWithCleanup() else {
+                print("Cleanup cancelled.")
+                return
+            }
+
+            let result = performCleanup(output: output)
+            displayCleanupResults(result, output: output)
+        }
+
+        private func displayCleanupPreview(_ analysis: CrashReportAnalysis, output: OutputHandler) {
             if !all {
-                output.display(message: "Reports older than \(age) days: \(analysis.reportsOlderThan30Days) (\(analysis.formattedOlderSize))", level: .normal)
+                let msg = "Reports older than \(age) days: \(analysis.reportsOlderThan30Days)"
+                output.display(message: "\(msg) (\(analysis.formattedOlderSize))", level: .normal)
             } else {
-                output.display(message: "All reports: \(analysis.totalReports) (\(analysis.formattedTotalSize))", level: .normal)
+                let msg = "All reports: \(analysis.totalReports)"
+                output.display(message: "\(msg) (\(analysis.formattedTotalSize))", level: .normal)
+            }
+        }
+
+        private func shouldProceedWithCleanup() -> Bool {
+            if force || dryRun {
+                return true
             }
 
-            // Confirm deletion
-            if !force && !dryRun {
-                print("")
-                print("⚠️  Warning: This will delete crash report files.")
-                print("    This operation is irreversible.")
-                print("")
-                print("Are you sure you want to proceed? (y/N): ", terminator: "")
+            print("")
+            print("⚠️  Warning: This will delete crash report files.")
+            print("    This operation is irreversible.")
+            print("")
+            print("Are you sure you want to proceed? (y/N): ", terminator: "")
 
-                guard let response = readLine()?.lowercased(), response == "y" || response == "yes" else {
-                    print("Cleanup cancelled.")
-                    return
-                }
+            guard let response = readLine()?.lowercased() else {
+                return false
             }
+            return response == "y" || response == "yes"
+        }
 
-            // Perform cleanup
+        private func performCleanup(output: OutputHandler) -> CleanupResult {
             let fileManager = FileManager.default
             let home = fileManager.homeDirectoryForCurrentUser.path
-            let logsPath = "\(home)/Library/Logs"
-            let diagnosticReportsPath = "\(logsPath)/DiagnosticReports"
+            let diagnosticReportsPath = "\(home)/Library/Logs/DiagnosticReports"
 
-            var filesRemoved = 0
-            var bytesFreed: UInt64 = 0
-            var errors: [String] = []
+            var result = CleanupResult()
+            let ageThreshold = calculateAgeThreshold()
 
-            // Calculate age threshold
-            let ageThreshold = all ? Date.distantPast : Calendar.current.date(byAdding: .day, value: -age, to: Date()) ?? Date()
-
-            // Clean crash reports
-            if let enumerator = fileManager.enumerator(atPath: diagnosticReportsPath) {
-                while let file = enumerator.nextObject() as? String {
-                    let fullPath = (diagnosticReportsPath as NSString).appendingPathComponent(file)
-
-                    // Check if it's a crash report file
-                    let isCrashReport = CrashReport.ReportType.allCases.contains { type in
-                        file.hasSuffix(type.rawValue)
-                    }
-
-                    guard isCrashReport else { continue }
-
-                    // Get file attributes
-                    guard let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
-                          let modDate = attrs[.modificationDate] as? Date,
-                          let size = attrs[.size] as? UInt64 else {
-                        continue
-                    }
-
-                    // Check age
-                    guard modDate < ageThreshold else { continue }
-
-                    if dryRun {
-                        output.display(message: "[DRY RUN] Would delete: \(file)", level: .verbose)
-                        filesRemoved += 1
-                        bytesFreed += size
-                    } else {
-                        do {
-                            try fileManager.removeItem(atPath: fullPath)
-                            filesRemoved += 1
-                            bytesFreed += size
-                            output.display(message: "Deleted: \(file)", level: .verbose)
-                        } catch {
-                            errors.append("\(file): \(error.localizedDescription)")
-                        }
-                    }
-                }
+            guard let enumerator = fileManager.enumerator(atPath: diagnosticReportsPath) else {
+                return result
             }
 
-            // Display results
-            print("")
+            while let file = enumerator.nextObject() as? String {
+                processFile(
+                    file,
+                    basePath: diagnosticReportsPath,
+                    ageThreshold: ageThreshold,
+                    output: output,
+                    result: &result
+                )
+            }
+
+            return result
+        }
+
+        private func calculateAgeThreshold() -> Date {
+            if all {
+                return Date.distantPast
+            }
+            return Calendar.current.date(byAdding: .day, value: -age, to: Date()) ?? Date()
+        }
+
+        private func processFile(
+            _ file: String,
+            basePath: String,
+            ageThreshold: Date,
+            output: OutputHandler,
+            result: inout CleanupResult
+        ) {
+            let fullPath = (basePath as NSString).appendingPathComponent(file)
+            let fileManager = FileManager.default
+
+            guard isCrashReportFile(file) else { return }
+
+            guard let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
+                  let modDate = attrs[.modificationDate] as? Date,
+                  let size = attrs[.size] as? UInt64,
+                  modDate < ageThreshold else {
+                return
+            }
+
             if dryRun {
-                output.displaySuccess("[DRY RUN] Would remove \(filesRemoved) files (\(ByteCountFormatter.string(fromByteCount: Int64(bytesFreed), countStyle: .file)))")
+                output.display(message: "[DRY RUN] Would delete: \(file)", level: .verbose)
+                result.filesRemoved += 1
+                result.bytesFreed += size
             } else {
-                output.displaySuccess("Removed \(filesRemoved) files (\(ByteCountFormatter.string(fromByteCount: Int64(bytesFreed), countStyle: .file)))")
+                deleteFile(fullPath, file: file, size: size, output: output, result: &result)
+            }
+        }
+
+        private func isCrashReportFile(_ file: String) -> Bool {
+            CrashReport.ReportType.allCases.contains { type in
+                file.hasSuffix(type.rawValue)
+            }
+        }
+
+        private func deleteFile(
+            _ fullPath: String,
+            file: String,
+            size: UInt64,
+            output: OutputHandler,
+            result: inout CleanupResult
+        ) {
+            do {
+                try FileManager.default.removeItem(atPath: fullPath)
+                result.filesRemoved += 1
+                result.bytesFreed += size
+                output.display(message: "Deleted: \(file)", level: .verbose)
+            } catch {
+                result.errors.append("\(file): \(error.localizedDescription)")
+            }
+        }
+
+        private func displayCleanupResults(_ result: CleanupResult, output: OutputHandler) {
+            print("")
+            let sizeStr = ByteCountFormatter.string(fromByteCount: Int64(result.bytesFreed), countStyle: .file)
+
+            if dryRun {
+                output.displaySuccess("[DRY RUN] Would remove \(result.filesRemoved) files (\(sizeStr))")
+            } else {
+                output.displaySuccess("Removed \(result.filesRemoved) files (\(sizeStr))")
             }
 
-            if !errors.isEmpty && verbose {
+            if !result.errors.isEmpty && verbose {
                 print("")
                 output.displayWarning("Errors occurred:")
-                for error in errors.prefix(5) {
+                for error in result.errors.prefix(5) {
                     print("  - \(error)")
                 }
-                if errors.count > 5 {
-                    print("  ... and \(errors.count - 5) more")
+                if result.errors.count > 5 {
+                    print("  ... and \(result.errors.count - 5) more")
                 }
             }
         }
     }
+}
+
+// MARK: - Helper Types
+
+private struct CleanupResult {
+    var filesRemoved: Int = 0
+    var bytesFreed: UInt64 = 0
+    var errors: [String] = []
 }

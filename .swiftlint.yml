@@ -74,6 +74,7 @@ identifier_name:
     error: 80
   excluded:
     - id
+    - n
     - x
     - y
     - z
@@ -83,6 +84,7 @@ identifier_name:
     - w
     - c
     - e
+    - L    # Localization function
     - mb
     - gb
     - tb
