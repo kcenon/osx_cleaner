@@ -24,7 +24,8 @@ struct OSXCleaner: AsyncParsableCommand {
             InteractiveCommand.self,
             TeamCommand.self,
             ServerCommand.self,
-            FleetCommand.self
+            FleetCommand.self,
+            MDMCommand.self
         ],
         defaultSubcommand: AnalyzeCommand.self
     )
