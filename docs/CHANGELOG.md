@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Code Quality Improvements** (#111)
+  - Add SwiftLint configuration (.swiftlint.yml) for consistent code style
+  - Refactor LogsCommand.swift: extract JSON types and reduce function complexity
+  - Refactor CleanCommand.swift: extract helper methods from run() function
+  - Refactor InteractiveTUI.swift: replace 7-member tuple with TUIDiskInfo struct
+  - Configure SwiftLint thresholds for project-appropriate limits
+  - Reduce total lint violations from 87 to 29 (all warnings, no errors)
+
 ### Added
 - **F04-2: Crash Report Analysis** (#81)
   - CrashReportAnalysisService for analyzing crash reports
