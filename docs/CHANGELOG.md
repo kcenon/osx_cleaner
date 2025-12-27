@@ -19,6 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduce total lint violations from 87 to 29 (all warnings, no errors)
 
 ### Added
+- **F12: Enterprise Audit Logging System** (#113)
+  - AuditEvent model with categories (cleanup, policy, security, system, user)
+  - AuditEventStore with SQLite persistence for long-term retention
+  - AuditLogger service for centralized audit logging
+  - AuditExporter for JSON, CSV, and JSON Lines export formats
+  - CLI `audit` command with subcommands:
+    - `audit list`: View recent audit events with filtering
+    - `audit show`: Display detailed event information
+    - `audit stats`: Show aggregate statistics
+    - `audit export`: Export events to file
+    - `audit clear`: Clear old events with retention policy
+    - `audit info`: Display audit system information
+  - Event filtering by category, result, date range, and session
+  - Configurable retention policy (default: 365 days)
+  - 25 comprehensive unit tests for audit functionality
+
 - **F04-2: Crash Report Analysis** (#81)
   - CrashReportAnalysisService for analyzing crash reports
   - Parse .crash, .ips, .spin, .hang, .diag report files

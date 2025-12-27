@@ -17,6 +17,7 @@
 - [Schedule Command](#schedule-command)
 - [Monitor Command](#monitor-command)
 - [Metrics Command](#metrics-command)
+- [Audit Command](#audit-command)
 - [Cleanup Logging](#cleanup-logging)
 - [Cleanup Levels](#cleanup-levels)
 - [Cleanup Targets](#cleanup-targets)
@@ -55,6 +56,7 @@ osxcleaner clean --level light
 | `schedule` | Manage schedules | Automation |
 | `monitor` | Monitor disk usage | Disk alerts |
 | `metrics` | Prometheus metrics endpoint | Remote monitoring |
+| `audit` | View and export audit logs | Compliance reporting |
 
 ### Global Options
 
@@ -723,6 +725,115 @@ scrape_configs:
 A pre-built dashboard is available at [`docs/monitoring/grafana-dashboard.json`](monitoring/grafana-dashboard.json).
 
 For detailed documentation, see [Monitoring Guide](monitoring/MONITORING.md).
+
+---
+
+## Audit Command
+
+The `audit` command provides enterprise-grade audit logging for compliance and reporting.
+
+### View Recent Events
+
+```bash
+# List last 20 events
+osxcleaner audit list
+
+# List last 50 events
+osxcleaner audit list --count 50
+
+# Filter by category
+osxcleaner audit list --category cleanup
+
+# Filter by result
+osxcleaner audit list --result failure
+
+# JSON output
+osxcleaner audit list --json
+```
+
+### Show Event Details
+
+```bash
+# Show details of a specific event
+osxcleaner audit show <event-id>
+
+# Show the last event
+osxcleaner audit show last
+
+# JSON output
+osxcleaner audit show last --json
+```
+
+### View Statistics
+
+```bash
+# Show all-time statistics
+osxcleaner audit stats
+
+# Statistics for last 30 days
+osxcleaner audit stats --days 30
+
+# JSON format
+osxcleaner audit stats --json
+```
+
+### Export Events
+
+```bash
+# Export to JSON (default)
+osxcleaner audit export
+
+# Export to CSV
+osxcleaner audit export --format csv
+
+# Export to JSON Lines
+osxcleaner audit export --format jsonl
+
+# Export with custom output path
+osxcleaner audit export --output /path/to/export.json
+
+# Export last 7 days only
+osxcleaner audit export --days 7
+
+# Export specific category
+osxcleaner audit export --category security
+```
+
+### Clear Old Events
+
+```bash
+# Apply retention policy (delete events older than N days)
+osxcleaner audit clear --older-than 90 --force
+
+# Clear ALL events (use with caution)
+osxcleaner audit clear --all --force
+```
+
+### Audit System Info
+
+```bash
+# Show audit system information
+osxcleaner audit info
+```
+
+### Event Categories
+
+| Category | Description |
+|----------|-------------|
+| `cleanup` | File deletion, cache cleanup operations |
+| `policy` | Policy application, compliance checks |
+| `security` | Access control, authentication events |
+| `system` | Startup, shutdown, configuration changes |
+| `user` | Manual user actions |
+
+### Event Results
+
+| Result | Description |
+|--------|-------------|
+| `success` | Operation completed successfully |
+| `failure` | Operation failed |
+| `warning` | Operation completed with warnings |
+| `skipped` | Operation was skipped |
 
 ---
 
