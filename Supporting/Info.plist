@@ -36,5 +36,13 @@
 	<true/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSAccentColorName</key>
+	<string>AccentColor</string>
+	<key>CFBundleDocumentTypes</key>
+	<array/>
+	<key>LSUIElement</key>
+	<false/>
 </dict>
 </plist>
