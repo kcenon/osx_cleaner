@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2021-2025
+
+require 'bundler/gem_tasks'
+require 'rspec/core/rake_task'
+require 'rubocop/rake_task'
+
+RSpec::Core::RakeTask.new(:spec)
+RuboCop::RakeTask.new(:rubocop)
+
+task default: %i[spec rubocop]
