@@ -546,6 +546,7 @@ osxcleaner/
 | [설치 가이드](docs/INSTALLATION.md) | 시스템 요구사항, 설치 방법, 문제 해결 |
 | [사용 가이드](docs/USAGE.md) | CLI 명령어, 예제, CI/CD 통합 |
 | [안전 가이드](docs/SAFETY.md) | 안전 분류 체계, 보호 경로, FAQ |
+| [App Store 가이드](docs/APPSTORE.md) | 빌드, 서명, 공증, App Store 배포 |
 | [기여 가이드](docs/CONTRIBUTING.md) | 기여 방법, 코딩 표준 |
 | [변경 이력](docs/CHANGELOG.md) | 버전 히스토리 및 릴리스 노트 |
 

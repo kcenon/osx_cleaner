@@ -4,11 +4,26 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Bundle Extension for Resource Access
+
+private extension Bundle {
+    /// Returns the resource bundle for localized strings
+    /// Works with both Swift Package Manager and Xcode project builds
+    static var localizationBundle: Bundle {
+        #if SWIFT_PACKAGE
+        return .module
+        #else
+        // For Xcode project, use the main bundle or app bundle
+        return Bundle.main
+        #endif
+    }
+}
+
 // MARK: - Localization Helper
 
-/// Localized string helper that uses Bundle.module for SPM resource access
+/// Localized string helper that works with both SPM and Xcode project
 func L(_ key: String) -> String {
-    NSLocalizedString(key, bundle: .module, comment: "")
+    NSLocalizedString(key, bundle: .localizationBundle, comment: "")
 }
 
 /// Localized string with format arguments
