@@ -248,7 +248,8 @@ public final class AuditExporter {
             let percentage = statistics.totalEvents > 0
                 ? Double(count) / Double(statistics.totalEvents) * 100
                 : 0
-            lines.append(String(format: "  %-15s: %5d (%5.1f%%)", category.rawValue, count, percentage))
+            let categoryName = category.rawValue.padding(toLength: 15, withPad: " ", startingAt: 0)
+            lines.append("  \(categoryName): \(String(format: "%5d", count)) (\(String(format: "%5.1f", percentage))%)")
         }
         lines.append("")
 
@@ -259,7 +260,8 @@ public final class AuditExporter {
             let percentage = statistics.totalEvents > 0
                 ? Double(count) / Double(statistics.totalEvents) * 100
                 : 0
-            lines.append(String(format: "  %-15s: %5d (%5.1f%%)", result.rawValue, count, percentage))
+            let resultName = result.rawValue.padding(toLength: 15, withPad: " ", startingAt: 0)
+            lines.append("  \(resultName): \(String(format: "%5d", count)) (\(String(format: "%5.1f", percentage))%)")
         }
         lines.append("")
 
