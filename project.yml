@@ -100,6 +100,10 @@ targets:
         NSHumanReadableCopyright: "Copyright © 2021-2025 kcenon. All rights reserved."
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: false
+        ITSAppUsesNonExemptEncryption: false
+        NSAccentColorName: AccentColor
+        CFBundleDocumentTypes: []
+        LSUIElement: false
     entitlements:
       path: Supporting/OSXCleanerGUI.entitlements
       properties:
@@ -193,6 +197,26 @@ schemes:
       config: Debug
     archive:
       config: Release
+      revealArchiveInOrganizer: true
+
+  OSXCleanerGUI-AppStore:
+    build:
+      targets:
+        OSXCleanerGUI: all
+        OSXCleanerKit: all
+    run:
+      config: Release
+    test:
+      config: Release
+      targets:
+        - OSXCleanerKitTests
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release
+      revealArchiveInOrganizer: true
 
   osxcleaner:
     build:
