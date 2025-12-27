@@ -10,6 +10,14 @@ public struct AppConfiguration: Codable {
     public var logLevel: String
     public var excludedPaths: [String]
 
+    // Server connection settings
+    public var serverURL: String?
+    public var serverTimeout: Int?
+    public var agentId: UUID?
+    public var authToken: String?
+    public var tokenExpiresAt: Date?
+    public var lastHeartbeat: Date?
+
     public static let `default` = AppConfiguration(
         defaultSafetyLevel: 2, // Normal cleanup level
         autoBackup: true,
@@ -27,12 +35,24 @@ public struct AppConfiguration: Codable {
         defaultSafetyLevel: Int = 3,
         autoBackup: Bool = true,
         logLevel: String = "info",
-        excludedPaths: [String] = []
+        excludedPaths: [String] = [],
+        serverURL: String? = nil,
+        serverTimeout: Int? = nil,
+        agentId: UUID? = nil,
+        authToken: String? = nil,
+        tokenExpiresAt: Date? = nil,
+        lastHeartbeat: Date? = nil
     ) {
         self.defaultSafetyLevel = defaultSafetyLevel
         self.autoBackup = autoBackup
         self.logLevel = logLevel
         self.excludedPaths = excludedPaths
+        self.serverURL = serverURL
+        self.serverTimeout = serverTimeout
+        self.agentId = agentId
+        self.authToken = authToken
+        self.tokenExpiresAt = tokenExpiresAt
+        self.lastHeartbeat = lastHeartbeat
     }
 }
 
