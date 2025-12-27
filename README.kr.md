@@ -116,6 +116,7 @@ OSX Cleaner는 4단계 안전 등급 시스템을 사용합니다:
 | F08 | CI/CD 파이프라인 통합 | P2 | DevOps |
 | F09 | 팀 환경 관리 | P2 | DevOps |
 | F10 | macOS 버전별 최적화 | P1 | 전체 |
+| F11 | Prometheus 메트릭 엔드포인트 | P2 | DevOps |
 
 ---
 
@@ -294,6 +295,40 @@ sync:
   interval_seconds: 3600
   sync_on_startup: true
 ```
+
+### Prometheus 메트릭 (F11)
+
+OSX Cleaner는 원격 모니터링을 위한 Prometheus 호환 메트릭 엔드포인트를 제공합니다.
+
+```bash
+# 메트릭 서버 시작 (기본 포트 9090)
+osxcleaner metrics start
+
+# 사용자 지정 포트로 시작
+osxcleaner metrics start --port 8080
+
+# 현재 메트릭 보기
+osxcleaner metrics show
+
+# 서버 상태 확인
+osxcleaner metrics status
+
+# 서버 중지
+osxcleaner metrics stop
+```
+
+#### 사용 가능한 메트릭
+
+| 메트릭 | 타입 | 설명 |
+|--------|------|------|
+| `osxcleaner_disk_usage_percent` | Gauge | 현재 디스크 사용률 |
+| `osxcleaner_disk_available_bytes` | Gauge | 사용 가능한 디스크 공간 (바이트) |
+| `osxcleaner_cleanup_operations_total` | Counter | 총 정리 작업 수 |
+| `osxcleaner_bytes_cleaned_total` | Counter | 정리된 총 바이트 |
+
+사전 제작된 Grafana 대시보드: [`docs/monitoring/grafana-dashboard.json`](docs/monitoring/grafana-dashboard.json)
+
+자세한 문서: [모니터링 가이드](docs/monitoring/MONITORING.md)
 
 ### 수동 빌드
 

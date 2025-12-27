@@ -16,6 +16,7 @@
 - [Config Command](#config-command)
 - [Schedule Command](#schedule-command)
 - [Monitor Command](#monitor-command)
+- [Metrics Command](#metrics-command)
 - [Cleanup Logging](#cleanup-logging)
 - [Cleanup Levels](#cleanup-levels)
 - [Cleanup Targets](#cleanup-targets)
@@ -53,6 +54,7 @@ osxcleaner clean --level light
 | `config` | Manage configuration | Initial setup |
 | `schedule` | Manage schedules | Automation |
 | `monitor` | Monitor disk usage | Disk alerts |
+| `metrics` | Prometheus metrics endpoint | Remote monitoring |
 
 ### Global Options
 
@@ -649,6 +651,78 @@ osxcleaner monitor check --quiet
 | Warning   | 85%     | Yellow alert |
 | Critical  | 90%     | Orange alert with recommendation |
 | Emergency | 95%     | Red alert, auto-cleanup if enabled |
+
+---
+
+## Metrics Command
+
+Expose Prometheus metrics for remote monitoring with tools like Prometheus and Grafana.
+
+### Start Metrics Server
+
+```bash
+# Start with default settings (port 9090)
+osxcleaner metrics start
+
+# Start with custom port
+osxcleaner metrics start --port 8080
+
+# Run in foreground (useful for debugging)
+osxcleaner metrics start --foreground
+```
+
+### View Metrics
+
+```bash
+# Display current metrics in Prometheus format
+osxcleaner metrics show
+
+# Check server status
+osxcleaner metrics status
+
+# JSON output
+osxcleaner metrics status --format json
+
+# Via curl
+curl http://localhost:9090/metrics
+```
+
+### Stop Server
+
+```bash
+osxcleaner metrics stop
+```
+
+### Available Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `osxcleaner_disk_total_bytes` | Gauge | Total disk space in bytes |
+| `osxcleaner_disk_available_bytes` | Gauge | Available disk space in bytes |
+| `osxcleaner_disk_used_bytes` | Gauge | Used disk space in bytes |
+| `osxcleaner_disk_usage_percent` | Gauge | Disk usage percentage |
+| `osxcleaner_cleanup_operations_total` | Counter | Total cleanup operations |
+| `osxcleaner_bytes_cleaned_total` | Counter | Total bytes cleaned |
+| `osxcleaner_files_removed_total` | Counter | Total files removed |
+| `osxcleaner_cleanup_errors_total` | Counter | Total cleanup errors |
+
+### Prometheus Configuration
+
+Add to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'osxcleaner'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+```
+
+### Grafana Dashboard
+
+A pre-built dashboard is available at [`docs/monitoring/grafana-dashboard.json`](monitoring/grafana-dashboard.json).
+
+For detailed documentation, see [Monitoring Guide](monitoring/MONITORING.md).
 
 ---
 
