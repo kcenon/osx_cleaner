@@ -35,6 +35,29 @@ public struct MenuItem {
     }
 }
 
+// MARK: - TUI Disk Info
+
+/// Disk information for TUI display
+private struct TUIDiskInfo {
+    let total: UInt64
+    let used: UInt64
+    let available: UInt64
+    let usagePercent: Double
+    let totalFormatted: String
+    let usedFormatted: String
+    let availableFormatted: String
+
+    static let empty = TUIDiskInfo(
+        total: 0,
+        used: 0,
+        available: 0,
+        usagePercent: 0,
+        totalFormatted: "N/A",
+        usedFormatted: "N/A",
+        availableFormatted: "N/A"
+    )
+}
+
 // MARK: - Interactive TUI
 
 /// Main interactive TUI class for OSX Cleaner
@@ -650,15 +673,7 @@ public final class InteractiveTUI {
 
     // MARK: - Helpers
 
-    private func getDiskInfo() -> (
-        total: UInt64,
-        used: UInt64,
-        available: UInt64,
-        usagePercent: Double,
-        totalFormatted: String,
-        usedFormatted: String,
-        availableFormatted: String
-    ) {
+    private func getDiskInfo() -> TUIDiskInfo {
         let fileManager = FileManager.default
 
         do {
@@ -671,7 +686,7 @@ public final class InteractiveTUI {
             let used = total - free
             let usagePercent = total > 0 ? Double(used) / Double(total) * 100.0 : 0.0
 
-            return (
+            return TUIDiskInfo(
                 total: total,
                 used: used,
                 available: free,
@@ -681,7 +696,7 @@ public final class InteractiveTUI {
                 availableFormatted: ByteCountFormatter.string(fromByteCount: Int64(free), countStyle: .file)
             )
         } catch {
-            return (0, 0, 0, 0, "N/A", "N/A", "N/A")
+            return .empty
         }
     }
 
