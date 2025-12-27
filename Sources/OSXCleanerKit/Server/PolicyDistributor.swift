@@ -518,7 +518,7 @@ public actor PolicyDistributor {
     public func rollback(distributionId: UUID) async throws {
         guard var status = distributions[distributionId] else {
             // Check history
-            guard let historicalStatus = distributionHistory.first(where: { $0.id == distributionId }) else {
+            guard distributionHistory.contains(where: { $0.id == distributionId }) else {
                 throw PolicyDistributionError.distributionNotFound(distributionId)
             }
             // Cannot rollback from history for now
@@ -584,7 +584,7 @@ public actor PolicyDistributor {
         distributions[distributionId] = status
 
         // Get agents from registry
-        let agents = await failedAgentIds.asyncCompactMap { await registry.agent(byId: $0) }
+        _ = await failedAgentIds.asyncCompactMap { await registry.agent(byId: $0) }
 
         // Retry distribution
         // Note: We would need the original policy here
