@@ -116,6 +116,7 @@ OSX Cleaner uses a 4-level safety classification system:
 | F08 | CI/CD Pipeline Integration | P2 | DevOps |
 | F09 | Team Environment Management | P2 | DevOps |
 | F10 | macOS Version Optimization | P1 | All |
+| F11 | Prometheus Metrics Endpoint | P2 | DevOps |
 
 ---
 
@@ -294,6 +295,40 @@ sync:
   interval_seconds: 3600
   sync_on_startup: true
 ```
+
+### Prometheus Metrics (F11)
+
+OSX Cleaner provides a Prometheus-compatible metrics endpoint for remote monitoring.
+
+```bash
+# Start metrics server (default port 9090)
+osxcleaner metrics start
+
+# Start with custom port
+osxcleaner metrics start --port 8080
+
+# View current metrics
+osxcleaner metrics show
+
+# Check server status
+osxcleaner metrics status
+
+# Stop server
+osxcleaner metrics stop
+```
+
+#### Available Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `osxcleaner_disk_usage_percent` | Gauge | Current disk usage percentage |
+| `osxcleaner_disk_available_bytes` | Gauge | Available disk space in bytes |
+| `osxcleaner_cleanup_operations_total` | Counter | Total cleanup operations |
+| `osxcleaner_bytes_cleaned_total` | Counter | Total bytes cleaned |
+
+A pre-built Grafana dashboard is available at [`docs/monitoring/grafana-dashboard.json`](docs/monitoring/grafana-dashboard.json).
+
+For detailed documentation, see [Monitoring Guide](docs/monitoring/MONITORING.md).
 
 ### Manual Build
 
