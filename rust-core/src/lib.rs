@@ -39,14 +39,15 @@ impl FFIResult {
             error_message: ptr::null_mut(),
             data: data
                 .map(|s| {
-                    CString::new(s).unwrap_or_else(|e| {
-                        log::error!(
+                    CString::new(s)
+                        .unwrap_or_else(|e| {
+                            log::error!(
                             "FFI string conversion failed (NUL at position {}): returning empty",
                             e.nul_position()
                         );
-                        CString::new("").unwrap() // Safe: empty string has no NUL
-                    })
-                    .into_raw()
+                            CString::new("").unwrap() // Safe: empty string has no NUL
+                        })
+                        .into_raw()
                 })
                 .unwrap_or(ptr::null_mut()),
         }
