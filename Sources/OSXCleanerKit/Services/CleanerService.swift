@@ -54,11 +54,19 @@ public final class CleanerService: CleanerServiceProtocol {
     public init(
         fileManager: FileManager = .default,
         rustBridge: RustBridge = .shared,
-        loggingService: AutomatedCleanupLoggingService = .shared
+        loggingService: AutomatedCleanupLoggingService = .shared,
+        forceSwiftFallback: Bool = false
     ) {
         self.fileManager = fileManager
         self.rustBridge = rustBridge
         self.loggingService = loggingService
+
+        // Force Swift fallback if requested (for testing)
+        if forceSwiftFallback {
+            useRustCore = false
+            AppLogger.shared.info("Using Swift fallback (forced for testing)")
+            return
+        }
 
         // Try to initialize Rust core
         do {
