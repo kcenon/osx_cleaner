@@ -10,10 +10,12 @@
 //! This module scans all application caches and provides
 //! intelligent cleanup options based on size and safety.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -55,6 +57,106 @@ const CLOUD_SERVICE_PATTERNS: &[(&str, CloudServiceType)] = &[
     ("com.google.GoogleDrive", CloudServiceType::GoogleDrive),
 ];
 
+/// Cache entry for mdfind results
+struct CacheEntry {
+    /// Cached app name (None if lookup failed)
+    value: Option<String>,
+    /// When this entry expires
+    expires_at: Instant,
+}
+
+/// Thread-safe cache for app name lookups
+struct AppNameCache {
+    /// Cache storage
+    cache: RwLock<HashMap<String, CacheEntry>>,
+    /// Time-to-live for cache entries
+    ttl: Duration,
+}
+
+impl AppNameCache {
+    /// Create a new cache with specified TTL
+    fn new(ttl: Duration) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            ttl,
+        }
+    }
+
+    /// Get app name from cache or perform lookup
+    fn get_or_lookup(&self, bundle_id: &str) -> Option<String> {
+        // Check cache first (read lock)
+        {
+            let cache = self.cache.read().unwrap();
+            if let Some(entry) = cache.get(bundle_id) {
+                if entry.expires_at > Instant::now() {
+                    return entry.value.clone();
+                }
+            }
+        }
+
+        // Cache miss - perform lookup
+        let result = self.lookup_app_name(bundle_id);
+
+        // Store in cache (write lock)
+        {
+            let mut cache = self.cache.write().unwrap();
+            cache.insert(
+                bundle_id.to_string(),
+                CacheEntry {
+                    value: result.clone(),
+                    expires_at: Instant::now() + self.ttl,
+                },
+            );
+        }
+
+        result
+    }
+
+    /// Perform actual mdfind lookup
+    fn lookup_app_name(&self, bundle_id: &str) -> Option<String> {
+        // Try to get the app name using mdfind
+        if let Ok(output) = Command::new("mdfind")
+            .args(["kMDItemCFBundleIdentifier", "==", bundle_id])
+            .output()
+        {
+            if output.status.success() {
+                let path_str = String::from_utf8_lossy(&output.stdout);
+                if let Some(path) = path_str.trim().lines().next() {
+                    // Extract app name from path (e.g., /Applications/Foo.app -> Foo)
+                    if let Some(app_name) = std::path::Path::new(path)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.trim_end_matches(".app").to_string())
+                    {
+                        if !app_name.is_empty() {
+                            return Some(app_name);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: parse bundle ID
+        // e.g., com.apple.Preview -> Preview
+        //       com.spotify.client -> Spotify
+        bundle_id.split('.').next_back().map(|s| {
+            let mut chars = s.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        })
+    }
+
+    /// Clear expired cache entries
+    #[allow(dead_code)]
+    fn clear_expired(&self) {
+        let mut cache = self.cache.write().unwrap();
+        let now = Instant::now();
+        cache.retain(|_, entry| entry.expires_at > now);
+    }
+}
+
 /// Application cache cleaner
 pub struct AppCacheCleaner {
     /// Base path for caches
@@ -63,6 +165,8 @@ pub struct AppCacheCleaner {
     exclusions: HashSet<String>,
     /// Whether to include cloud service caches
     include_cloud_caches: bool,
+    /// Cache for app name lookups
+    app_name_cache: AppNameCache,
 }
 
 impl Default for AppCacheCleaner {
@@ -80,6 +184,7 @@ impl AppCacheCleaner {
             cache_base: expand_home("~/Library/Caches"),
             exclusions,
             include_cloud_caches: true,
+            app_name_cache: AppNameCache::new(Duration::from_secs(300)), // 5 minutes TTL
         }
     }
 
@@ -93,6 +198,7 @@ impl AppCacheCleaner {
             cache_base: expand_home("~/Library/Caches"),
             exclusions: all_exclusions,
             include_cloud_caches: true,
+            app_name_cache: AppNameCache::new(Duration::from_secs(300)), // 5 minutes TTL
         }
     }
 
@@ -233,40 +339,9 @@ impl AppCacheCleaner {
         self.scan_all_caches().iter().map(|e| e.size).sum()
     }
 
-    /// Get app name from bundle ID
+    /// Get app name from bundle ID (cached)
     fn get_app_name(&self, bundle_id: &str) -> Option<String> {
-        // Try to get the app name using mdfind
-        if let Ok(output) = Command::new("mdfind")
-            .args(["kMDItemCFBundleIdentifier", "==", bundle_id])
-            .output()
-        {
-            if output.status.success() {
-                let path_str = String::from_utf8_lossy(&output.stdout);
-                if let Some(path) = path_str.trim().lines().next() {
-                    // Extract app name from path (e.g., /Applications/Foo.app -> Foo)
-                    if let Some(app_name) = std::path::Path::new(path)
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.trim_end_matches(".app").to_string())
-                    {
-                        if !app_name.is_empty() {
-                            return Some(app_name);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fallback: parse bundle ID
-        // e.g., com.apple.Preview -> Preview
-        //       com.spotify.client -> Spotify
-        bundle_id.split('.').next_back().map(|s| {
-            let mut chars = s.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
+        self.app_name_cache.get_or_lookup(bundle_id)
     }
 
     /// Check if the related app is running
@@ -606,6 +681,7 @@ mod tests {
             cache_base: temp.path().to_path_buf(),
             exclusions: HashSet::new(),
             include_cloud_caches: true,
+            app_name_cache: AppNameCache::new(Duration::from_secs(300)),
         };
 
         // Should return empty vec, not panic
