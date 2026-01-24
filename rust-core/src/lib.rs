@@ -1337,4 +1337,185 @@ mod tests {
             osx_free_string(result.data);
         }
     }
+
+    // ============================================================================
+    // FFI Memory Management Tests
+    // ============================================================================
+
+    #[test]
+    fn test_ffi_result_ok_with_data() {
+        let result = FFIResult::ok(Some("test data".to_string()));
+
+        assert!(result.success);
+        assert!(result.error_message.is_null());
+        assert!(!result.data.is_null());
+
+        // Verify data content
+        unsafe {
+            let data = CStr::from_ptr(result.data);
+            assert_eq!(data.to_str().unwrap(), "test data");
+
+            // Clean up
+            osx_free_string(result.data);
+        }
+    }
+
+    #[test]
+    fn test_ffi_result_ok_without_data() {
+        let result = FFIResult::ok(None);
+
+        assert!(result.success);
+        assert!(result.error_message.is_null());
+        assert!(result.data.is_null());
+
+        // Should not crash when freeing null pointers
+        unsafe {
+            osx_free_string(result.data);
+        }
+    }
+
+    #[test]
+    fn test_ffi_result_error() {
+        let result = FFIResult::err("test error".to_string());
+
+        assert!(!result.success);
+        assert!(!result.error_message.is_null());
+        assert!(result.data.is_null());
+
+        // Verify error message
+        unsafe {
+            let error = CStr::from_ptr(result.error_message);
+            assert_eq!(error.to_str().unwrap(), "test error");
+
+            // Clean up
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_no_memory_leak_in_loop() {
+        // Allocate and free many results to check for leaks
+        for i in 0..10000 {
+            let data = format!("test data iteration {}", i);
+            let result = FFIResult::ok(Some(data));
+            unsafe {
+                osx_free_string(result.data);
+            }
+        }
+
+        // If we get here without OOM, no significant leaks
+        // More precise testing requires valgrind or similar
+    }
+
+    #[test]
+    fn test_error_path_no_leak() {
+        for _ in 0..10000 {
+            let result = FFIResult::err("error message".to_string());
+            unsafe {
+                osx_free_string(result.error_message);
+            }
+        }
+    }
+
+    #[test]
+    fn test_free_null_data_safe() {
+        let result = FFIResult {
+            success: true,
+            error_message: ptr::null_mut(),
+            data: ptr::null_mut(),
+        };
+
+        // Should not crash
+        unsafe {
+            osx_free_string(result.data);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_free_null_error_safe() {
+        let result = FFIResult {
+            success: false,
+            error_message: ptr::null_mut(),
+            data: ptr::null_mut(),
+        };
+
+        // Should not crash
+        unsafe {
+            osx_free_string(result.error_message);
+            osx_free_string(result.data);
+        }
+    }
+
+    #[test]
+    fn test_analyze_path_roundtrip() {
+        use std::ffi::CString;
+        unsafe {
+            let path = CString::new("/tmp").unwrap();
+            let result = osx_analyze_path(path.as_ptr());
+
+            if result.success {
+                assert!(!result.data.is_null());
+
+                // Parse JSON data
+                let json_str = CStr::from_ptr(result.data).to_str().unwrap();
+                let _: serde_json::Value =
+                    serde_json::from_str(json_str).expect("Should be valid JSON");
+            }
+
+            osx_free_string(result.data);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_analyze_invalid_path() {
+        use std::ffi::CString;
+        unsafe {
+            let path = CString::new("/nonexistent/path/12345").unwrap();
+            let result = osx_analyze_path(path.as_ptr());
+
+            // Should handle gracefully (may succeed or fail, but shouldn't crash)
+            osx_free_string(result.data);
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_multiple_allocations_deallocation() {
+        // Test multiple allocations and deallocations
+        let mut results = Vec::new();
+
+        // Allocate multiple results
+        for i in 0..100 {
+            let data = format!("data {}", i);
+            results.push(FFIResult::ok(Some(data)));
+        }
+
+        // Free all results
+        unsafe {
+            for result in results {
+                osx_free_string(result.data);
+                osx_free_string(result.error_message);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ffi_result_lifecycle() {
+        // Test complete lifecycle: create -> use -> free
+        let result = FFIResult::ok(Some("lifecycle test".to_string()));
+
+        unsafe {
+            // Use the data
+            let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+            assert_eq!(data_str, "lifecycle test");
+
+            // Free the data
+            osx_free_string(result.data);
+
+            // Note: After free, the pointer should not be used
+            // This test verifies we can call free without crashes
+        }
+    }
 }
