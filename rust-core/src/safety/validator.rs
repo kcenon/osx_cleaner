@@ -162,6 +162,17 @@ impl SafetyValidator {
             }
         }
 
+        // Handle special paths that have no file_name
+        // Root ("/"), empty (""), current ("."), parent ("..")
+        // These should always be protected
+        if path.file_name().is_none() {
+            log::debug!(
+                "Path {:?} has no file_name (root/empty/./.. path), marking as protected",
+                path
+            );
+            return true;
+        }
+
         // Check if it's a user critical path
         if is_in_home_dir(path) {
             if let Some(rel_path) = relative_to_home(path) {
@@ -466,12 +477,15 @@ mod tests {
         let path = Path::new(path_str);
 
         // The glob pattern com.apple.* should match the last component
-        let last_component = path.file_name().unwrap().to_string_lossy();
-        let matches_glob = validator
-            .glob_patterns
-            .iter()
-            .any(|p| p.matches(&last_component));
-        assert!(matches_glob, "Glob pattern should match com.apple.Safari");
+        // Handle special paths that have no file_name (root, empty, ".", "..")
+        if let Some(file_name) = path.file_name() {
+            let last_component = file_name.to_string_lossy();
+            let matches_glob = validator
+                .glob_patterns
+                .iter()
+                .any(|p| p.matches(&last_component));
+            assert!(matches_glob, "Glob pattern should match com.apple.Safari");
+        }
     }
 
     #[test]
@@ -481,5 +495,81 @@ mod tests {
         // Verify WARNING_PATTERNS contains expected patterns
         assert!(WARNING_PATTERNS.contains(&"com.apple.*"));
         assert!(WARNING_PATTERNS.contains(&"*.app/Contents/MacOS/*"));
+    }
+
+    #[test]
+    fn test_root_path_is_protected() {
+        let validator = SafetyValidator::new();
+        assert!(
+            validator.is_protected(Path::new("/")),
+            "Root path should be protected"
+        );
+    }
+
+    #[test]
+    fn test_empty_path_is_protected() {
+        let validator = SafetyValidator::new();
+        assert!(
+            validator.is_protected(Path::new("")),
+            "Empty path should be protected"
+        );
+    }
+
+    #[test]
+    fn test_current_dir_is_protected() {
+        let validator = SafetyValidator::new();
+        assert!(
+            validator.is_protected(Path::new(".")),
+            "Current directory path should be protected"
+        );
+    }
+
+    #[test]
+    fn test_parent_dir_is_protected() {
+        let validator = SafetyValidator::new();
+        assert!(
+            validator.is_protected(Path::new("..")),
+            "Parent directory path should be protected"
+        );
+    }
+
+    #[test]
+    fn test_edge_case_paths_classification() {
+        let validator = SafetyValidator::new();
+
+        // All edge case paths should be classified as DANGER
+        assert_eq!(
+            validator.classify(Path::new("/")),
+            SafetyLevel::Danger,
+            "Root path should be DANGER level"
+        );
+        assert_eq!(
+            validator.classify(Path::new("")),
+            SafetyLevel::Danger,
+            "Empty path should be DANGER level"
+        );
+        assert_eq!(
+            validator.classify(Path::new(".")),
+            SafetyLevel::Danger,
+            "Current dir should be DANGER level"
+        );
+        assert_eq!(
+            validator.classify(Path::new("..")),
+            SafetyLevel::Danger,
+            "Parent dir should be DANGER level"
+        );
+    }
+
+    #[test]
+    fn test_normal_path_not_affected() {
+        let validator = SafetyValidator::new();
+
+        // Normal paths should work as before
+        let normal_path = Path::new("/tmp/test_file.txt");
+        assert!(!validator.is_protected(normal_path));
+
+        // System paths should still be protected
+        assert!(validator.is_protected(Path::new("/System")));
+        assert!(validator.is_protected(Path::new("/usr/bin")));
     }
 }
