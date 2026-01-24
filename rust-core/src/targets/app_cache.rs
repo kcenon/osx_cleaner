@@ -359,26 +359,7 @@ impl AppCacheCleaner {
     pub fn get_cleanup_targets(&self) -> Vec<CleanupTarget> {
         self.scan_all_caches()
             .into_iter()
-            .map(|entry| {
-                let mut target = CleanupTarget::new_direct(
-                    entry.path,
-                    format!("{} Cache", entry.app_name),
-                    entry.safety_level,
-                )
-                .with_size(entry.size);
-
-                // Add description based on status
-                let mut desc = format!("Application cache for {}", entry.app_name);
-                if entry.is_app_running {
-                    desc.push_str(" (app is running)");
-                }
-                if let Some(warning) = entry.sync_warning {
-                    desc.push_str(&format!(" - Warning: {}", warning));
-                }
-                target = target.with_description(desc);
-
-                target
-            })
+            .map(|entry| entry.to_cleanup_target(true))
             .collect()
     }
 
@@ -390,15 +371,7 @@ impl AppCacheCleaner {
         caches
             .into_iter()
             .filter(|e| bundle_set.contains(e.bundle_id.as_str()))
-            .map(|entry| {
-                CleanupTarget::new_direct(
-                    entry.path,
-                    format!("{} Cache", entry.app_name),
-                    entry.safety_level,
-                )
-                .with_size(entry.size)
-                .with_description(format!("Application cache for {}", entry.app_name))
-            })
+            .map(|entry| entry.to_cleanup_target(false))
             .collect()
     }
 
@@ -480,6 +453,45 @@ pub struct AppCacheEntry {
     pub sync_warning: Option<String>,
     /// Whether the related app is running
     pub is_app_running: bool,
+}
+
+impl AppCacheEntry {
+    /// Convert AppCacheEntry to CleanupTarget
+    ///
+    /// Creates a CleanupTarget with the appropriate name, size, and safety level.
+    /// Optionally includes additional description based on app running status
+    /// and sync warnings.
+    ///
+    /// # Arguments
+    ///
+    /// * `include_details` - Whether to include detailed description
+    ///
+    /// # Returns
+    ///
+    /// A CleanupTarget configured for this cache entry
+    pub fn to_cleanup_target(&self, include_details: bool) -> CleanupTarget {
+        let mut target = CleanupTarget::new_direct(
+            self.path.clone(),
+            format!("{} Cache", self.app_name),
+            self.safety_level,
+        )
+        .with_size(self.size);
+
+        if include_details {
+            let mut desc = format!("Application cache for {}", self.app_name);
+            if self.is_app_running {
+                desc.push_str(" (app is running)");
+            }
+            if let Some(warning) = &self.sync_warning {
+                desc.push_str(&format!(" - Warning: {}", warning));
+            }
+            target = target.with_description(desc);
+        } else {
+            target = target.with_description(format!("Application cache for {}", self.app_name));
+        }
+
+        target
+    }
 }
 
 /// Result of app cache cleanup operation
@@ -609,5 +621,81 @@ mod tests {
         let top = cleaner.get_top_caches(10);
         // Result depends on actual system state
         assert!(top.len() <= 10);
+    }
+
+    #[test]
+    fn test_app_cache_entry_to_cleanup_target_with_details() {
+        let entry = AppCacheEntry {
+            path: PathBuf::from("/tmp/test"),
+            bundle_id: "com.example.app".to_string(),
+            app_name: "Example App".to_string(),
+            size: 1024,
+            safety_level: SafetyLevel::Safe,
+            cloud_service: None,
+            sync_warning: Some("Test warning".to_string()),
+            is_app_running: true,
+        };
+
+        let target = entry.to_cleanup_target(true);
+
+        assert_eq!(target.name, "Example App Cache");
+        assert_eq!(target.size, 1024);
+        assert_eq!(target.safety_level, SafetyLevel::Safe);
+        assert!(target.description.is_some());
+
+        let desc = target.description.unwrap();
+        assert!(desc.contains("Application cache for Example App"));
+        assert!(desc.contains("app is running"));
+        assert!(desc.contains("Warning: Test warning"));
+    }
+
+    #[test]
+    fn test_app_cache_entry_to_cleanup_target_without_details() {
+        let entry = AppCacheEntry {
+            path: PathBuf::from("/tmp/test"),
+            bundle_id: "com.example.app".to_string(),
+            app_name: "Example App".to_string(),
+            size: 2048,
+            safety_level: SafetyLevel::Caution,
+            cloud_service: None,
+            sync_warning: Some("Test warning".to_string()),
+            is_app_running: true,
+        };
+
+        let target = entry.to_cleanup_target(false);
+
+        assert_eq!(target.name, "Example App Cache");
+        assert_eq!(target.size, 2048);
+        assert_eq!(target.safety_level, SafetyLevel::Caution);
+        assert!(target.description.is_some());
+
+        let desc = target.description.unwrap();
+        assert_eq!(desc, "Application cache for Example App");
+        // Should not contain detailed info when include_details is false
+        assert!(!desc.contains("app is running"));
+        assert!(!desc.contains("Warning:"));
+    }
+
+    #[test]
+    fn test_app_cache_entry_to_cleanup_target_minimal() {
+        let entry = AppCacheEntry {
+            path: PathBuf::from("/tmp/test"),
+            bundle_id: "com.example.minimal".to_string(),
+            app_name: "Minimal".to_string(),
+            size: 512,
+            safety_level: SafetyLevel::Safe,
+            cloud_service: None,
+            sync_warning: None,
+            is_app_running: false,
+        };
+
+        let target = entry.to_cleanup_target(true);
+
+        assert_eq!(target.name, "Minimal Cache");
+        assert_eq!(target.size, 512);
+        assert!(target.description.is_some());
+
+        let desc = target.description.unwrap();
+        assert_eq!(desc, "Application cache for Minimal");
     }
 }
