@@ -108,7 +108,7 @@ pub extern "C" fn osx_core_version() -> *mut c_char {
 /// # Arguments
 ///
 /// * `path` - A pointer to a null-terminated C string containing the path to analyze.
-///            Must be a valid UTF-8 encoded path.
+///   Must be a valid UTF-8 encoded path.
 ///
 /// # Returns
 ///
@@ -404,7 +404,7 @@ pub unsafe extern "C" fn osx_validate_cleanup(
 /// # Arguments
 ///
 /// * `path` - A pointer to a null-terminated C string containing the path to clean.
-///            Must be a valid UTF-8 encoded path.
+///   Must be a valid UTF-8 encoded path.
 /// * `cleanup_level` - Cleanup intensity level (1-4):
 ///   - 1: Light - Only user caches (SAFE level)
 ///   - 2: Normal - User caches + logs (SAFE + LOW_RISK levels)
