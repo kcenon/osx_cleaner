@@ -100,11 +100,84 @@ pub extern "C" fn osx_core_version() -> *mut c_char {
         .into_raw()
 }
 
-/// Analyze a path for cleanup opportunities
+/// Analyzes the specified path for cleanup opportunities.
+///
+/// This function scans the given path and returns information about files
+/// that can be safely cleaned up, organized by category and safety level.
+///
+/// # Arguments
+///
+/// * `path` - A pointer to a null-terminated C string containing the path to analyze.
+///            Must be a valid UTF-8 encoded path.
+///
+/// # Returns
+///
+/// Returns an `FFIResult` struct containing:
+/// - On success: `success = true`, `data` contains JSON-encoded analysis results
+/// - On failure: `success = false`, `error_message` contains error description
 ///
 /// # Safety
-/// - `path` must be a valid null-terminated C string
-/// - The returned FFIResult must be freed with `osx_free_result`
+///
+/// This function is unsafe because it dereferences raw pointers.
+///
+/// ## Preconditions
+///
+/// The caller MUST ensure:
+/// - `path` is a valid, non-null pointer to a null-terminated C string
+/// - `path` remains valid for the entire duration of this function call
+/// - `path` points to a valid UTF-8 encoded string
+///
+/// ## Postconditions
+///
+/// After this function returns:
+/// - The returned `FFIResult` is owned by the caller
+/// - The caller MUST call `osx_free_result()` to free the returned result
+/// - The `path` pointer is no longer referenced and can be freed by the caller
+///
+/// ## Thread Safety
+///
+/// This function is thread-safe. Multiple threads may call this function
+/// concurrently with different paths. However, calling with the same path
+/// from multiple threads may result in redundant work.
+///
+/// ## Undefined Behavior
+///
+/// The following will cause undefined behavior:
+/// - Passing a null pointer for `path`
+/// - Passing a pointer to non-null-terminated data
+/// - Passing a pointer to invalid memory
+/// - Using the returned pointers after calling `osx_free_result()`
+/// - Calling `osx_free_result()` more than once on the same result
+///
+/// # Example (Swift)
+///
+/// ```swift
+/// func analyzeDirectory(_ path: String) throws -> AnalysisResult {
+///     let cPath = path.cString(using: .utf8)!
+///     let result = osx_analyze_path(cPath)
+///     defer { osx_free_result(result) }
+///
+///     guard result.success else {
+///         let error = String(cString: result.error_message)
+///         throw AnalysisError.failed(error)
+///     }
+///
+///     let json = String(cString: result.data)
+///     return try JSONDecoder().decode(AnalysisResult.self, from: json.data(using: .utf8)!)
+/// }
+/// ```
+///
+/// # Example (C)
+///
+/// ```c
+/// FFIResult result = osx_analyze_path("/Users/example/Library/Caches");
+/// if (result.success) {
+///     printf("Analysis: %s\n", result.data);
+/// } else {
+///     fprintf(stderr, "Error: %s\n", result.error_message);
+/// }
+/// osx_free_result(result);
+/// ```
 #[no_mangle]
 pub unsafe extern "C" fn osx_analyze_path(path: *const c_char) -> FFIResult {
     if path.is_null() {
@@ -323,12 +396,109 @@ pub unsafe extern "C" fn osx_validate_cleanup(
     }
 }
 
-/// Clean a path with the specified cleanup level
+/// Executes cleanup operations on the specified path.
+///
+/// This function performs file deletion based on the specified cleanup level
+/// and safety validation. It supports dry-run mode for previewing changes.
+///
+/// # Arguments
+///
+/// * `path` - A pointer to a null-terminated C string containing the path to clean.
+///            Must be a valid UTF-8 encoded path.
+/// * `cleanup_level` - Cleanup intensity level (1-4):
+///   - 1: Light - Only user caches (SAFE level)
+///   - 2: Normal - User caches + logs (SAFE + LOW_RISK levels)
+///   - 3: Deep - Includes old files (SAFE + LOW_RISK + MEDIUM_RISK levels)
+///   - 4: System - Everything except DANGER (use with extreme caution)
+/// * `dry_run` - If `true`, simulates deletion without actually removing files.
+///
+/// # Returns
+///
+/// Returns an `FFIResult` struct containing:
+/// - On success: `success = true`, `data` contains JSON with deletion statistics
+/// - On failure: `success = false`, `error_message` contains error description
 ///
 /// # Safety
-/// - `path` must be a valid null-terminated C string
-/// - `cleanup_level` is 1-4 (Light, Normal, Deep, System)
-/// - `dry_run` if true, no files will be deleted
+///
+/// This function is unsafe because:
+/// - It dereferences raw pointers
+/// - It may perform destructive file system operations
+/// - Incorrect usage can lead to data loss
+///
+/// ## Preconditions
+///
+/// The caller MUST ensure:
+/// - `path` is a valid, non-null pointer to a null-terminated C string
+/// - `path` remains valid for the entire duration of this function call
+/// - `path` points to a valid UTF-8 encoded string
+/// - `cleanup_level` is in range 1-4 (values outside this range may cause errors)
+/// - Files at `path` are not in use by critical applications (in production mode)
+///
+/// ## Postconditions
+///
+/// After this function returns:
+/// - The returned `FFIResult` is owned by the caller
+/// - The caller MUST call `osx_free_result()` to free the returned result
+/// - If `dry_run == false` and `success == true`, files may have been deleted
+/// - Deletion operations are logged (if logging is initialized)
+///
+/// ## Thread Safety
+///
+/// This function is thread-safe for operations on different paths.
+/// **AVOID** calling this function on the same path from multiple threads,
+/// as it may cause race conditions in file system operations.
+///
+/// ## Data Loss Prevention
+///
+/// This function implements multiple safety checks:
+/// - Protected paths (system directories) are never deleted
+/// - Cloud-synced files are checked before deletion
+/// - Running application caches are validated
+/// - Files are classified by safety level before deletion
+///
+/// ## Undefined Behavior
+///
+/// The following will cause undefined behavior:
+/// - Passing a null pointer for `path`
+/// - Passing a pointer to non-null-terminated data
+/// - Passing a pointer to invalid memory
+/// - Using the returned pointers after calling `osx_free_result()`
+///
+/// # Example (Swift)
+///
+/// ```swift
+/// func cleanDirectory(_ path: String, level: CleanupLevel, dryRun: Bool) throws -> CleanStats {
+///     let cPath = path.cString(using: .utf8)!
+///     let result = osx_clean_path(cPath, Int32(level.rawValue), dryRun)
+///     defer { osx_free_result(result) }
+///
+///     guard result.success else {
+///         let error = String(cString: result.error_message)
+///         throw CleanupError.failed(error)
+///     }
+///
+///     let json = String(cString: result.data)
+///     return try JSONDecoder().decode(CleanStats.self, from: json.data(using: .utf8)!)
+/// }
+/// ```
+///
+/// # Example (C)
+///
+/// ```c
+/// // Dry run first
+/// FFIResult preview = osx_clean_path("/Users/example/Library/Caches", 2, true);
+/// if (preview.success) {
+///     printf("Would delete: %s\n", preview.data);
+///     osx_free_result(preview);
+///
+///     // Confirm and execute
+///     FFIResult actual = osx_clean_path("/Users/example/Library/Caches", 2, false);
+///     if (actual.success) {
+///         printf("Deleted: %s\n", actual.data);
+///     }
+///     osx_free_result(actual);
+/// }
+/// ```
 #[no_mangle]
 pub unsafe extern "C" fn osx_clean_path(
     path: *const c_char,
@@ -355,11 +525,47 @@ pub unsafe extern "C" fn osx_clean_path(
     }
 }
 
-/// Free a string allocated by Rust
+/// Frees a string allocated by Rust.
+///
+/// This function deallocates memory for a C string that was created
+/// by Rust and returned through the FFI boundary.
+///
+/// # Arguments
+///
+/// * `s` - A pointer to a null-terminated C string allocated by Rust.
 ///
 /// # Safety
-/// - `s` must be a pointer returned by a Rust FFI function
-/// - `s` must not be used after this call
+///
+/// This function is unsafe because:
+/// - It assumes `s` was allocated by Rust using `CString::into_raw()`
+/// - It transfers ownership of the memory back to Rust for deallocation
+///
+/// ## Preconditions
+///
+/// The caller MUST ensure:
+/// - `s` is either null OR a valid pointer returned by a Rust FFI function
+/// - `s` has not been freed previously
+/// - `s` has not been modified after allocation (must remain null-terminated)
+///
+/// ## Postconditions
+///
+/// After this function returns:
+/// - The memory pointed to by `s` is deallocated
+/// - `s` becomes a dangling pointer and MUST NOT be used
+///
+/// ## Undefined Behavior
+///
+/// The following will cause undefined behavior:
+/// - Passing a pointer not allocated by Rust
+/// - Calling this function twice on the same pointer (double-free)
+/// - Using `s` after this function returns
+/// - Passing a pointer to stack-allocated or static string
+///
+/// ## Notes
+///
+/// - Passing a null pointer is safe and will be ignored
+/// - This function is typically called by `osx_free_result()` and should
+///   rarely be called directly
 #[no_mangle]
 pub unsafe extern "C" fn osx_free_string(s: *mut c_char) {
     if !s.is_null() {
@@ -367,10 +573,68 @@ pub unsafe extern "C" fn osx_free_string(s: *mut c_char) {
     }
 }
 
-/// Free an FFIResult
+/// Frees an FFIResult structure and its contents.
+///
+/// This function deallocates all memory associated with an `FFIResult`,
+/// including both the `error_message` and `data` fields.
+///
+/// # Arguments
+///
+/// * `result` - A pointer to an `FFIResult` structure.
 ///
 /// # Safety
-/// - `result` must be a valid pointer to an FFIResult
+///
+/// This function is unsafe because:
+/// - It assumes `result` points to a valid `FFIResult` allocated by Rust
+/// - It deallocates the result and all its associated memory
+///
+/// ## Preconditions
+///
+/// The caller MUST ensure:
+/// - `result` is either null OR a valid pointer to an `FFIResult`
+/// - `result` has not been freed previously
+/// - The `FFIResult` was created by a Rust FFI function
+///
+/// ## Postconditions
+///
+/// After this function returns:
+/// - All memory associated with `result` is deallocated
+/// - `result` becomes a dangling pointer and MUST NOT be used
+/// - Both `error_message` and `data` pointers are freed
+///
+/// ## Thread Safety
+///
+/// This function is NOT thread-safe for the same `result`.
+/// Multiple threads MUST NOT free the same result concurrently.
+///
+/// ## Undefined Behavior
+///
+/// The following will cause undefined behavior:
+/// - Calling this function twice on the same result (double-free)
+/// - Using `result` or its fields after this function returns
+/// - Passing a pointer to stack-allocated or improperly initialized `FFIResult`
+///
+/// ## Notes
+///
+/// - Passing a null pointer is safe and will be ignored
+/// - The function frees both `error_message` and `data` if they are non-null
+/// - Always use `defer { osx_free_result(result) }` in Swift to ensure cleanup
+///
+/// # Example (Swift)
+///
+/// ```swift
+/// let result = osx_analyze_path(path)
+/// defer { osx_free_result(result) }  // Automatic cleanup
+/// // Use result...
+/// ```
+///
+/// # Example (C)
+///
+/// ```c
+/// FFIResult result = osx_analyze_path("/path");
+/// // Use result...
+/// osx_free_result(result);  // Manual cleanup
+/// ```
 #[no_mangle]
 pub unsafe extern "C" fn osx_free_result(result: *mut FFIResult) {
     if !result.is_null() {
