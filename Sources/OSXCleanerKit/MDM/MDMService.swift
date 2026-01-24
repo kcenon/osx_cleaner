@@ -20,10 +20,15 @@ public actor MDMService {
     private var cachedPolicies: [MDMPolicy] = []
     private var lastSyncAt: Date?
     private var syncTimer: Task<Void, Never>?
+    private let cleanerService: any CleanerServiceProtocol
 
     // MARK: - Initialization
 
-    public init() {}
+    /// Initialize MDM service with optional dependency injection
+    /// - Parameter cleanerService: CleanerService implementation (defaults to CleanerService())
+    public init(cleanerService: any CleanerServiceProtocol = CleanerService()) {
+        self.cleanerService = cleanerService
+    }
 
     // MARK: - Connection Management
 
@@ -309,13 +314,12 @@ public actor MDMService {
         do {
             switch command.type {
             case .cleanup:
-                let cleanerService = CleanerService()
                 let cleanerConfig = CleanerConfiguration(
                     cleanupLevel: .normal,
                     dryRun: false,
                     includeSystemCaches: true
                 )
-                let result = try await cleanerService.clean(with: cleanerConfig)
+                let result = try await self.cleanerService.clean(with: cleanerConfig)
 
                 return MDMCommandResult(
                     commandId: command.id,

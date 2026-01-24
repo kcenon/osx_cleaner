@@ -43,7 +43,7 @@ public struct CleanError: Error {
 /// This service uses the Rust core library for high-performance file cleanup
 /// with safety validation. Falls back to Swift implementation if Rust core
 /// is not available.
-public final class CleanerService {
+public final class CleanerService: CleanerServiceProtocol {
     private let fileManager: FileManager
     private let rustBridge: RustBridge
     private let loggingService: AutomatedCleanupLoggingService
