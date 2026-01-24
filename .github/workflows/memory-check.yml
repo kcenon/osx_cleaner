@@ -1,0 +1,138 @@
+name: Memory Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  rust-memory-check:
+    name: Rust Memory Tests
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rust-src
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-core/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run FFI memory tests
+        run: |
+          cd rust-core
+          cargo test --lib ffi -- --nocapture --test-threads=1
+          cargo test --test ffi_memory_tests -- --nocapture --test-threads=1
+
+      - name: Run stress tests
+        run: |
+          cd rust-core
+          cargo test --release test_no_memory_leak_in_loop -- --nocapture
+          cargo test --release test_error_path_no_leak -- --nocapture
+          cargo test --release test_massive_allocation_deallocation -- --nocapture
+          cargo test --release test_massive_error_allocation -- --nocapture
+
+      - name: Check test output for warnings
+        run: |
+          cd rust-core
+          cargo test --release 2>&1 | tee test_output.txt
+          if grep -i "memory leak\|segmentation fault\|abort" test_output.txt; then
+            echo "Memory issue detected!"
+            exit 1
+          fi
+          echo "No memory issues detected"
+
+  swift-memory-check:
+    name: Swift Memory Tests
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-core/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust core
+        run: |
+          cd rust-core
+          cargo build --release
+
+      - name: Run Swift memory tests
+        run: |
+          swift test --filter RustBridgeMemoryTests
+
+      - name: Run Swift stress tests
+        run: |
+          swift test --filter RustBridgeMemoryTests.testStressTestSequential
+          swift test --filter RustBridgeMemoryTests.testStressTestConcurrent
+
+  integration-memory-check:
+    name: Integration Memory Tests
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-core/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust core
+        run: |
+          cd rust-core
+          cargo build --release
+
+      - name: Run end-to-end memory tests
+        run: |
+          # Run both Rust and Swift tests together
+          cd rust-core
+          cargo test --release
+          cd ..
+          swift test --filter RustBridgeMemoryTests
+
+      - name: Memory usage summary
+        run: |
+          echo "Memory check completed successfully"
+          echo "All FFI memory management tests passed"
