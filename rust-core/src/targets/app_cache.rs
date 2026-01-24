@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rayon::prelude::*;
@@ -292,7 +292,7 @@ impl AppCacheCleaner {
     }
 
     /// Check cloud sync status for a cache directory
-    fn check_cloud_sync_status(&self, path: &PathBuf, service: CloudServiceType) -> SyncStatus {
+    fn check_cloud_sync_status(&self, path: &Path, service: CloudServiceType) -> SyncStatus {
         use crate::safety::cloud::{
             get_dropbox_status, get_google_drive_status, get_icloud_status, get_onedrive_status,
         };

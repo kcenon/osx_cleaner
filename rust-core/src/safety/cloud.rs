@@ -247,10 +247,10 @@ pub fn get_onedrive_status(path: &Path) -> Option<SyncStatus> {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 // OneDrive uses com.microsoft.OneDrive* extended attributes
-                if stdout.contains("com.microsoft.OneDrive.sync") {
-                    if stdout.contains("syncing") || stdout.contains("uploading") {
-                        return Some(SyncStatus::Syncing);
-                    }
+                if stdout.contains("com.microsoft.OneDrive.sync")
+                    && (stdout.contains("syncing") || stdout.contains("uploading"))
+                {
+                    return Some(SyncStatus::Syncing);
                 }
             }
         }
