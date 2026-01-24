@@ -122,14 +122,15 @@ pub fn analyze_home_directory(home_path: &Path, top_n: usize) -> Vec<DirectoryIn
         return Vec::new();
     }
 
-    let entries: Vec<_> = match fs::read_dir(home_path) {
-        Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
+    let entries = match fs::read_dir(home_path) {
+        Ok(entries) => entries,
         Err(_) => return Vec::new(),
     };
 
     let mut dirs: Vec<DirectoryInfo> = entries
-        .par_iter()
-        .filter_map(|entry| {
+        .par_bridge()
+        .filter_map(|entry_result| {
+            let entry = entry_result.ok()?;
             let path = entry.path();
             if !path.is_dir() {
                 return None;
@@ -171,14 +172,15 @@ pub fn analyze_caches(caches_path: &Path) -> Vec<CacheInfo> {
 
     let validator = SafetyValidator::new();
 
-    let entries: Vec<_> = match fs::read_dir(caches_path) {
-        Ok(entries) => entries.filter_map(|e| e.ok()).collect(),
+    let entries = match fs::read_dir(caches_path) {
+        Ok(entries) => entries,
         Err(_) => return Vec::new(),
     };
 
     let mut caches: Vec<CacheInfo> = entries
-        .par_iter()
-        .filter_map(|entry| {
+        .par_bridge()
+        .filter_map(|entry_result| {
+            let entry = entry_result.ok()?;
             let path = entry.path();
             if !path.is_dir() {
                 return None;
@@ -325,22 +327,33 @@ pub fn analyze_developer(developer_path: &Path) -> Vec<DeveloperComponentInfo> {
     components
 }
 
-/// Calculate the total size of a directory
+/// Calculate the total size of a directory using streaming
 pub fn calculate_dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
         .into_iter()
+        .par_bridge()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-        .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
         .sum()
 }
 
-/// Count items in a directory
+/// Count items in a directory using streaming
 fn count_items(path: &Path) -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let counter = AtomicU64::new(0);
+
     WalkDir::new(path)
         .into_iter()
+        .par_bridge()
         .filter_map(|e| e.ok())
-        .count() as u64
+        .for_each(|_| {
+            counter.fetch_add(1, Ordering::Relaxed);
+        });
+
+    counter.load(Ordering::Relaxed)
 }
 
 /// Parse cache directory name to extract app name and bundle ID
