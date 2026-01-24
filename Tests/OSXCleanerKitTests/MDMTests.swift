@@ -527,3 +527,123 @@ final class MockMDMConnectorTests: XCTestCase {
         XCTAssertEqual(commands[0].type, .cleanup)
     }
 }
+
+// MARK: - MDMService Dependency Injection Tests
+
+final class MDMServiceDependencyInjectionTests: XCTestCase {
+
+    func testMDMServiceUsesInjectedCleanerService() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        mockCleaner.cleanResult = CleanResult(
+            freedBytes: 5000,
+            filesRemoved: 10,
+            directoriesRemoved: 2,
+            errors: []
+        )
+
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        let command = MDMCommand(
+            id: "cleanup-cmd",
+            type: .cleanup,
+            priority: .high
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then
+        XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
+        XCTAssertNotNil(mockCleaner.lastCleanConfiguration, "Configuration should be captured")
+        XCTAssertTrue(result.success, "Command should succeed")
+        XCTAssertNotNil(result.message, "Message should be present")
+        XCTAssertEqual(result.details["bytes_freed"], "5000", "Details should contain freed bytes")
+    }
+
+    func testMDMServiceHandlesCleanerServiceError() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        mockCleaner.cleanError = CleanError(
+            path: "/test/path",
+            reason: "Permission denied"
+        )
+
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        let command = MDMCommand(
+            id: "cleanup-cmd",
+            type: .cleanup,
+            priority: .normal
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then
+        XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
+        XCTAssertFalse(result.success, "Command should fail")
+        XCTAssertNotNil(result.message, "Error message should be present")
+    }
+
+    func testMDMServiceDefaultCleanerService() async throws {
+        // Given - MDMService with default CleanerService
+        let mdmService = MDMService()
+
+        let command = MDMCommand(
+            id: "cleanup-cmd",
+            type: .cleanup,
+            priority: .normal
+        )
+
+        // When - Execute command (may succeed or fail based on actual system state)
+        let result = try await mdmService.executeCommand(command)
+
+        // Then - Verify result structure (not actual cleanup)
+        XCTAssertNotNil(result.commandId, "Result should have command ID")
+        XCTAssertEqual(result.commandId, "cleanup-cmd", "Command ID should match")
+    }
+
+    func testMDMServiceMultipleCleanupCommands() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        mockCleaner.cleanResult = CleanResult(
+            freedBytes: 1000,
+            filesRemoved: 5,
+            directoriesRemoved: 1,
+            errors: []
+        )
+
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        // When - Execute multiple cleanup commands
+        for i in 1...3 {
+            let command = MDMCommand(
+                id: "cleanup-cmd-\(i)",
+                type: .cleanup,
+                priority: .normal
+            )
+            _ = try await mdmService.executeCommand(command)
+        }
+
+        // Then
+        XCTAssertEqual(mockCleaner.cleanCallCount, 3, "CleanerService should be called 3 times")
+    }
+
+    func testMDMServiceSharedInstanceUsesDefaultCleaner() async throws {
+        // Given - Shared instance should use default CleanerService
+        let sharedService = MDMService.shared
+
+        let command = MDMCommand(
+            id: "test-cmd",
+            type: .cleanup,
+            priority: .low
+        )
+
+        // When
+        let result = try await sharedService.executeCommand(command)
+
+        // Then - Verify it completes (actual behavior depends on system)
+        XCTAssertEqual(result.commandId, "test-cmd", "Command ID should match")
+    }
+}
