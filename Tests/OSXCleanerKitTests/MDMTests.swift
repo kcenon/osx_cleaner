@@ -557,7 +557,7 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
         XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
         XCTAssertNotNil(mockCleaner.lastCleanConfiguration, "Configuration should be captured")
         XCTAssertTrue(result.success, "Command should succeed")
-        XCTAssertTrue(result.message.contains("5,000"), "Message should contain freed bytes")
+        XCTAssertTrue(result.message?.contains("5,000") ?? false, "Message should contain freed bytes")
     }
 
     func testMDMServiceHandlesCleanerServiceError() async throws {
@@ -583,7 +583,7 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
         XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
         XCTAssertFalse(result.success, "Command should fail")
         XCTAssertTrue(
-            result.message.contains("Permission denied"),
+            result.message?.contains("Permission denied") ?? false,
             "Error message should be propagated"
         )
     }
