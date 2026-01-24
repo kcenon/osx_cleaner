@@ -9,6 +9,38 @@ import Foundation
 /// This class provides a safe Swift interface to the Rust FFI functions.
 /// It handles memory management, string conversion, and error propagation
 /// across the FFI boundary.
+///
+/// # FFI Safety
+///
+/// This bridge ensures safe interaction with Rust by:
+/// - **Memory Management**: Automatically frees Rust-allocated memory using `defer`
+/// - **String Conversion**: Validates UTF-8 encoding for all string parameters
+/// - **Error Handling**: Converts FFI errors to Swift exceptions
+/// - **Thread Safety**: Protects initialization with serial queue
+///
+/// # Memory Ownership
+///
+/// - **Input Strings**: Swift owns strings passed to Rust (borrowed by Rust)
+/// - **Output Results**: Rust allocates FFIResult, Swift frees with `osx_free_result()`
+/// - **Automatic Cleanup**: All methods use `defer` to prevent memory leaks
+///
+/// # Thread Safety
+///
+/// - Initialization is protected by a serial queue (`initQueue`)
+/// - All FFI functions are thread-safe when operating on different paths
+/// - Avoid concurrent cleanup operations on the same path
+///
+/// # Example
+///
+/// ```swift
+/// let bridge = RustBridge.shared
+/// try bridge.initialize()
+///
+/// // Memory is automatically managed
+/// let result = try bridge.analyzePath("/Users/example/Library/Caches")
+/// ```
+///
+/// For detailed FFI usage guidelines, see `docs/reference/ffi-guide.md`.
 public final class RustBridge {
     /// Shared singleton instance
     public static let shared = RustBridge()
@@ -167,11 +199,42 @@ public final class RustBridge {
     // MARK: - Helpers
 
     /// Process an FFI result and decode the JSON data
+    ///
+    /// This method demonstrates proper FFI memory management:
+    ///
+    /// 1. **Check Success**: Validates `result.success` before accessing data
+    /// 2. **Copy Data**: Converts C strings to Swift strings (copies memory)
+    /// 3. **Free Memory**: Uses `defer` to ensure Rust-allocated memory is freed
+    /// 4. **Error Propagation**: Converts Rust errors to Swift exceptions
+    ///
+    /// # Memory Safety
+    ///
+    /// - **Input**: `result` is stack-allocated by Rust (no ownership transfer)
+    /// - **Strings**: `error_message` and `data` are heap-allocated by Rust
+    /// - **Ownership**: Swift takes ownership and MUST free strings
+    /// - **Cleanup**: `defer` ensures strings are freed even if function throws
+    ///
+    /// # Example Memory Flow
+    ///
+    /// ```
+    /// 1. Rust allocates FFIResult { data: heap_string }
+    /// 2. Swift receives result (borrowed, not owned)
+    /// 3. Swift copies data: String(cString: dataPtr)
+    /// 4. defer block executes: osx_free_string(dataPtr)
+    /// 5. Rust deallocates heap_string
+    /// ```
+    ///
+    /// - Parameter result: FFI result from Rust (strings will be freed automatically)
+    /// - Returns: Decoded Swift object
+    /// - Throws: `RustBridgeError` if parsing fails or result indicates error
     private func processFFIResult<T: Decodable>(_ result: osx_FFIResult) throws -> T {
+        // Check success before accessing data (safety contract)
         if !result.success {
             let errorMessage: String
             if let errorPtr = result.error_message {
+                // Copy error message to Swift string
                 errorMessage = String(cString: errorPtr)
+                // Free Rust-allocated memory immediately after copy
                 osx_free_string(errorPtr)
             } else {
                 errorMessage = "Unknown error"
@@ -182,8 +245,10 @@ public final class RustBridge {
         guard let dataPtr = result.data else {
             throw RustBridgeError.nullPointer
         }
+        // Free data string at end of scope (even if exception thrown)
         defer { osx_free_string(dataPtr) }
 
+        // Copy C string to Swift string (memory-safe)
         let jsonString = String(cString: dataPtr)
 
         guard let jsonData = jsonString.data(using: .utf8) else {
