@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rayon::prelude::*;
@@ -292,42 +292,65 @@ impl AppCacheCleaner {
     }
 
     /// Check cloud sync status for a cache directory
-    fn check_cloud_sync_status(&self, _path: &PathBuf, service: CloudServiceType) -> SyncStatus {
+    fn check_cloud_sync_status(&self, path: &Path, service: CloudServiceType) -> SyncStatus {
+        use crate::safety::cloud::{
+            get_dropbox_status, get_google_drive_status, get_icloud_status, get_onedrive_status,
+        };
+
         // Use the safety module's cloud sync detection
         match service {
             CloudServiceType::ICloud => {
                 // Check iCloud sync status using brctl
-                let output = Command::new("brctl").args(["status"]).output();
-
-                match output {
-                    Ok(o) if o.status.success() => {
-                        let status = String::from_utf8_lossy(&o.stdout);
-                        if status.contains("syncing") {
-                            SyncStatus::Syncing
-                        } else if status.contains("pending") {
-                            SyncStatus::Pending
-                        } else {
-                            SyncStatus::Synced
+                get_icloud_status(path).unwrap_or_else(|| {
+                    // Fallback to legacy brctl check
+                    let output = Command::new("brctl").args(["status"]).output();
+                    match output {
+                        Ok(o) if o.status.success() => {
+                            let status = String::from_utf8_lossy(&o.stdout);
+                            if status.contains("syncing") {
+                                SyncStatus::Syncing
+                            } else if status.contains("pending") {
+                                SyncStatus::Pending
+                            } else {
+                                SyncStatus::Synced
+                            }
                         }
+                        _ => SyncStatus::NotApplicable,
                     }
-                    _ => SyncStatus::NotApplicable,
-                }
+                })
             }
             CloudServiceType::Dropbox => {
-                // Can't easily determine sync status without Dropbox CLI
-                // TODO: Implement proper Dropbox sync detection
-                let _ = is_app_running("Dropbox"); // Check if running for future use
-                SyncStatus::NotApplicable
+                // Implement proper Dropbox sync detection
+                get_dropbox_status(path).unwrap_or_else(|| {
+                    // Fallback: check if app is running
+                    if is_app_running("Dropbox") {
+                        SyncStatus::Synced
+                    } else {
+                        SyncStatus::NotApplicable
+                    }
+                })
             }
             CloudServiceType::OneDrive => {
-                // TODO: Implement proper OneDrive sync detection
-                let _ = is_app_running("OneDrive");
-                SyncStatus::NotApplicable
+                // Implement proper OneDrive sync detection
+                get_onedrive_status(path).unwrap_or_else(|| {
+                    // Fallback: check if app is running
+                    if is_app_running("OneDrive") {
+                        SyncStatus::Synced
+                    } else {
+                        SyncStatus::NotApplicable
+                    }
+                })
             }
             CloudServiceType::GoogleDrive => {
-                // TODO: Implement proper Google Drive sync detection
-                let _ = is_app_running("Google Drive");
-                SyncStatus::NotApplicable
+                // Implement proper Google Drive sync detection
+                get_google_drive_status(path).unwrap_or_else(|| {
+                    // Fallback: check if app is running
+                    if is_app_running("Google Drive") {
+                        SyncStatus::Synced
+                    } else {
+                        SyncStatus::NotApplicable
+                    }
+                })
             }
         }
     }
