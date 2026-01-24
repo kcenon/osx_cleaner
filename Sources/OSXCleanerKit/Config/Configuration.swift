@@ -9,6 +9,7 @@ public struct AppConfiguration: Codable {
     public var autoBackup: Bool
     public var logLevel: String
     public var excludedPaths: [String]
+    public var showPerformanceWarnings: Bool
 
     // Server connection settings
     public var serverURL: String?
@@ -28,7 +29,8 @@ public struct AppConfiguration: Codable {
             "~/Pictures",
             "~/Music",
             "~/Movies"
-        ]
+        ],
+        showPerformanceWarnings: true
     )
 
     public init(
@@ -36,6 +38,7 @@ public struct AppConfiguration: Codable {
         autoBackup: Bool = true,
         logLevel: String = "info",
         excludedPaths: [String] = [],
+        showPerformanceWarnings: Bool = true,
         serverURL: String? = nil,
         serverTimeout: Int? = nil,
         agentId: UUID? = nil,
@@ -47,6 +50,7 @@ public struct AppConfiguration: Codable {
         self.autoBackup = autoBackup
         self.logLevel = logLevel
         self.excludedPaths = excludedPaths
+        self.showPerformanceWarnings = showPerformanceWarnings
         self.serverURL = serverURL
         self.serverTimeout = serverTimeout
         self.agentId = agentId

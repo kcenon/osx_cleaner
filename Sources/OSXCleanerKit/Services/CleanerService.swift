@@ -48,6 +48,8 @@ public final class CleanerService: CleanerServiceProtocol {
     private let rustBridge: RustBridge
     private let loggingService: AutomatedCleanupLoggingService
     private var useRustCore: Bool = true
+    private var hasNotifiedRustFailure: Bool = false
+    private var rustInitError: Error?
 
     public init(
         fileManager: FileManager = .default,
@@ -61,9 +63,11 @@ public final class CleanerService: CleanerServiceProtocol {
         // Try to initialize Rust core
         do {
             try rustBridge.initialize()
+            AppLogger.shared.info("Rust core initialized successfully")
         } catch {
             AppLogger.shared.warning("Rust core unavailable, using Swift fallback: \(error)")
             useRustCore = false
+            rustInitError = error
         }
     }
 
@@ -80,6 +84,11 @@ public final class CleanerService: CleanerServiceProtocol {
         with config: CleanerConfiguration,
         triggerType: CleanupSession.TriggerType
     ) async throws -> CleanResult {
+        // Notify about Rust core failure on first cleanup
+        if let error = rustInitError, !hasNotifiedRustFailure {
+            await notifyRustCoreFailure(error: error)
+        }
+
         let startTime = Date()
         var session = CleanupSession(
             triggerType: triggerType,
@@ -292,6 +301,49 @@ public final class CleanerService: CleanerServiceProtocol {
         }
 
         return totalSize
+    }
+
+    // MARK: - Rust Core Failure Notification
+
+    private func notifyRustCoreFailure(error: Error) async {
+        // Only notify once per session
+        guard !hasNotifiedRustFailure else { return }
+        hasNotifiedRustFailure = true
+
+        // Check if performance warnings are enabled
+        let configService = ConfigurationService()
+        guard let config = try? configService.load(),
+              config.showPerformanceWarnings else {
+            return
+        }
+
+        // Send notification
+        let notificationService = NotificationService.shared
+        await notificationService.sendRustCoreFailure(error: error)
+
+        // Print CLI warning to stderr
+        printRustCoreWarning(error: error)
+    }
+
+    private func printRustCoreWarning(error: Error) {
+        let warning = """
+        ⚠️  WARNING: Rust core unavailable - running in compatibility mode
+
+        Performance Impact:
+        - Cleanup operations may be 10-50x slower
+        - Some advanced safety features may be limited
+
+        Reason: \(error.localizedDescription)
+
+        To resolve:
+        1. Ensure libosxcore.dylib is in the expected location
+        2. Run 'osxcleaner diagnose' for detailed information
+        3. Reinstall OSX Cleaner if the issue persists
+
+        """
+        if let data = warning.data(using: .utf8) {
+            FileHandle.standardError.write(data)
+        }
     }
 }
 

@@ -181,6 +181,32 @@ public final class NotificationService {
         )
     }
 
+    /// Send a Rust core initialization failure notification
+    /// - Parameter error: The error that occurred during initialization
+    public func sendRustCoreFailure(error: Error) async {
+        let content = UNMutableNotificationContent()
+        content.title = "OSX Cleaner - Performance Notice"
+        content.body = """
+            Running in compatibility mode.
+            Cleanup operations may be slower than usual.
+
+            Reason: \(error.localizedDescription)
+
+            Run 'osxcleaner diagnose' for details.
+            """
+        content.sound = .default
+        content.categoryIdentifier = "\(bundleIdentifier).performance-warning"
+
+        content.userInfo = [
+            "error": error.localizedDescription
+        ]
+
+        await sendNotification(
+            identifier: "\(bundleIdentifier).rust-core-failure",
+            content: content
+        )
+    }
+
     // MARK: - Notification Categories
 
     /// Register notification categories with action buttons
@@ -233,10 +259,25 @@ public final class NotificationService {
             options: []
         )
 
+        // Performance warning category
+        let diagnoseAction = UNNotificationAction(
+            identifier: "\(bundleIdentifier).action.diagnose",
+            title: "Diagnose",
+            options: [.foreground]
+        )
+
+        let performanceWarningCategory = UNNotificationCategory(
+            identifier: "\(bundleIdentifier).performance-warning",
+            actions: [diagnoseAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
         notificationCenter.setNotificationCategories([
             diskWarningCategory,
             cleanupCompleteCategory,
-            cleanupErrorCategory
+            cleanupErrorCategory,
+            performanceWarningCategory
         ])
     }
 
@@ -309,6 +350,8 @@ public class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
             handleRetryAction(userInfo: userInfo)
         case "com.osxcleaner.action.view-logs":
             handleViewLogsAction()
+        case "com.osxcleaner.action.diagnose":
+            handleDiagnoseAction()
         default:
             break
         }
@@ -358,5 +401,10 @@ public class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         // Open log file location
         let logPath = "/tmp/osxcleaner-daily.log"
         AppLogger.shared.info("User requested to view logs at: \(logPath)")
+    }
+
+    private func handleDiagnoseAction() {
+        AppLogger.shared.info("User requested diagnostics for Rust core failure")
+        // Note: Actual diagnostics would be triggered by the main app
     }
 }
