@@ -38,15 +38,36 @@ impl FFIResult {
             success: true,
             error_message: ptr::null_mut(),
             data: data
-                .map(|s| CString::new(s).unwrap().into_raw())
+                .map(|s| {
+                    CString::new(s)
+                        .unwrap_or_else(|e| {
+                            log::error!(
+                            "FFI string conversion failed (NUL at position {}): returning empty",
+                            e.nul_position()
+                        );
+                            CString::new("").unwrap() // Safe: empty string has no NUL
+                        })
+                        .into_raw()
+                })
                 .unwrap_or(ptr::null_mut()),
         }
     }
 
     pub fn err(message: String) -> Self {
+        let error_message = CString::new(message.clone())
+            .unwrap_or_else(|e| {
+                log::error!(
+                    "FFI error message conversion failed (NUL at position {}): returning sanitized",
+                    e.nul_position()
+                );
+                let sanitized: String = message.chars().filter(|&c| c != '\0').collect();
+                CString::new(sanitized).unwrap() // Safe: NUL bytes removed
+            })
+            .into_raw();
+
         FFIResult {
             success: false,
-            error_message: CString::new(message).unwrap().into_raw(),
+            error_message,
             data: ptr::null_mut(),
         }
     }
@@ -68,7 +89,15 @@ pub extern "C" fn osx_core_init() -> bool {
 #[no_mangle]
 pub extern "C" fn osx_core_version() -> *mut c_char {
     let version = env!("CARGO_PKG_VERSION");
-    CString::new(version).unwrap().into_raw()
+    CString::new(version)
+        .unwrap_or_else(|e| {
+            log::error!(
+                "Version string conversion failed (NUL at position {}): returning fallback",
+                e.nul_position()
+            );
+            CString::new("unknown").unwrap() // Safe: "unknown" has no NUL
+        })
+        .into_raw()
 }
 
 /// Analyze a path for cleanup opportunities
@@ -1224,6 +1253,88 @@ mod tests {
             // Test with non-Google Drive path
             let local_path = CString::new("/tmp/test").unwrap();
             assert!(!osx_is_google_drive_path(local_path.as_ptr()));
+        }
+    }
+
+    // FFI Safety Tests for NUL byte handling
+
+    #[test]
+    fn test_ffi_result_with_nul_byte() {
+        // Test that FFIResult::ok handles NUL bytes gracefully
+        let data_with_nul = "hello\0world".to_string();
+        let result = FFIResult::ok(Some(data_with_nul));
+        assert!(result.success);
+        assert!(!result.data.is_null());
+        // Should return empty string instead of panicking
+        unsafe {
+            let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+            assert_eq!(data_str, "");
+            osx_free_string(result.data);
+        }
+    }
+
+    #[test]
+    fn test_ffi_result_normal_string() {
+        // Test that normal strings work correctly
+        let normal = "hello world".to_string();
+        let result = FFIResult::ok(Some(normal.clone()));
+        assert!(result.success);
+        assert!(!result.data.is_null());
+        unsafe {
+            let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+            assert_eq!(data_str, "hello world");
+            osx_free_string(result.data);
+        }
+    }
+
+    #[test]
+    fn test_ffi_result_none() {
+        // Test that None returns null pointer
+        let result = FFIResult::ok(None);
+        assert!(result.success);
+        assert!(result.data.is_null());
+    }
+
+    #[test]
+    fn test_ffi_error_with_nul_byte() {
+        // Test that FFIResult::err handles NUL bytes gracefully
+        let error_with_nul = "error\0message".to_string();
+        let result = FFIResult::err(error_with_nul);
+        assert!(!result.success);
+        assert!(!result.error_message.is_null());
+        // Should return sanitized message (NUL bytes stripped)
+        unsafe {
+            let error_str = CStr::from_ptr(result.error_message).to_str().unwrap();
+            assert_eq!(error_str, "errormessage");
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_ffi_error_normal_string() {
+        // Test that normal error messages work correctly
+        let normal_error = "normal error".to_string();
+        let result = FFIResult::err(normal_error.clone());
+        assert!(!result.success);
+        assert!(!result.error_message.is_null());
+        unsafe {
+            let error_str = CStr::from_ptr(result.error_message).to_str().unwrap();
+            assert_eq!(error_str, "normal error");
+            osx_free_string(result.error_message);
+        }
+    }
+
+    #[test]
+    fn test_ffi_result_empty_string() {
+        // Test that empty strings work correctly
+        let empty = "".to_string();
+        let result = FFIResult::ok(Some(empty));
+        assert!(result.success);
+        assert!(!result.data.is_null());
+        unsafe {
+            let data_str = CStr::from_ptr(result.data).to_str().unwrap();
+            assert_eq!(data_str, "");
+            osx_free_string(result.data);
         }
     }
 }
