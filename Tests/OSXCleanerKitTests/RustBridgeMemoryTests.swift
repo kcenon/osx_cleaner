@@ -235,16 +235,6 @@ final class RustBridgeMemoryTests: XCTestCase {
             }
         }
     }
-
-    // MARK: - Helper Methods
-
-    private func measureAsync(block: @escaping () async -> Void) async {
-        let start = Date()
-        await block()
-        let end = Date()
-        let duration = end.timeIntervalSince(start)
-        print("Async operation took \(duration) seconds")
-    }
 }
 
 // MARK: - Test Helper Extensions

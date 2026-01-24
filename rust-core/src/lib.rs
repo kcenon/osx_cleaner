@@ -1459,8 +1459,8 @@ mod tests {
 
                 // Parse JSON data
                 let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-                let _: serde_json::Value = serde_json::from_str(json_str)
-                    .expect("Should be valid JSON");
+                let _: serde_json::Value =
+                    serde_json::from_str(json_str).expect("Should be valid JSON");
             }
 
             osx_free_string(result.data);

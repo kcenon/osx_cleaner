@@ -107,8 +107,8 @@ fn test_analyze_path_memory() {
 
         if result.success && !result.data.is_null() {
             let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-            let _: serde_json::Value = serde_json::from_str(json_str)
-                .expect("Should be valid JSON");
+            let _: serde_json::Value =
+                serde_json::from_str(json_str).expect("Should be valid JSON");
         }
 
         osx_free_string(result.data);
@@ -126,8 +126,7 @@ fn test_classify_path_memory() {
         assert!(!result.data.is_null());
 
         let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-        let _: serde_json::Value = serde_json::from_str(json_str)
-            .expect("Should be valid JSON");
+        let _: serde_json::Value = serde_json::from_str(json_str).expect("Should be valid JSON");
 
         osx_free_string(result.data);
         osx_free_string(result.error_message);
@@ -144,8 +143,8 @@ fn test_validate_batch_memory() {
         assert!(!result.data.is_null());
 
         let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-        let _: Vec<serde_json::Value> = serde_json::from_str(json_str)
-            .expect("Should be valid JSON array");
+        let _: Vec<serde_json::Value> =
+            serde_json::from_str(json_str).expect("Should be valid JSON array");
 
         osx_free_string(result.data);
         osx_free_string(result.error_message);
@@ -159,8 +158,8 @@ fn test_get_disk_space_memory() {
     if result.success && !result.data.is_null() {
         unsafe {
             let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-            let _: serde_json::Value = serde_json::from_str(json_str)
-                .expect("Should be valid JSON");
+            let _: serde_json::Value =
+                serde_json::from_str(json_str).expect("Should be valid JSON");
 
             osx_free_string(result.data);
         }
@@ -179,8 +178,8 @@ fn test_analyze_home_memory() {
     if !result.data.is_null() {
         unsafe {
             let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-            let _: Vec<serde_json::Value> = serde_json::from_str(json_str)
-                .expect("Should be valid JSON array");
+            let _: Vec<serde_json::Value> =
+                serde_json::from_str(json_str).expect("Should be valid JSON array");
 
             osx_free_string(result.data);
         }
@@ -195,8 +194,8 @@ fn test_analyze_caches_memory() {
     if !result.data.is_null() {
         unsafe {
             let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-            let _: Vec<serde_json::Value> = serde_json::from_str(json_str)
-                .expect("Should be valid JSON array");
+            let _: Vec<serde_json::Value> =
+                serde_json::from_str(json_str).expect("Should be valid JSON array");
 
             osx_free_string(result.data);
         }
@@ -212,8 +211,8 @@ fn test_get_running_processes_memory() {
 
     unsafe {
         let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-        let _: Vec<serde_json::Value> = serde_json::from_str(json_str)
-            .expect("Should be valid JSON array");
+        let _: Vec<serde_json::Value> =
+            serde_json::from_str(json_str).expect("Should be valid JSON array");
 
         osx_free_string(result.data);
     }
@@ -229,8 +228,7 @@ fn test_detect_cloud_service_memory() {
         assert!(!result.data.is_null());
 
         let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-        let _: serde_json::Value = serde_json::from_str(json_str)
-            .expect("Should be valid JSON");
+        let _: serde_json::Value = serde_json::from_str(json_str).expect("Should be valid JSON");
 
         osx_free_string(result.data);
         osx_free_string(result.error_message);
@@ -247,8 +245,7 @@ fn test_get_cloud_sync_info_memory() {
         assert!(!result.data.is_null());
 
         let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-        let _: serde_json::Value = serde_json::from_str(json_str)
-            .expect("Should be valid JSON");
+        let _: serde_json::Value = serde_json::from_str(json_str).expect("Should be valid JSON");
 
         osx_free_string(result.data);
         osx_free_string(result.error_message);
@@ -265,8 +262,7 @@ fn test_is_safe_to_delete_cloud_memory() {
         assert!(!result.data.is_null());
 
         let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-        let _: serde_json::Value = serde_json::from_str(json_str)
-            .expect("Should be valid JSON");
+        let _: serde_json::Value = serde_json::from_str(json_str).expect("Should be valid JSON");
 
         osx_free_string(result.data);
         osx_free_string(result.error_message);
@@ -361,8 +357,8 @@ fn test_get_deletion_logs_memory() {
     unsafe {
         if !result.data.is_null() {
             let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-            let _: serde_json::Value = serde_json::from_str(json_str)
-                .expect("Should be valid JSON");
+            let _: serde_json::Value =
+                serde_json::from_str(json_str).expect("Should be valid JSON");
             osx_free_string(result.data);
         }
     }
@@ -376,8 +372,8 @@ fn test_get_log_stats_memory() {
     unsafe {
         if !result.data.is_null() {
             let json_str = CStr::from_ptr(result.data).to_str().unwrap();
-            let _: serde_json::Value = serde_json::from_str(json_str)
-                .expect("Should be valid JSON");
+            let _: serde_json::Value =
+                serde_json::from_str(json_str).expect("Should be valid JSON");
             osx_free_string(result.data);
         }
     }
