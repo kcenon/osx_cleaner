@@ -140,18 +140,15 @@ fn clean_directory(
     config: &CleanConfig,
     result: &mut CleanResult,
 ) -> Result<(), CleanError> {
-    // Collect all entries first
-    let entries: Vec<_> = fs::read_dir(path)
+    // Stream entries with parallel size calculation
+    let sizes: Vec<_> = fs::read_dir(path)
         .map_err(|e| CleanError::IoError(e.to_string()))?
-        .filter_map(|e| e.ok())
-        .collect();
-
-    // Calculate sizes before deletion
-    let sizes: Vec<_> = entries
-        .par_iter()
-        .filter_map(|entry| {
+        .par_bridge()
+        .filter_map(|entry_result| {
+            let entry = entry_result.ok()?;
             let path = entry.path();
-            calculate_size(&path).ok().map(|size| (path, size))
+            let size = calculate_size(&path).ok()?;
+            Some((path, size))
         })
         .collect();
 

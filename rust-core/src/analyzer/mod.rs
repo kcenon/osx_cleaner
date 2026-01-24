@@ -260,7 +260,7 @@ mod tests {
         let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf());
         let cleanable = analyzer.estimate_cleanable();
 
-        // Should have some cleanable items
-        assert!(cleanable.total_bytes >= 0);
+        // total_bytes is u64, always >= 0, so just verify it's calculated
+        let _ = cleanable.total_bytes;
     }
 }

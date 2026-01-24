@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use walkdir::WalkDir;
 
-use crate::safety::{categorize_path, PathCategory};
+use crate::safety::categorize_path;
 
 /// Analysis result for a scanned path
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,9 +84,14 @@ pub fn analyze_with_config(path: &str, config: &ScanConfig) -> Result<AnalysisRe
         walker = walker.max_depth(depth);
     }
 
-    // Collect entries in parallel
-    let entries: Vec<_> = walker
+    // Stream and process entries in parallel, counting files and directories
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let directory_count = AtomicUsize::new(0);
+
+    let file_infos: Vec<FileInfo> = walker
         .into_iter()
+        .par_bridge()
         .filter_map(|e| e.ok())
         .filter(|e| {
             if !config.include_hidden {
@@ -98,13 +103,16 @@ pub fn analyze_with_config(path: &str, config: &ScanConfig) -> Result<AnalysisRe
                 true
             }
         })
-        .collect();
-
-    // Process entries in parallel
-    let file_infos: Vec<FileInfo> = entries
-        .par_iter()
-        .filter(|e| e.file_type().is_file())
         .filter_map(|e| {
+            if e.file_type().is_dir() {
+                directory_count.fetch_add(1, Ordering::Relaxed);
+                return None;
+            }
+
+            if !e.file_type().is_file() {
+                return None;
+            }
+
             let metadata = e.metadata().ok()?;
             let size = metadata.len();
 
@@ -135,25 +143,22 @@ pub fn analyze_with_config(path: &str, config: &ScanConfig) -> Result<AnalysisRe
     // Calculate statistics
     let total_size: u64 = file_infos.iter().map(|f| f.size).sum();
     let file_count = file_infos.len();
-    let directory_count = entries.iter().filter(|e| e.file_type().is_dir()).count();
+    let directory_count = directory_count.load(Ordering::Relaxed);
 
-    // Group by category
-    let mut category_map: HashMap<PathCategory, (u64, usize)> = HashMap::new();
-    for entry in &entries {
-        if entry.file_type().is_file() {
-            let category = categorize_path(entry.path());
-            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-
-            let entry = category_map.entry(category).or_insert((0, 0));
-            entry.0 += size;
-            entry.1 += 1;
-        }
+    // Group by category using existing file_infos
+    let mut category_map: HashMap<String, (u64, usize)> = HashMap::new();
+    for file_info in &file_infos {
+        let entry = category_map
+            .entry(file_info.category.clone())
+            .or_insert((0, 0));
+        entry.0 += file_info.size;
+        entry.1 += 1;
     }
 
     let categories: Vec<CategoryStats> = category_map
         .into_iter()
-        .map(|(cat, (size, count))| CategoryStats {
-            category: format!("{:?}", cat),
+        .map(|(category, (size, count))| CategoryStats {
+            category,
             size,
             count,
         })
