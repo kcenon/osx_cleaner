@@ -53,18 +53,20 @@ impl FFIResult {
     }
 
     pub fn err(message: String) -> Self {
+        let error_message = CString::new(message.clone())
+            .unwrap_or_else(|e| {
+                log::error!(
+                    "FFI error message conversion failed (NUL at position {}): returning sanitized",
+                    e.nul_position()
+                );
+                let sanitized: String = message.chars().filter(|&c| c != '\0').collect();
+                CString::new(sanitized).unwrap() // Safe: NUL bytes removed
+            })
+            .into_raw();
+
         FFIResult {
             success: false,
-            error_message: CString::new(message)
-                .unwrap_or_else(|e| {
-                    log::error!(
-                        "FFI error message conversion failed (NUL at position {}): returning sanitized",
-                        e.nul_position()
-                    );
-                    let sanitized: String = message.chars().filter(|&c| c != '\0').collect();
-                    CString::new(sanitized).unwrap() // Safe: NUL bytes removed
-                })
-                .into_raw(),
+            error_message,
             data: ptr::null_mut(),
         }
     }
