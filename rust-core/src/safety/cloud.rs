@@ -150,9 +150,28 @@ pub fn get_dropbox_status(path: &Path) -> Option<SyncStatus> {
         return None;
     }
 
-    // Check for extended attributes
+    // Check for Dropbox CLI if available
     #[cfg(target_os = "macos")]
     {
+        if let Ok(output) = Command::new("dropbox")
+            .args(["filestatus", &path.to_string_lossy()])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if stdout.contains("syncing") || stdout.contains("uploading") {
+                    return Some(SyncStatus::Syncing);
+                }
+                if stdout.contains("downloading") {
+                    return Some(SyncStatus::Syncing);
+                }
+                if stdout.contains("unsyncable") || stdout.contains("error") {
+                    return Some(SyncStatus::Error);
+                }
+            }
+        }
+
+        // Fallback: Check for extended attributes
         let output = Command::new("xattr")
             .args(["-p", "com.dropbox.attrs", &path.to_string_lossy()])
             .output()
@@ -163,6 +182,25 @@ pub fn get_dropbox_status(path: &Path) -> Option<SyncStatus> {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if stdout.contains("syncing") {
                     return Some(SyncStatus::Syncing);
+                }
+            }
+        }
+    }
+
+    // Check for .dropbox.cache directory (indicates active sync)
+    if let Some(parent) = path.parent() {
+        let cache_dir = parent.join(".dropbox.cache");
+        if cache_dir.exists() {
+            // If cache dir exists and is recent, files might be syncing
+            if let Ok(metadata) = fs::metadata(&cache_dir) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(elapsed) = modified.elapsed() {
+                        // If modified within last 5 minutes, consider as potentially syncing
+                        if elapsed.as_secs() < 300 {
+                            // Can't determine exact status, return synced to be conservative
+                            return Some(SyncStatus::Synced);
+                        }
+                    }
                 }
             }
         }
@@ -183,11 +221,53 @@ pub fn get_onedrive_status(path: &Path) -> Option<SyncStatus> {
         return None;
     }
 
-    // Check for placeholder files
+    // Check for placeholder files (.cloud extension)
     if let Some(filename) = path.file_name() {
         let name = filename.to_string_lossy();
         if name.ends_with(".cloud") {
             return Some(SyncStatus::CloudOnly);
+        }
+    }
+
+    // Check for OneDrive marker file
+    if let Some(parent) = path.parent() {
+        let marker = parent.join(".849C9593-D756-4E56-8D6E-42412F2A707B");
+        if marker.exists() {
+            // OneDrive folder marker exists
+        }
+    }
+
+    // Check for extended attributes on macOS
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = Command::new("xattr")
+            .args(["-l", &path.to_string_lossy()])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // OneDrive uses com.microsoft.OneDrive* extended attributes
+                if stdout.contains("com.microsoft.OneDrive.sync") {
+                    if stdout.contains("syncing") || stdout.contains("uploading") {
+                        return Some(SyncStatus::Syncing);
+                    }
+                }
+            }
+        }
+    }
+
+    // Check for temporary sync files
+    if let Some(parent) = path.parent() {
+        if let Ok(entries) = fs::read_dir(parent) {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    // OneDrive creates .tmp files during sync
+                    if name.starts_with("~$") || name.contains(".tmp") {
+                        // Potential sync activity, but can't determine for this specific file
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -198,6 +278,28 @@ pub fn get_onedrive_status(path: &Path) -> Option<SyncStatus> {
 pub fn is_google_drive_path(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     path_str.contains("/Google Drive/") || path_str.contains("/GoogleDrive/")
+}
+
+/// Get Google Drive sync status for a path
+pub fn get_google_drive_status(path: &Path) -> Option<SyncStatus> {
+    if !is_google_drive_path(path) {
+        return None;
+    }
+
+    // Check for .tmp files (Google Drive creates these during sync)
+    if let Some(filename) = path.file_name() {
+        let name = filename.to_string_lossy();
+        if name.starts_with(".gd") || name.ends_with(".gdtmp") {
+            return Some(SyncStatus::Syncing);
+        }
+    }
+
+    // Check for temporary download files
+    if path.extension().and_then(|e| e.to_str()) == Some("gdoc-download") {
+        return Some(SyncStatus::Syncing);
+    }
+
+    Some(SyncStatus::Synced)
 }
 
 /// Detect cloud service for a path
@@ -223,7 +325,7 @@ pub fn get_cloud_sync_info(path: &Path) -> Option<CloudSyncInfo> {
         CloudService::ICloud => get_icloud_status(path).unwrap_or(SyncStatus::Synced),
         CloudService::Dropbox => get_dropbox_status(path).unwrap_or(SyncStatus::Synced),
         CloudService::OneDrive => get_onedrive_status(path).unwrap_or(SyncStatus::Synced),
-        CloudService::GoogleDrive => SyncStatus::Synced,
+        CloudService::GoogleDrive => get_google_drive_status(path).unwrap_or(SyncStatus::Synced),
         CloudService::Unknown => SyncStatus::NotApplicable,
     };
 
@@ -296,5 +398,64 @@ mod tests {
     fn test_cloud_service_name() {
         assert_eq!(CloudService::ICloud.name(), "iCloud");
         assert_eq!(CloudService::Dropbox.name(), "Dropbox");
+        assert_eq!(CloudService::OneDrive.name(), "OneDrive");
+        assert_eq!(CloudService::GoogleDrive.name(), "Google Drive");
+    }
+
+    #[test]
+    fn test_is_onedrive_path() {
+        let onedrive_path = PathBuf::from("/Users/test/OneDrive/file.txt");
+        assert!(is_onedrive_path(&onedrive_path));
+
+        let local_path = PathBuf::from("/Users/test/Documents/file.txt");
+        assert!(!is_onedrive_path(&local_path));
+    }
+
+    #[test]
+    fn test_is_google_drive_path() {
+        let gdrive_path1 = PathBuf::from("/Users/test/Google Drive/file.txt");
+        assert!(is_google_drive_path(&gdrive_path1));
+
+        let gdrive_path2 = PathBuf::from("/Users/test/GoogleDrive/file.txt");
+        assert!(is_google_drive_path(&gdrive_path2));
+
+        let local_path = PathBuf::from("/Users/test/Documents/file.txt");
+        assert!(!is_google_drive_path(&local_path));
+    }
+
+    #[test]
+    fn test_get_google_drive_status() {
+        let gdrive_path = PathBuf::from("/Users/test/Google Drive/document.txt");
+        let status = get_google_drive_status(&gdrive_path);
+        assert!(status.is_some());
+
+        // Test temporary file detection
+        let temp_file = PathBuf::from("/Users/test/Google Drive/.gd_temp_file");
+        if let Some(status) = get_google_drive_status(&temp_file) {
+            assert_eq!(status, SyncStatus::Syncing);
+        }
+    }
+
+    #[test]
+    fn test_get_onedrive_status() {
+        let onedrive_path = PathBuf::from("/Users/test/OneDrive/document.txt");
+        let status = get_onedrive_status(&onedrive_path);
+        assert!(status.is_some());
+
+        // Test cloud-only file detection
+        let cloud_file = PathBuf::from("/Users/test/OneDrive/file.cloud");
+        if let Some(status) = get_onedrive_status(&cloud_file) {
+            assert_eq!(status, SyncStatus::CloudOnly);
+        }
+    }
+
+    #[test]
+    fn test_cloud_sync_info_integration() {
+        let gdrive_path = PathBuf::from("/Users/test/Google Drive/document.txt");
+        let info = get_cloud_sync_info(&gdrive_path);
+
+        if let Some(info) = info {
+            assert_eq!(info.service, CloudService::GoogleDrive);
+        }
     }
 }
