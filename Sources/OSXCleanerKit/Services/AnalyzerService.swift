@@ -3,20 +3,57 @@
 
 import Foundation
 
-/// Result of disk analysis
+/// Result of disk space analysis
+///
+/// Contains detailed statistics about analyzed files and directories,
+/// including potential space savings and categorized items.
+///
+/// ## Topics
+///
+/// ### Properties
+/// - ``totalSize``
+/// - ``potentialSavings``
+/// - ``fileCount``
+/// - ``directoryCount``
+/// - ``categories``
+/// - ``largestItems``
+/// - ``oldestItems``
+///
+/// ### Formatted Output
+/// - ``formattedTotalSize``
+/// - ``formattedPotentialSavings``
 public struct AnalysisResult {
+    /// Total size of all analyzed files and directories in bytes
     public let totalSize: UInt64
+
+    /// Estimated space that could be recovered by cleanup operations
     public let potentialSavings: UInt64
+
+    /// Total number of files analyzed
     public let fileCount: Int
+
+    /// Total number of directories analyzed
     public let directoryCount: Int
+
+    /// Items grouped by category (caches, logs, etc.)
     public let categories: [AnalysisCategory]
+
+    /// Top items sorted by size (largest first)
     public let largestItems: [AnalysisItem]
+
+    /// Items sorted by access time (oldest first)
     public let oldestItems: [AnalysisItem]
 
+    /// Human-readable string representation of total size
+    ///
+    /// - Returns: Formatted string (e.g., "1.5 GB")
     public var formattedTotalSize: String {
         ByteCountFormatter.string(fromByteCount: Int64(totalSize), countStyle: .file)
     }
 
+    /// Human-readable string representation of potential savings
+    ///
+    /// - Returns: Formatted string (e.g., "500 MB")
     public var formattedPotentialSavings: String {
         ByteCountFormatter.string(fromByteCount: Int64(potentialSavings), countStyle: .file)
     }
@@ -41,12 +78,36 @@ public struct AnalysisResult {
 }
 
 /// Category of analyzed items
+///
+/// Groups related items together (e.g., "System Caches", "Developer Caches")
+/// and provides aggregate statistics for each category.
+///
+/// ## Topics
+///
+/// ### Properties
+/// - ``name``
+/// - ``size``
+/// - ``itemCount``
+/// - ``topItems``
+///
+/// ### Formatted Output
+/// - ``formattedSize``
 public struct AnalysisCategory {
+    /// Category name (e.g., "System Caches", "Logs")
     public let name: String
+
+    /// Total size of all items in this category (bytes)
     public let size: UInt64
+
+    /// Number of items in this category
     public let itemCount: Int
+
+    /// Top items in this category, sorted by size
     public let topItems: [AnalysisItem]
 
+    /// Human-readable string representation of category size
+    ///
+    /// - Returns: Formatted string (e.g., "300 MB")
     public var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
@@ -60,12 +121,36 @@ public struct AnalysisCategory {
 }
 
 /// Individual analyzed item
+///
+/// Represents a single file or directory discovered during analysis,
+/// including its location, size, and access metadata.
+///
+/// ## Topics
+///
+/// ### Properties
+/// - ``path``
+/// - ``size``
+/// - ``lastAccessed``
+/// - ``category``
+///
+/// ### Formatted Output
+/// - ``formattedSize``
 public struct AnalysisItem {
+    /// Full filesystem path to the item
     public let path: String
+
+    /// Size of the item in bytes
     public let size: UInt64
+
+    /// Last access/modification time of the item
     public let lastAccessed: Date?
+
+    /// Category this item belongs to (if categorized)
     public let category: String?
 
+    /// Human-readable string representation of item size
+    ///
+    /// - Returns: Formatted string (e.g., "45 KB")
     public var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
@@ -80,14 +165,63 @@ public struct AnalysisItem {
 
 /// Service for analyzing disk usage
 ///
-/// This service uses the Rust core library for high-performance parallel
-/// directory scanning. Falls back to Swift implementation if Rust core
-/// is not available.
+/// `AnalyzerService` provides high-performance disk space analysis by leveraging
+/// the Rust core library for parallel directory scanning. When Rust core is unavailable,
+/// it automatically falls back to a Swift implementation.
+///
+/// ## Overview
+///
+/// This service scans directories to identify:
+/// - System caches
+/// - Developer build artifacts
+/// - Browser caches
+/// - Log files
+/// - Other cleanable items
+///
+/// ## Usage
+///
+/// ```swift
+/// let analyzer = AnalyzerService()
+/// let config = AnalyzerConfiguration(targetPath: "/Users/example/Library/Caches")
+/// let result = try await analyzer.analyze(with: config)
+///
+/// print("Total size: \(result.formattedTotalSize)")
+/// print("Potential savings: \(result.formattedPotentialSavings)")
+/// print("Found \(result.categories.count) categories")
+/// ```
+///
+/// ## Performance
+///
+/// - **Rust Core**: Parallel scanning with rayon (recommended)
+/// - **Swift Fallback**: Sequential scanning (slower but always available)
+///
+/// The service automatically selects the best available implementation.
+///
+/// ## Safety
+///
+/// This service only analyzes paths and does not modify the filesystem.
+/// Use ``CleanerService`` to perform cleanup operations based on analysis results.
+///
+/// ## Topics
+///
+/// ### Analyzing Paths
+/// - ``analyze(with:)``
+///
+/// ### Related Types
+/// - ``AnalysisResult``
+/// - ``AnalysisCategory``
+/// - ``AnalysisItem``
+/// - ``AnalyzerConfiguration``
 public final class AnalyzerService {
     private let fileManager: FileManager
     private let rustBridge: RustBridge
     private var useRustCore: Bool = true
 
+    /// Creates a new analyzer service instance
+    ///
+    /// - Parameters:
+    ///   - fileManager: File manager for filesystem operations
+    ///   - rustBridge: Bridge to Rust core library
     public init(
         fileManager: FileManager = .default,
         rustBridge: RustBridge = .shared
@@ -104,6 +238,34 @@ public final class AnalyzerService {
         }
     }
 
+    /// Analyze a path for cleanup opportunities
+    ///
+    /// This method performs deep analysis of the specified path, identifying
+    /// cached files, logs, and other cleanable content. It automatically uses
+    /// the Rust core for performance when available.
+    ///
+    /// - Parameter config: Configuration specifying target path and options
+    /// - Returns: Detailed analysis results
+    /// - Throws: ``RustBridgeError`` if Rust analysis fails, or file system errors
+    ///
+    /// ## Example
+    ///
+    /// ```swift
+    /// let analyzer = AnalyzerService()
+    /// let config = AnalyzerConfiguration(
+    ///     targetPath: "~/Library/Caches",
+    ///     minSize: 1024 * 1024  // Only show items >= 1 MB
+    /// )
+    /// let result = try await analyzer.analyze(with: config)
+    /// ```
+    ///
+    /// ## Performance Notes
+    ///
+    /// - Large directories may take several seconds to analyze
+    /// - Rust core provides 3-5x faster analysis than Swift fallback
+    /// - Analysis does not modify any files
+    ///
+    /// - Important: Requires read permissions on the target path
     public func analyze(with config: AnalyzerConfiguration) async throws -> AnalysisResult {
         AppLogger.shared.operation("Starting analysis of \(config.targetPath)")
 

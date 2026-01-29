@@ -4,6 +4,32 @@
 import Foundation
 
 /// Application configuration
+///
+/// Global settings for OSX Cleaner application behavior, including
+/// default cleanup levels, logging, and server connection settings.
+///
+/// ## Topics
+///
+/// ### Creating Configuration
+/// - ``default``
+/// - ``init(defaultSafetyLevel:autoBackup:logLevel:excludedPaths:showPerformanceWarnings:serverURL:serverTimeout:agentId:authToken:tokenExpiresAt:lastHeartbeat:)``
+///
+/// ### Cleanup Settings
+/// - ``defaultSafetyLevel``
+/// - ``autoBackup``
+/// - ``excludedPaths``
+///
+/// ### Logging
+/// - ``logLevel``
+/// - ``showPerformanceWarnings``
+///
+/// ### Server Connection
+/// - ``serverURL``
+/// - ``serverTimeout``
+/// - ``agentId``
+/// - ``authToken``
+/// - ``tokenExpiresAt``
+/// - ``lastHeartbeat``
 public struct AppConfiguration: Codable {
     public var defaultSafetyLevel: Int
     public var autoBackup: Bool
@@ -110,10 +136,30 @@ public struct CleanerConfiguration {
 }
 
 /// Configuration for analysis operations
+///
+/// Specifies parameters for disk space analysis operations.
+///
+/// ## Topics
+///
+/// ### Creating Configuration
+/// - ``init(targetPath:minSize:verbose:includeHidden:)``
+///
+/// ### Properties
+/// - ``targetPath``
+/// - ``minSize``
+/// - ``verbose``
+/// - ``includeHidden``
 public struct AnalyzerConfiguration {
+    /// Path to analyze (supports tilde expansion)
     public let targetPath: String
+
+    /// Minimum file size to include in results (bytes)
     public let minSize: UInt64?
+
+    /// Enable verbose output during analysis
     public let verbose: Bool
+
+    /// Include hidden files and directories in analysis
     public let includeHidden: Bool
 
     public init(
