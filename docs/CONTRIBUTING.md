@@ -97,6 +97,25 @@ Install these extensions:
 
 Open `Package.swift` directly in Xcode for Swift development.
 
+### 5. Local Development Directories
+
+The project root may contain local development directories that are not part of the OSX Cleaner codebase. These are excluded from version control via `.gitignore`.
+
+#### `unified_system/`
+
+This directory is used for **local development and experimentation** with separate projects. It contains independent Git repositories (e.g., `claude_code_agent`) that are not related to OSX Cleaner.
+
+**Important Notes:**
+- **Not part of OSX Cleaner**: This directory and its contents are completely independent projects
+- **Already ignored**: Listed in `.gitignore` under "Local Development Directories"
+- **Do not commit**: These directories should never be committed to the OSX Cleaner repository
+- **Safe to delete**: You can safely remove this directory if not needed for your local development
+
+**If you see this directory:**
+- It's a local development artifact on someone's machine
+- It's automatically excluded from git tracking
+- You don't need to worry about it for OSX Cleaner development
+
 ---
 
 ## Project Structure
