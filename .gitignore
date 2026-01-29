@@ -120,3 +120,10 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# =============================================================================
+# Local Development Directories
+# =============================================================================
+# unified_system/ - Contains separate Git repositories for local development
+# This directory is not part of the OSX Cleaner project
+unified_system/
