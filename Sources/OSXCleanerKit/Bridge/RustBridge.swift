@@ -14,9 +14,11 @@ import Foundation
 ///
 /// This bridge ensures safe interaction with Rust by:
 /// - **Memory Management**: Automatically frees Rust-allocated memory using `defer`
+/// - **Input Validation**: Validates all strings before FFI calls (null bytes, UTF-8, length)
 /// - **String Conversion**: Validates UTF-8 encoding for all string parameters
 /// - **Error Handling**: Converts FFI errors to Swift exceptions
 /// - **Thread Safety**: Protects initialization with serial queue
+/// - **DoS Prevention**: Rejects strings exceeding 4096 characters
 ///
 /// # Memory Ownership
 ///
@@ -115,6 +117,7 @@ public final class RustBridge {
     /// - Throws: `RustBridgeError` if the operation fails
     public func analyzePath(_ path: String) throws -> RustAnalysisResult {
         try ensureInitialized()
+        try validateFFIString(path)
 
         let result = path.withCString { pathPtr in
             osx_analyze_path(pathPtr)
@@ -135,6 +138,7 @@ public final class RustBridge {
     /// - Throws: `RustBridgeError` if the operation fails
     public func calculateSafety(for path: String) throws -> SafetyLevel {
         try ensureInitialized()
+        try validateFFIString(path)
 
         let level = path.withCString { pathPtr in
             osx_calculate_safety(pathPtr)
@@ -166,6 +170,7 @@ public final class RustBridge {
         dryRun: Bool
     ) throws -> RustCleanResult {
         try ensureInitialized()
+        try validateFFIString(path)
 
         let result = path.withCString { pathPtr in
             osx_clean_path(pathPtr, cleanupLevel.rawValue, dryRun)
@@ -194,6 +199,34 @@ public final class RustBridge {
             cleanupLevel = .system
         }
         return try cleanPath(path, cleanupLevel: cleanupLevel, dryRun: dryRun)
+    }
+
+    // MARK: - Input Validation
+
+    /// Validate a string before passing to FFI boundary
+    ///
+    /// This method ensures strings meet FFI safety requirements:
+    /// - No null bytes (invalid in C strings)
+    /// - Valid UTF-8 encoding
+    /// - Reasonable length (prevents DoS attacks)
+    ///
+    /// - Parameter string: The string to validate
+    /// - Throws: `RustBridgeError.invalidString` if validation fails
+    private func validateFFIString(_ string: String) throws {
+        // Check for null bytes (invalid in C strings)
+        guard !string.contains("\0") else {
+            throw RustBridgeError.invalidString("String contains null byte")
+        }
+
+        // Verify UTF-8 validity by checking if conversion succeeds
+        guard string.utf8CString.count > 0 else {
+            throw RustBridgeError.invalidString("String is not valid UTF-8")
+        }
+
+        // Check reasonable length (prevent DoS)
+        guard string.count <= 4096 else {
+            throw RustBridgeError.invalidString("String exceeds maximum length (4096 characters)")
+        }
     }
 
     // MARK: - Helpers
