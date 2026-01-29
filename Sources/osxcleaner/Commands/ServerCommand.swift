@@ -127,6 +127,22 @@ extension ServerCommand {
         @Option(name: .shortAndLong, help: "Request timeout in seconds")
         var timeout: Int = 30
 
+        mutating func validate() throws {
+            // Validate server URL is valid and uses HTTPS
+            guard let url = URL(string: serverURL) else {
+                throw ValidationError.invalidFFIString("Invalid server URL format")
+            }
+
+            guard url.scheme == "https" else {
+                throw ValidationError.insecureMDMURL
+            }
+
+            // Validate timeout is positive
+            guard timeout > 0 else {
+                throw ValidationError.invalidCheckInterval(timeout)
+            }
+        }
+
         mutating func run() async throws {
             let progressView = ProgressView()
 
@@ -223,6 +239,24 @@ extension ServerCommand {
 
         @Flag(name: .shortAndLong, help: "Show output in JSON format")
         var json: Bool = false
+
+        mutating func validate() throws {
+            // Validate custom name if provided
+            if let agentName = name {
+                let trimmed = agentName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    throw ValidationError.missingRequiredField("name")
+                }
+            }
+
+            // Validate tags format if provided
+            if let tagStr = tags {
+                let trimmed = tagStr.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    throw ValidationError.missingRequiredField("tags")
+                }
+            }
+        }
 
         mutating func run() async throws {
             let progressView = ProgressView()

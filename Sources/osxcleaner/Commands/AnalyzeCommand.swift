@@ -51,6 +51,34 @@ struct AnalyzeCommand: AsyncParsableCommand {
     @Argument(help: "Path to analyze (default: home directory)")
     var path: String?
 
+    // MARK: - Validation
+
+    mutating func validate() throws {
+        // Validate custom path if provided
+        if let customPath = path {
+            let options = PathValidator.ValidationOptions.lenient
+            _ = try PathValidator.validate(customPath, options: options)
+        }
+
+        // Validate quiet and verbose cannot be used together
+        if quiet && verbose {
+            throw ValidationError.conflictingOptions("Cannot use --quiet with --verbose")
+        }
+
+        // Validate top parameter is positive if provided
+        if let topValue = top {
+            guard topValue > 0 else {
+                throw ValidationError.invalidCheckInterval(topValue)
+            }
+        }
+
+        // Validate minSize format if provided
+        if let sizeStr = minSize {
+            _ = parseSize(sizeStr) // This will return nil if invalid, but we won't throw
+            // The parseSize method handles invalid formats gracefully
+        }
+    }
+
     // MARK: - Run
 
     mutating func run() async throws {

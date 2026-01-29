@@ -60,6 +60,33 @@ struct CleanCommand: AsyncParsableCommand {
     @Argument(help: "Specific paths to clean (optional)")
     var paths: [String] = []
 
+    // MARK: - Validation
+
+    mutating func validate() throws {
+        // Validate custom paths if provided
+        if !paths.isEmpty {
+            let options = PathValidator.ValidationOptions.lenient
+            _ = try PathValidator.validateAll(paths, options: options)
+        }
+
+        // Check conflicting options: dryRun and nonInteractive
+        if dryRun && !nonInteractive {
+            // This is not conflicting - dry run without non-interactive is valid
+        }
+
+        // Validate quiet and verbose cannot be used together
+        if quiet && verbose {
+            throw ValidationError.conflictingOptions("Cannot use --quiet with --verbose")
+        }
+
+        // Validate minSpace is positive if provided
+        if let minSpaceValue = minSpace {
+            guard minSpaceValue > 0 else {
+                throw ValidationError.invalidCheckInterval(Int(minSpaceValue))
+            }
+        }
+    }
+
     // MARK: - Run
 
     mutating func run() async throws {

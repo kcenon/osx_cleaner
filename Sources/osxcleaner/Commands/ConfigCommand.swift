@@ -54,6 +54,18 @@ extension ConfigCommand {
         @Argument(help: "Configuration value")
         var value: String
 
+        mutating func validate() throws {
+            // Validate key is not empty
+            guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ValidationError.missingRequiredField("key")
+            }
+
+            // Validate value is not empty
+            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ValidationError.missingRequiredField("value")
+            }
+        }
+
         mutating func run() async throws {
             let progressView = ProgressView()
             let configService = ConfigurationService()
