@@ -178,6 +178,7 @@ public enum RustBridgeError: LocalizedError {
     case initializationFailed
     case nullPointer
     case invalidUTF8
+    case invalidString(String)
     case rustError(String)
     case jsonParsingError(String)
 
@@ -189,6 +190,8 @@ public enum RustBridgeError: LocalizedError {
             return "Received null pointer from Rust"
         case .invalidUTF8:
             return "Invalid UTF-8 string from Rust"
+        case .invalidString(let message):
+            return "Invalid string for FFI: \(message)"
         case .rustError(let message):
             return "Rust error: \(message)"
         case .jsonParsingError(let message):
