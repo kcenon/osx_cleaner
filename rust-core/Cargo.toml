@@ -59,6 +59,14 @@ filetime = "0.2"
 name = "safety_benchmark"
 harness = false
 
+[[bench]]
+name = "analysis_bench"
+harness = false
+
+[[bench]]
+name = "ffi_bench"
+harness = false
+
 [profile.release]
 lto = true
 codegen-units = 1
