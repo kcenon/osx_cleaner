@@ -716,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_scan_handles_empty_cache_dir() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
         let cleaner = AppCacheCleaner {
             cache_base: temp.path().to_path_buf(),
             exclusions: HashSet::new(),
@@ -759,7 +759,9 @@ mod tests {
         assert_eq!(target.safety_level, SafetyLevel::Safe);
         assert!(target.description.is_some());
 
-        let desc = target.description.unwrap();
+        let desc = target
+            .description
+            .expect("Description should be present");
         assert!(desc.contains("Application cache for Example App"));
         assert!(desc.contains("app is running"));
         assert!(desc.contains("Warning: Test warning"));
@@ -785,7 +787,9 @@ mod tests {
         assert_eq!(target.safety_level, SafetyLevel::Caution);
         assert!(target.description.is_some());
 
-        let desc = target.description.unwrap();
+        let desc = target
+            .description
+            .expect("Description should be present");
         assert_eq!(desc, "Application cache for Example App");
         // Should not contain detailed info when include_details is false
         assert!(!desc.contains("app is running"));
@@ -811,7 +815,9 @@ mod tests {
         assert_eq!(target.size, 512);
         assert!(target.description.is_some());
 
-        let desc = target.description.unwrap();
+        let desc = target
+            .description
+            .expect("Description should be present");
         assert_eq!(desc, "Application cache for Minimal");
     }
 }

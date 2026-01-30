@@ -534,8 +534,9 @@ mod tests {
     #[allow(dead_code)]
     fn create_test_log(dir: &Path, name: &str, content: &str, age_days: u32) -> PathBuf {
         let path = dir.join(name);
-        let mut file = File::create(&path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
+        let mut file = File::create(&path).expect("Failed to create test log file");
+        file.write_all(content.as_bytes())
+            .expect("Failed to write test log content");
 
         // Set modification time
         if age_days > 0 {
