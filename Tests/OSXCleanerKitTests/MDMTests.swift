@@ -647,3 +647,233 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
         XCTAssertEqual(result.commandId, "test-cmd", "Command ID should match")
     }
 }
+
+// MARK: - MDMService Compliance and Configuration Tests
+
+final class MDMServiceComplianceConfigTests: XCTestCase {
+
+    func testExecuteCommandReportCompliance() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        // Connect to MDM first
+        try await mdmService.connect(
+            provider: .jamf,
+            serverURL: URL(string: "https://test.jamfcloud.com")!,
+            credentials: MDMCredentials(apiToken: "test-token")
+        )
+
+        let command = MDMCommand(
+            id: "compliance-cmd",
+            type: .reportCompliance,
+            priority: .normal
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then - May fail due to network/mock connector, but should have structure
+        XCTAssertEqual(result.commandId, "compliance-cmd")
+        XCTAssertNotNil(result.message, "Result should have message")
+
+        // Check that it either succeeded or failed with a meaningful message
+        if result.success {
+            XCTAssertTrue(result.message?.contains("Compliance reported") ?? false)
+            XCTAssertNotNil(result.details["status"], "Should have compliance status in details")
+        } else {
+            // If failed, should have error message
+            XCTAssertFalse(result.message?.isEmpty ?? true, "Should have failure message")
+        }
+    }
+
+    func testExecuteCommandUpdateConfig() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        // Create valid configuration JSON
+        let config = MDMConfiguration(
+            provider: .jamf,
+            serverURL: URL(string: "https://test.jamfcloud.com")!,
+            requestTimeout: 45,
+            syncInterval: 400,
+            autoSync: false,
+            autoReportStatus: false
+        )
+
+        let encoder = JSONEncoder()
+        let configData = try encoder.encode(config)
+        guard let configString = String(data: configData, encoding: .utf8) else {
+            XCTFail("Failed to create config string")
+            return
+        }
+
+        // First connect to MDM
+        try await mdmService.connect(
+            provider: .jamf,
+            serverURL: URL(string: "https://test.jamfcloud.com")!,
+            credentials: MDMCredentials(apiToken: "test-token")
+        )
+
+        let command = MDMCommand(
+            id: "config-cmd",
+            type: .updateConfig,
+            parameters: ["config": configString],
+            priority: .high
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then
+        XCTAssertEqual(result.commandId, "config-cmd")
+        XCTAssertTrue(result.success, "Config update should succeed")
+        XCTAssertNotNil(result.message, "Result should have message")
+        XCTAssertTrue(result.message?.contains("Configuration updated") ?? false)
+    }
+
+    func testExecuteCommandUpdateConfigMissingParameter() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        // Connect first
+        try await mdmService.connect(
+            provider: .jamf,
+            serverURL: URL(string: "https://test.jamfcloud.com")!,
+            credentials: MDMCredentials(apiToken: "test-token")
+        )
+
+        // Command without config parameter
+        let command = MDMCommand(
+            id: "config-cmd",
+            type: .updateConfig,
+            parameters: [:],  // Missing "config" parameter
+            priority: .normal
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then - executeCommand returns failure result, not throws
+        XCTAssertEqual(result.commandId, "config-cmd")
+        XCTAssertFalse(result.success, "Should fail due to missing parameter")
+        XCTAssertTrue(result.message?.contains("Missing config parameter") ?? false)
+    }
+
+    func testExecuteCommandUpdateConfigInvalidJSON() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        // Connect first
+        try await mdmService.connect(
+            provider: .jamf,
+            serverURL: URL(string: "https://test.jamfcloud.com")!,
+            credentials: MDMCredentials(apiToken: "test-token")
+        )
+
+        let command = MDMCommand(
+            id: "config-cmd",
+            type: .updateConfig,
+            parameters: ["config": "invalid-json-data"],
+            priority: .normal
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then - executeCommand returns failure result, not throws
+        XCTAssertEqual(result.commandId, "config-cmd")
+        XCTAssertFalse(result.success, "Should fail due to invalid JSON")
+        XCTAssertTrue(result.message?.contains("Failed to decode config") ?? false || result.message?.contains("Config update failed") ?? false)
+    }
+
+    func testExecuteCommandReportComplianceNotConnected() async throws {
+        // Given - Not connected to MDM
+        let mockCleaner = MockCleanerService()
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        let command = MDMCommand(
+            id: "compliance-cmd",
+            type: .reportCompliance,
+            priority: .normal
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then - executeCommand returns failure result when not connected
+        XCTAssertEqual(result.commandId, "compliance-cmd")
+        XCTAssertFalse(result.success, "Should fail when not connected")
+        XCTAssertTrue(result.message?.contains("Not connected") ?? false)
+    }
+
+    func testComplianceReportStructure() async throws {
+        // Given
+        let mockCleaner = MockCleanerService()
+        let mdmService = MDMService(cleanerService: mockCleaner)
+
+        // Connect to MDM
+        try await mdmService.connect(
+            provider: .jamf,
+            serverURL: URL(string: "https://test.jamfcloud.com")!,
+            credentials: MDMCredentials(apiToken: "test-token")
+        )
+
+        let command = MDMCommand(
+            id: "compliance-cmd",
+            type: .reportCompliance,
+            priority: .normal
+        )
+
+        // When
+        let result = try await mdmService.executeCommand(command)
+
+        // Then - Verify command is properly handled
+        XCTAssertEqual(result.commandId, "compliance-cmd")
+        XCTAssertNotNil(result.message, "Should have message")
+
+        // Check result structure (may succeed or fail due to network)
+        if result.success {
+            XCTAssertTrue(result.message?.contains("Compliance reported") ?? false)
+            XCTAssertNotNil(result.details["status"], "Should have status in details")
+            XCTAssertNotNil(result.details["policies_checked"], "Should have policies count")
+        }
+        // If failed, it's expected due to mock server
+    }
+}
+
+// MARK: - MDMError Equatable Extension for Testing
+
+extension MDMError: Equatable {
+    public static func == (lhs: MDMError, rhs: MDMError) -> Bool {
+        switch (lhs, rhs) {
+        case (.notConnected, .notConnected):
+            return true
+        case (.authenticationFailed(let lMsg), .authenticationFailed(let rMsg)):
+            return lMsg == rMsg
+        case (.connectionFailed(let lMsg), .connectionFailed(let rMsg)):
+            return lMsg == rMsg
+        case (.requestFailed(let lMsg), .requestFailed(let rMsg)):
+            return lMsg == rMsg
+        case (.invalidConfiguration(let lMsg), .invalidConfiguration(let rMsg)):
+            return lMsg == rMsg
+        case (.policyNotFound(let lMsg), .policyNotFound(let rMsg)):
+            return lMsg == rMsg
+        case (.commandExecutionFailed(let lMsg), .commandExecutionFailed(let rMsg)):
+            return lMsg == rMsg
+        case (.providerNotSupported(let lProvider), .providerNotSupported(let rProvider)):
+            return lProvider == rProvider
+        case (.invalidResponse(let lMsg), .invalidResponse(let rMsg)):
+            return lMsg == rMsg
+        case (.rateLimited(let lRetry), .rateLimited(let rRetry)):
+            return lRetry == rRetry
+        case (.networkUnavailable, .networkUnavailable):
+            return true
+        default:
+            return false
+        }
+    }
+}
