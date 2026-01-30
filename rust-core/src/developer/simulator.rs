@@ -559,7 +559,8 @@ mod tests {
             }
         }"#;
 
-        let parsed: SimctlDevicesOutput = serde_json::from_str(json).unwrap();
+        let parsed: SimctlDevicesOutput =
+            serde_json::from_str(json).expect("Failed to parse simctl devices JSON");
         assert_eq!(parsed.devices.len(), 2);
 
         let ios17_devices = &parsed.devices["com.apple.CoreSimulator.SimRuntime.iOS-17-0"];
@@ -585,7 +586,8 @@ mod tests {
             }
         }"#;
 
-        let parsed: SimctlDevicesOutput = serde_json::from_str(json).unwrap();
+        let parsed: SimctlDevicesOutput =
+            serde_json::from_str(json).expect("Failed to parse simctl devices JSON");
         let ios17_devices = &parsed.devices["com.apple.CoreSimulator.SimRuntime.iOS-17-0"];
         assert_eq!(ios17_devices[0].is_available, None);
     }
@@ -611,7 +613,8 @@ mod tests {
             ]
         }"#;
 
-        let parsed: SimctlRuntimesOutput = serde_json::from_str(json).unwrap();
+        let parsed: SimctlRuntimesOutput =
+            serde_json::from_str(json).expect("Failed to parse simctl runtimes JSON");
         assert_eq!(parsed.runtimes.len(), 2);
         assert_eq!(parsed.runtimes[0].version, "17.0");
         assert_eq!(parsed.runtimes[0].is_available, Some(true));
@@ -631,7 +634,8 @@ mod tests {
             ]
         }"#;
 
-        let parsed: SimctlRuntimesOutput = serde_json::from_str(json).unwrap();
+        let parsed: SimctlRuntimesOutput =
+            serde_json::from_str(json).expect("Failed to parse simctl runtimes JSON");
         assert_eq!(parsed.runtimes.len(), 1);
         assert_eq!(parsed.runtimes[0].platform, None);
         assert_eq!(parsed.runtimes[0].is_available, None);
@@ -640,10 +644,11 @@ mod tests {
 
     #[test]
     fn test_scan_caches_with_temp_directory() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
         let caches_path = temp.path().join("Caches");
-        fs::create_dir(&caches_path).unwrap();
-        fs::write(caches_path.join("cache_file.dat"), "test cache data").unwrap();
+        fs::create_dir(&caches_path).expect("Failed to create Caches directory");
+        fs::write(caches_path.join("cache_file.dat"), "test cache data")
+            .expect("Failed to write cache file");
 
         let cleaner = SimulatorCleaner {
             devices_path: PathBuf::from("/nonexistent"),
@@ -658,9 +663,9 @@ mod tests {
 
     #[test]
     fn test_scan_caches_empty_directory() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
         let caches_path = temp.path().join("Caches");
-        fs::create_dir(&caches_path).unwrap();
+        fs::create_dir(&caches_path).expect("Failed to create Caches directory");
         // Empty directory - no files
 
         let cleaner = SimulatorCleaner {

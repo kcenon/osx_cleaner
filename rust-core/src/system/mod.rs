@@ -301,8 +301,11 @@ mod tests {
         assert!(!ptr.is_null());
 
         unsafe {
-            let json_str = CStr::from_ptr(ptr).to_str().unwrap();
-            let _: SystemInfo = serde_json::from_str(json_str).unwrap();
+            let json_str = CStr::from_ptr(ptr)
+                .to_str()
+                .expect("FFI string should be valid UTF-8");
+            let _: SystemInfo =
+                serde_json::from_str(json_str).expect("SystemInfo JSON should be valid");
             super::super::osx_free_string(ptr);
         }
     }
@@ -313,7 +316,9 @@ mod tests {
         assert!(!ptr.is_null());
 
         unsafe {
-            let version_str = CStr::from_ptr(ptr).to_str().unwrap();
+            let version_str = CStr::from_ptr(ptr)
+                .to_str()
+                .expect("FFI version string should be valid UTF-8");
             assert!(Version::parse(version_str).is_some());
             super::super::osx_free_string(ptr);
         }

@@ -205,8 +205,9 @@ mod tests {
 
     #[test]
     fn test_analyze_empty_dir() {
-        let dir = tempdir().unwrap();
-        let result = analyze(dir.path().to_str().unwrap()).unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
+        let result = analyze(dir.path().to_str().expect("Path should be valid UTF-8"))
+            .expect("Analyze operation should succeed");
 
         assert_eq!(result.file_count, 0);
         assert_eq!(result.total_size, 0);
@@ -214,11 +215,12 @@ mod tests {
 
     #[test]
     fn test_analyze_with_files() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "hello world").unwrap();
+        std::fs::write(&file_path, "hello world").expect("Failed to write test file");
 
-        let result = analyze(dir.path().to_str().unwrap()).unwrap();
+        let result = analyze(dir.path().to_str().expect("Path should be valid UTF-8"))
+            .expect("Analyze operation should succeed");
 
         assert_eq!(result.file_count, 1);
         assert!(result.total_size > 0);

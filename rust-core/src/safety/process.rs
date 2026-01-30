@@ -210,7 +210,9 @@ mod tests {
 
         let chrome_paths = mapping.get_cache_paths("Google Chrome");
         assert!(chrome_paths.is_some());
-        assert!(!chrome_paths.unwrap().is_empty());
+        assert!(!chrome_paths
+            .expect("Chrome cache paths should exist")
+            .is_empty());
     }
 
     #[test]

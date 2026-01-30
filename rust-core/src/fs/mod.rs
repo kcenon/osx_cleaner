@@ -183,48 +183,60 @@ mod tests {
 
     #[test]
     fn test_get_size_file() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "hello").unwrap();
+        std::fs::write(&file_path, "hello").expect("Failed to write test file");
 
-        let size = get_size(file_path.to_str().unwrap()).unwrap();
+        let size = get_size(file_path.to_str().expect("Path should be valid UTF-8"))
+            .expect("Get size should succeed");
         assert_eq!(size, 5);
     }
 
     #[test]
     fn test_get_size_directory() {
-        let dir = tempdir().unwrap();
-        std::fs::write(dir.path().join("a.txt"), "aaa").unwrap();
-        std::fs::write(dir.path().join("b.txt"), "bb").unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
+        std::fs::write(dir.path().join("a.txt"), "aaa").expect("Failed to write test file a");
+        std::fs::write(dir.path().join("b.txt"), "bb").expect("Failed to write test file b");
 
-        let size = get_size(dir.path().to_str().unwrap()).unwrap();
+        let size = get_size(dir.path().to_str().expect("Path should be valid UTF-8"))
+            .expect("Get size should succeed");
         assert_eq!(size, 5);
     }
 
     #[test]
     fn test_is_writable() {
-        let dir = tempdir().unwrap();
-        assert!(is_writable(dir.path().to_str().unwrap()));
+        let dir = tempdir().expect("Failed to create temp directory");
+        assert!(is_writable(
+            dir.path().to_str().expect("Path should be valid UTF-8")
+        ));
 
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "test").unwrap();
-        assert!(is_writable(file_path.to_str().unwrap()));
+        std::fs::write(&file_path, "test").expect("Failed to write test file");
+        assert!(is_writable(
+            file_path.to_str().expect("Path should be valid UTF-8")
+        ));
     }
 
     #[test]
     fn test_exists() {
-        let dir = tempdir().unwrap();
-        assert!(exists(dir.path().to_str().unwrap()));
+        let dir = tempdir().expect("Failed to create temp directory");
+        assert!(exists(
+            dir.path().to_str().expect("Path should be valid UTF-8")
+        ));
         assert!(!exists("/nonexistent/path"));
     }
 
     #[test]
     fn test_is_directory() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "test").unwrap();
+        std::fs::write(&file_path, "test").expect("Failed to write test file");
 
-        assert!(is_directory(dir.path().to_str().unwrap()));
-        assert!(!is_directory(file_path.to_str().unwrap()));
+        assert!(is_directory(
+            dir.path().to_str().expect("Path should be valid UTF-8")
+        ));
+        assert!(!is_directory(
+            file_path.to_str().expect("Path should be valid UTF-8")
+        ));
     }
 }

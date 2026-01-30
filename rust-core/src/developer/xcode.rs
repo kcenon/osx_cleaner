@@ -577,14 +577,14 @@ mod tests {
 
     #[test]
     fn test_scan_with_temp_derived_data() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
         let derived_data = temp.path().join("DerivedData");
-        fs::create_dir(&derived_data).unwrap();
+        fs::create_dir(&derived_data).expect("Failed to create DerivedData directory");
 
         // Create a fake project directory
         let project_dir = derived_data.join("MyProject-abc123");
-        fs::create_dir(&project_dir).unwrap();
-        fs::write(project_dir.join("test.txt"), "test content").unwrap();
+        fs::create_dir(&project_dir).expect("Failed to create project directory");
+        fs::write(project_dir.join("test.txt"), "test content").expect("Failed to write test file");
 
         let cleaner = XcodeCleaner {
             derived_data_path: derived_data,
@@ -630,17 +630,18 @@ mod tests {
 
     #[test]
     fn test_device_support_cleanup_targets_with_options() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
 
         // Create fake iOS Device Support directories
         let ios_support = temp.path().join("iOS DeviceSupport");
-        fs::create_dir(&ios_support).unwrap();
+        fs::create_dir(&ios_support).expect("Failed to create iOS DeviceSupport directory");
 
         // Create version directories (newer versions first when sorted)
         for version in ["18.0 (22A1234)", "17.0 (21A5678)", "16.0 (20A1234)"] {
             let version_dir = ios_support.join(version);
-            fs::create_dir(&version_dir).unwrap();
-            fs::write(version_dir.join("symbols"), "fake symbols").unwrap();
+            fs::create_dir(&version_dir).expect("Failed to create version directory");
+            fs::write(version_dir.join("symbols"), "fake symbols")
+                .expect("Failed to write fake symbols");
         }
 
         let cleaner = XcodeCleaner {
@@ -664,15 +665,16 @@ mod tests {
 
     #[test]
     fn test_smart_vs_regular_cleanup_targets() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
 
         let ios_support = temp.path().join("iOS DeviceSupport");
-        fs::create_dir(&ios_support).unwrap();
+        fs::create_dir(&ios_support).expect("Failed to create iOS DeviceSupport directory");
 
         for version in ["18.0 (22A1234)", "17.0 (21A5678)"] {
             let version_dir = ios_support.join(version);
-            fs::create_dir(&version_dir).unwrap();
-            fs::write(version_dir.join("symbols"), "fake symbols").unwrap();
+            fs::create_dir(&version_dir).expect("Failed to create version directory");
+            fs::write(version_dir.join("symbols"), "fake symbols")
+                .expect("Failed to write fake symbols");
         }
 
         let cleaner = XcodeCleaner {
@@ -713,11 +715,15 @@ mod tests {
             }
         }"#;
 
-        let parsed: DeviceCtlOutput = serde_json::from_str(json).unwrap();
+        let parsed: DeviceCtlOutput =
+            serde_json::from_str(json).expect("Failed to parse DeviceCtl JSON");
         assert_eq!(parsed.result.devices.len(), 2);
 
         let first_device = &parsed.result.devices[0];
-        let props = first_device.device_properties.as_ref().unwrap();
+        let props = first_device
+            .device_properties
+            .as_ref()
+            .expect("Device properties should be present");
         assert_eq!(props.platform.as_deref(), Some("iOS"));
         assert_eq!(props.os_version_number.as_deref(), Some("18.4.1"));
     }

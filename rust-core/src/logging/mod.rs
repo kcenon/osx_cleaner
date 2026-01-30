@@ -437,10 +437,11 @@ mod tests {
 
     #[test]
     fn test_file_logger() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let log_path = dir.path().join("test.log");
 
-        let logger = DeletionLogger::with_file(&log_path).unwrap();
+        let logger =
+            DeletionLogger::with_file(&log_path).expect("Failed to create logger with file");
         logger.log_deletion(
             "/test/path",
             SafetyLevel::Safe,
