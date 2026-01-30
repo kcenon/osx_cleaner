@@ -237,7 +237,7 @@ mod tests {
         if cfg!(target_os = "macos") {
             let version = Version::detect();
             assert!(version.is_some());
-            let v = version.unwrap();
+            let v = version.expect("macOS version should be detectable");
             assert!(v.major >= 10);
         }
     }
