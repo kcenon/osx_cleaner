@@ -107,7 +107,11 @@ pub fn is_writable(path: &str) -> bool {
     if !path.exists() {
         // Check if parent directory is writable
         if let Some(parent) = path.parent() {
-            return is_writable(parent.to_str().unwrap_or(""));
+            // If parent path cannot be converted to string, treat as not writable
+            if let Some(parent_str) = parent.to_str() {
+                return is_writable(parent_str);
+            }
+            return false;
         }
         return false;
     }
