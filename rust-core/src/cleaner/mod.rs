@@ -265,16 +265,20 @@ mod tests {
 
     #[test]
     fn test_clean_file_dry_run() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "test content").unwrap();
+        std::fs::write(&file_path, "test content").expect("Failed to write test file");
 
         let config = CleanConfig {
             cleanup_level: CleanupLevel::System, // Allow all levels
             dry_run: true,
         };
 
-        let result = clean(file_path.to_str().unwrap(), &config).unwrap();
+        let result = clean(
+            file_path.to_str().expect("Path should be valid UTF-8"),
+            &config,
+        )
+        .expect("Clean operation should succeed");
 
         assert!(result.dry_run);
         assert_eq!(result.files_removed, 1);
@@ -285,16 +289,20 @@ mod tests {
 
     #[test]
     fn test_clean_file_actual() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "test content").unwrap();
+        std::fs::write(&file_path, "test content").expect("Failed to write test file");
 
         let config = CleanConfig {
             cleanup_level: CleanupLevel::System,
             dry_run: false,
         };
 
-        let result = clean(file_path.to_str().unwrap(), &config).unwrap();
+        let result = clean(
+            file_path.to_str().expect("Path should be valid UTF-8"),
+            &config,
+        )
+        .expect("Clean operation should succeed");
 
         assert!(!result.dry_run);
         assert_eq!(result.files_removed, 1);
