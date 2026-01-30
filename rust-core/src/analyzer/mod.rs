@@ -236,10 +236,8 @@ mod tests {
         let temp = tempdir().expect("Failed to create temp directory");
 
         // Create some test directories
-        std::fs::create_dir(temp.path().join("Documents"))
-            .expect("Failed to create Documents dir");
-        std::fs::create_dir(temp.path().join("Downloads"))
-            .expect("Failed to create Downloads dir");
+        std::fs::create_dir(temp.path().join("Documents")).expect("Failed to create Documents dir");
+        std::fs::create_dir(temp.path().join("Downloads")).expect("Failed to create Downloads dir");
         std::fs::write(temp.path().join("Documents/test.txt"), "hello")
             .expect("Failed to write test.txt");
 
