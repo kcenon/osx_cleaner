@@ -219,18 +219,24 @@ mod tests {
 
     #[test]
     fn test_exists() {
-        let dir = tempdir().unwrap();
-        assert!(exists(dir.path().to_str().unwrap()));
+        let dir = tempdir().expect("Failed to create temp directory");
+        assert!(exists(
+            dir.path().to_str().expect("Path should be valid UTF-8")
+        ));
         assert!(!exists("/nonexistent/path"));
     }
 
     #[test]
     fn test_is_directory() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp directory");
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "test").unwrap();
+        std::fs::write(&file_path, "test").expect("Failed to write test file");
 
-        assert!(is_directory(dir.path().to_str().unwrap()));
-        assert!(!is_directory(file_path.to_str().unwrap()));
+        assert!(is_directory(
+            dir.path().to_str().expect("Path should be valid UTF-8")
+        ));
+        assert!(!is_directory(
+            file_path.to_str().expect("Path should be valid UTF-8")
+        ));
     }
 }

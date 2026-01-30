@@ -1357,7 +1357,7 @@ mod tests {
         unsafe {
             let path =
                 CString::new("/Users/test/Library/Mobile Documents/com~apple~CloudDocs/file.txt")
-                    .unwrap();
+                    .expect("FFI CString creation should succeed");
             let result = osx_detect_cloud_service(path.as_ptr());
             assert!(result.success);
             if !result.data.is_null() {
