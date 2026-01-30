@@ -373,21 +373,32 @@ public actor MDMService {
                 )
 
             case .reportCompliance:
-                // TODO: Implement compliance check
+                let complianceReport = try await checkCompliance()
+                try await reportCompliance(complianceReport)
+
                 return MDMCommandResult(
                     commandId: command.id,
                     success: true,
-                    message: "Compliance reported",
+                    message: "Compliance reported: \(complianceReport.overallStatus.rawValue)",
                     executedAt: Date(),
-                    duration: Date().timeIntervalSince(startTime)
+                    duration: Date().timeIntervalSince(startTime),
+                    details: [
+                        "status": complianceReport.overallStatus.rawValue,
+                        "policies_checked": "\(complianceReport.policyReports.count)"
+                    ]
                 )
 
             case .updateConfig:
-                // TODO: Implement config update
+                guard let configData = command.parameters["config"] else {
+                    throw MDMError.invalidConfiguration("Missing config parameter")
+                }
+
+                try await updateConfiguration(configData: configData)
+
                 return MDMCommandResult(
                     commandId: command.id,
                     success: true,
-                    message: "Configuration updated",
+                    message: "Configuration updated successfully",
                     executedAt: Date(),
                     duration: Date().timeIntervalSince(startTime)
                 )
@@ -438,6 +449,146 @@ public actor MDMService {
     private func stopAutoSync() {
         syncTimer?.cancel()
         syncTimer = nil
+    }
+
+    // MARK: - Compliance Checking
+
+    /// Check compliance for all MDM policies
+    /// - Returns: Compliance report for all synced policies
+    private func checkCompliance() async throws -> MDMComplianceReport {
+        guard connector != nil else {
+            throw MDMError.notConnected
+        }
+
+        let agentId = try await getAgentId()
+        var policyReports: [MDMComplianceReport.PolicyComplianceInfo] = []
+
+        // Initialize policy engine with policy store
+        let policyStore = try PolicyStore()
+        let policyEngine = PolicyEngine(store: policyStore, config: .default)
+
+        // Check compliance for each synced MDM policy
+        for mdmPolicy in cachedPolicies where mdmPolicy.enabled {
+            do {
+                // Convert MDM policy to internal Policy format
+                let policy = convertToPolicy(mdmPolicy)
+
+                // Check compliance using PolicyEngine
+                let report = try await policyEngine.checkCompliance(policy: policy)
+
+                // Convert PolicyComplianceReport to MDMComplianceReport.PolicyComplianceInfo
+                let mdmStatus: MDMComplianceReport.ComplianceStatus
+                switch report.status {
+                case .compliant:
+                    mdmStatus = .compliant
+                case .nonCompliant:
+                    mdmStatus = .nonCompliant
+                case .error:
+                    mdmStatus = .error
+                case .pending:
+                    mdmStatus = .unknown
+                }
+
+                policyReports.append(MDMComplianceReport.PolicyComplianceInfo(
+                    policyId: mdmPolicy.id,
+                    policyName: mdmPolicy.name,
+                    status: mdmStatus,
+                    lastEvaluatedAt: report.checkedAt,
+                    issues: report.issues,
+                    recommendations: report.recommendations
+                ))
+            } catch {
+                AppLogger.shared.error("Compliance check failed for policy '\(mdmPolicy.name)': \(error)")
+
+                // Add error report
+                policyReports.append(MDMComplianceReport.PolicyComplianceInfo(
+                    policyId: mdmPolicy.id,
+                    policyName: mdmPolicy.name,
+                    status: .error,
+                    issues: [error.localizedDescription],
+                    recommendations: ["Check policy configuration and retry"]
+                ))
+            }
+        }
+
+        // Determine overall compliance status
+        let overallStatus: MDMComplianceReport.ComplianceStatus
+        if policyReports.isEmpty {
+            overallStatus = .unknown
+        } else if policyReports.contains(where: { $0.status == .error }) {
+            overallStatus = .error
+        } else if policyReports.contains(where: { $0.status == .nonCompliant }) {
+            overallStatus = .nonCompliant
+        } else {
+            overallStatus = .compliant
+        }
+
+        return MDMComplianceReport(
+            agentId: agentId,
+            reportedAt: Date(),
+            overallStatus: overallStatus,
+            policyReports: policyReports
+        )
+    }
+
+    // MARK: - Configuration Update
+
+    /// Update MDM configuration from JSON data
+    /// - Parameter configData: JSON string containing new configuration
+    private func updateConfiguration(configData: String) async throws {
+        guard let data = configData.data(using: .utf8) else {
+            throw MDMError.invalidConfiguration("Invalid config data encoding")
+        }
+
+        // Decode new configuration
+        let decoder = JSONDecoder()
+        let newConfig: MDMConfiguration
+        do {
+            newConfig = try decoder.decode(MDMConfiguration.self, from: data)
+        } catch {
+            throw MDMError.invalidConfiguration("Failed to decode config: \(error.localizedDescription)")
+        }
+
+        // Validate new configuration
+        guard newConfig.provider == config?.provider else {
+            throw MDMError.invalidConfiguration("Cannot change MDM provider via config update")
+        }
+
+        // Backup current configuration
+        let backupConfig = config
+
+        // Apply new configuration
+        do {
+            config = newConfig
+
+            // Update auto-sync settings
+            stopAutoSync()
+            if newConfig.autoSync {
+                startAutoSync(interval: newConfig.syncInterval)
+            }
+
+            AppLogger.shared.info("MDM configuration updated successfully")
+
+            // Optionally acknowledge update to MDM server (best effort)
+            if let connector = connector {
+                do {
+                    let status = try await createCurrentStatus()
+                    try await connector.reportStatus(status)
+                } catch {
+                    // Log but don't fail the config update if acknowledgement fails
+                    AppLogger.shared.warning("Failed to acknowledge config update: \(error)")
+                }
+            }
+        } catch {
+            // Rollback on failure
+            config = backupConfig
+            if let backup = backupConfig, backup.autoSync {
+                startAutoSync(interval: backup.syncInterval)
+            }
+
+            AppLogger.shared.error("Configuration update failed, rolled back: \(error)")
+            throw MDMError.invalidConfiguration("Config update failed: \(error.localizedDescription)")
+        }
     }
 }
 
