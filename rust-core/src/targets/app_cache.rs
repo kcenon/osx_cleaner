@@ -185,7 +185,10 @@ impl AppNameCache {
                 cache.retain(|_, entry| entry.expires_at > now);
             }
             Err(poisoned) => {
-                log::warn!("Cache write lock poisoned while clearing, recovering: {}", poisoned);
+                log::warn!(
+                    "Cache write lock poisoned while clearing, recovering: {}",
+                    poisoned
+                );
                 let mut cache = poisoned.into_inner();
                 let now = Instant::now();
                 cache.retain(|_, entry| entry.expires_at > now);
