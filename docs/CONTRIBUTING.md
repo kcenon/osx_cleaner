@@ -289,12 +289,84 @@ final class SafetyTests: XCTestCase {
 
 ### Test Coverage Requirements
 
-| Module | Minimum Coverage |
-|--------|-----------------|
-| safety | 90% |
-| developer | 80% |
-| targets | 80% |
-| system | 85% |
+All code changes must maintain or improve test coverage. Coverage is automatically measured and enforced in CI/CD.
+
+#### Overall Coverage Thresholds
+
+| Scope | Minimum Coverage | Enforcement |
+|-------|------------------|-------------|
+| **Project (Overall)** | 80% | CI fails if below target |
+| **PR Patch (New Code)** | 85% | CI fails if new code not tested |
+
+#### Module-Specific Coverage
+
+| Module | Minimum Coverage | Rationale |
+|--------|------------------|-----------|
+| safety | 90% | Critical for system protection |
+| developer | 80% | Core feature |
+| targets | 80% | Core feature |
+| system | 85% | System-level operations |
+| CleanerService | 80% | Critical service |
+| AnalyzerService | 80% | Critical service |
+| RustBridge (FFI) | 80% | Interface layer |
+| MDMService | 80% | Enterprise feature |
+
+#### Measuring Coverage Locally
+
+**Swift Coverage:**
+```bash
+# Run tests with coverage
+swift test --enable-code-coverage
+
+# Generate coverage report (lcov format)
+xcrun llvm-cov export --format=lcov \
+  --instr-profile=.build/debug/codecov/default.profdata \
+  .build/debug/osxcleanerPackageTests.xctest/Contents/MacOS/osxcleanerPackageTests \
+  > coverage-swift.lcov
+
+# View coverage summary
+xcrun llvm-cov report \
+  --instr-profile=.build/debug/codecov/default.profdata \
+  .build/debug/osxcleanerPackageTests.xctest/Contents/MacOS/osxcleanerPackageTests
+```
+
+**Rust Coverage:**
+```bash
+# Install cargo-llvm-cov (first time only)
+cargo install cargo-llvm-cov
+
+# Generate coverage report
+cd rust-core
+cargo llvm-cov --all-features --lcov --output-path ../coverage-rust.lcov
+
+# View HTML coverage report
+cargo llvm-cov --all-features --html
+open target/llvm-cov/html/index.html
+```
+
+#### CI Coverage Workflow
+
+Coverage is automatically measured and reported:
+- **Codecov Integration**: Coverage reports uploaded to [Codecov](https://codecov.io/gh/kcenon/osx_cleaner)
+- **PR Comments**: Coverage changes displayed in PR comments
+- **Status Checks**: CI fails if coverage drops below threshold
+- **Badge**: ![codecov](https://codecov.io/gh/kcenon/osx_cleaner/branch/main/graph/badge.svg)
+
+#### Coverage Enforcement
+
+The `codecov.yml` configuration enforces:
+- **80% minimum** for overall project coverage
+- **85% minimum** for new code (PR patches)
+- **2% threshold** for project-level changes
+- **5% threshold** for patch-level changes
+
+**When CI Fails Due to Coverage:**
+
+1. Review Codecov report in PR comment
+2. Identify untested code paths
+3. Add tests for uncovered lines
+4. Focus on critical paths first (error handling, edge cases)
+5. Push updated tests
 
 ---
 
