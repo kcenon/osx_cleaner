@@ -1258,13 +1258,15 @@ mod tests {
     fn test_check_related_app_running_valid() {
         use std::ffi::CString;
         unsafe {
-            let cache_path = CString::new("Library/Caches/Google/Chrome").expect("FFI CString creation should succeed");
+            let cache_path = CString::new("Library/Caches/Google/Chrome")
+                .expect("FFI CString creation should succeed");
             let result = osx_check_related_app_running(cache_path.as_ptr());
             assert!(result.success);
             // Parse and validate JSON
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.contains("running"));
             }
             osx_free_string(result.data);
@@ -1278,8 +1280,9 @@ mod tests {
         // Should return a JSON array (even if empty)
         if !result.data.is_null() {
             unsafe {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.starts_with('['));
                 assert!(data_str.ends_with(']'));
                 osx_free_string(result.data);
@@ -1309,13 +1312,15 @@ mod tests {
     fn test_get_app_cache_paths_valid() {
         use std::ffi::CString;
         unsafe {
-            let app_name = CString::new("Google Chrome").expect("FFI CString creation should succeed");
+            let app_name =
+                CString::new("Google Chrome").expect("FFI CString creation should succeed");
             let result = osx_get_app_cache_paths(app_name.as_ptr());
             assert!(result.success);
             // Should return a JSON array
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 // Chrome should have cache paths defined
                 assert!(data_str.contains("Chrome") || data_str == "null");
                 osx_free_string(result.data);
@@ -1342,8 +1347,9 @@ mod tests {
             let result = osx_detect_cloud_service(path.as_ptr());
             assert!(result.success);
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.contains("is_cloud_path"));
                 assert!(data_str.contains("false")); // /tmp is not a cloud path
                 osx_free_string(result.data);
@@ -1361,8 +1367,9 @@ mod tests {
             let result = osx_detect_cloud_service(path.as_ptr());
             assert!(result.success);
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.contains("iCloud"));
                 assert!(data_str.contains("\"is_cloud_path\":true"));
                 osx_free_string(result.data);
@@ -1374,12 +1381,14 @@ mod tests {
     fn test_detect_cloud_service_dropbox_path() {
         use std::ffi::CString;
         unsafe {
-            let path = CString::new("/Users/test/Dropbox/document.txt").expect("FFI CString creation should succeed");
+            let path = CString::new("/Users/test/Dropbox/document.txt")
+                .expect("FFI CString creation should succeed");
             let result = osx_detect_cloud_service(path.as_ptr());
             assert!(result.success);
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.contains("Dropbox"));
                 assert!(data_str.contains("\"is_cloud_path\":true"));
                 osx_free_string(result.data);
@@ -1404,8 +1413,9 @@ mod tests {
             let result = osx_get_cloud_sync_info(path.as_ptr());
             assert!(result.success);
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.contains("\"is_cloud_path\":false"));
                 assert!(data_str.contains("NotApplicable"));
                 osx_free_string(result.data);
@@ -1430,8 +1440,9 @@ mod tests {
             let result = osx_is_safe_to_delete_cloud(path.as_ptr());
             assert!(result.success);
             if !result.data.is_null() {
-                let data_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let data_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 assert!(data_str.contains("\"safe\":true"));
                 osx_free_string(result.data);
             }
@@ -1452,11 +1463,13 @@ mod tests {
         unsafe {
             // Test with iCloud path
             let icloud_path =
-                CString::new("/Users/test/Library/Mobile Documents/com~apple~CloudDocs").expect("FFI CString creation should succeed");
+                CString::new("/Users/test/Library/Mobile Documents/com~apple~CloudDocs")
+                    .expect("FFI CString creation should succeed");
             assert!(osx_is_icloud_path(icloud_path.as_ptr()));
 
             // Test with non-iCloud path
-            let local_path = CString::new("/tmp/test").expect("FFI CString creation should succeed");
+            let local_path =
+                CString::new("/tmp/test").expect("FFI CString creation should succeed");
             assert!(!osx_is_icloud_path(local_path.as_ptr()));
         }
     }
@@ -1474,11 +1487,13 @@ mod tests {
         use std::ffi::CString;
         unsafe {
             // Test with Dropbox path
-            let dropbox_path = CString::new("/Users/test/Dropbox/file.txt").expect("FFI CString creation should succeed");
+            let dropbox_path = CString::new("/Users/test/Dropbox/file.txt")
+                .expect("FFI CString creation should succeed");
             assert!(osx_is_dropbox_path(dropbox_path.as_ptr()));
 
             // Test with non-Dropbox path
-            let local_path = CString::new("/tmp/test").expect("FFI CString creation should succeed");
+            let local_path =
+                CString::new("/tmp/test").expect("FFI CString creation should succeed");
             assert!(!osx_is_dropbox_path(local_path.as_ptr()));
         }
     }
@@ -1496,11 +1511,13 @@ mod tests {
         use std::ffi::CString;
         unsafe {
             // Test with OneDrive path
-            let onedrive_path = CString::new("/Users/test/OneDrive/file.txt").expect("FFI CString creation should succeed");
+            let onedrive_path = CString::new("/Users/test/OneDrive/file.txt")
+                .expect("FFI CString creation should succeed");
             assert!(osx_is_onedrive_path(onedrive_path.as_ptr()));
 
             // Test with non-OneDrive path
-            let local_path = CString::new("/tmp/test").expect("FFI CString creation should succeed");
+            let local_path =
+                CString::new("/tmp/test").expect("FFI CString creation should succeed");
             assert!(!osx_is_onedrive_path(local_path.as_ptr()));
         }
     }
@@ -1518,11 +1535,13 @@ mod tests {
         use std::ffi::CString;
         unsafe {
             // Test with Google Drive path
-            let gdrive_path = CString::new("/Users/test/Google Drive/file.txt").expect("FFI CString creation should succeed");
+            let gdrive_path = CString::new("/Users/test/Google Drive/file.txt")
+                .expect("FFI CString creation should succeed");
             assert!(osx_is_google_drive_path(gdrive_path.as_ptr()));
 
             // Test with non-Google Drive path
-            let local_path = CString::new("/tmp/test").expect("FFI CString creation should succeed");
+            let local_path =
+                CString::new("/tmp/test").expect("FFI CString creation should succeed");
             assert!(!osx_is_google_drive_path(local_path.as_ptr()));
         }
     }
@@ -1538,7 +1557,8 @@ mod tests {
         assert!(!result.data.is_null());
         // Should return sanitized string with NUL bytes removed
         unsafe {
-            let data_str = CStr::from_ptr(result.data).to_str()
+            let data_str = CStr::from_ptr(result.data)
+                .to_str()
                 .expect("FFI string should be valid UTF-8");
             assert_eq!(data_str, "helloworld"); // NUL byte removed
             osx_free_string(result.data);
@@ -1553,7 +1573,8 @@ mod tests {
         assert!(result.success);
         assert!(!result.data.is_null());
         unsafe {
-            let data_str = CStr::from_ptr(result.data).to_str()
+            let data_str = CStr::from_ptr(result.data)
+                .to_str()
                 .expect("FFI string should be valid UTF-8");
             assert_eq!(data_str, "hello world");
             osx_free_string(result.data);
@@ -1577,7 +1598,8 @@ mod tests {
         assert!(!result.error_message.is_null());
         // Should return sanitized message (NUL bytes stripped)
         unsafe {
-            let error_str = CStr::from_ptr(result.error_message).to_str()
+            let error_str = CStr::from_ptr(result.error_message)
+                .to_str()
                 .expect("FFI string should be valid UTF-8");
             assert_eq!(error_str, "errormessage");
             osx_free_string(result.error_message);
@@ -1592,7 +1614,8 @@ mod tests {
         assert!(!result.success);
         assert!(!result.error_message.is_null());
         unsafe {
-            let error_str = CStr::from_ptr(result.error_message).to_str()
+            let error_str = CStr::from_ptr(result.error_message)
+                .to_str()
                 .expect("FFI string should be valid UTF-8");
             assert_eq!(error_str, "normal error");
             osx_free_string(result.error_message);
@@ -1607,7 +1630,8 @@ mod tests {
         assert!(result.success);
         assert!(!result.data.is_null());
         unsafe {
-            let data_str = CStr::from_ptr(result.data).to_str()
+            let data_str = CStr::from_ptr(result.data)
+                .to_str()
                 .expect("FFI string should be valid UTF-8");
             assert_eq!(data_str, "");
             osx_free_string(result.data);
@@ -1629,8 +1653,10 @@ mod tests {
         // Verify data content
         unsafe {
             let data = CStr::from_ptr(result.data);
-            assert_eq!(data.to_str()
-                .expect("FFI string should be valid UTF-8"), "test data");
+            assert_eq!(
+                data.to_str().expect("FFI string should be valid UTF-8"),
+                "test data"
+            );
 
             // Clean up
             osx_free_string(result.data);
@@ -1662,8 +1688,10 @@ mod tests {
         // Verify error message
         unsafe {
             let error = CStr::from_ptr(result.error_message);
-            assert_eq!(error.to_str()
-                .expect("FFI string should be valid UTF-8"), "test error");
+            assert_eq!(
+                error.to_str().expect("FFI string should be valid UTF-8"),
+                "test error"
+            );
 
             // Clean up
             osx_free_string(result.error_message);
@@ -1736,8 +1764,9 @@ mod tests {
                 assert!(!result.data.is_null());
 
                 // Parse JSON data
-                let json_str = CStr::from_ptr(result.data).to_str()
-                .expect("FFI string should be valid UTF-8");
+                let json_str = CStr::from_ptr(result.data)
+                    .to_str()
+                    .expect("FFI string should be valid UTF-8");
                 let _: serde_json::Value =
                     serde_json::from_str(json_str).expect("Should be valid JSON");
             }
@@ -1751,7 +1780,8 @@ mod tests {
     fn test_analyze_invalid_path() {
         use std::ffi::CString;
         unsafe {
-            let path = CString::new("/nonexistent/path/12345").expect("FFI CString creation should succeed");
+            let path = CString::new("/nonexistent/path/12345")
+                .expect("FFI CString creation should succeed");
             let result = osx_analyze_path(path.as_ptr());
 
             // Should handle gracefully (may succeed or fail, but shouldn't crash)
@@ -1787,7 +1817,8 @@ mod tests {
 
         unsafe {
             // Use the data
-            let data_str = CStr::from_ptr(result.data).to_str()
+            let data_str = CStr::from_ptr(result.data)
+                .to_str()
                 .expect("FFI string should be valid UTF-8");
             assert_eq!(data_str, "lifecycle test");
 

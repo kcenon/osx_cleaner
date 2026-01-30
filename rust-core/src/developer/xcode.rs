@@ -584,8 +584,7 @@ mod tests {
         // Create a fake project directory
         let project_dir = derived_data.join("MyProject-abc123");
         fs::create_dir(&project_dir).expect("Failed to create project directory");
-        fs::write(project_dir.join("test.txt"), "test content")
-            .expect("Failed to write test file");
+        fs::write(project_dir.join("test.txt"), "test content").expect("Failed to write test file");
 
         let cleaner = XcodeCleaner {
             derived_data_path: derived_data,

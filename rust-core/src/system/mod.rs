@@ -304,8 +304,8 @@ mod tests {
             let json_str = CStr::from_ptr(ptr)
                 .to_str()
                 .expect("FFI string should be valid UTF-8");
-            let _: SystemInfo = serde_json::from_str(json_str)
-                .expect("SystemInfo JSON should be valid");
+            let _: SystemInfo =
+                serde_json::from_str(json_str).expect("SystemInfo JSON should be valid");
             super::super::osx_free_string(ptr);
         }
     }
