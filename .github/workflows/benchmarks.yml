@@ -1,0 +1,215 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust-benchmarks:
+    name: Rust Benchmarks
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-core/target/
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+
+      - name: Run Rust benchmarks (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          cd rust-core
+          cargo bench --no-fail-fast -- --save-baseline pr
+        continue-on-error: true
+
+      - name: Run Rust benchmarks (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cd rust-core
+          cargo bench --no-fail-fast -- --save-baseline main
+
+      - name: Run Rust benchmarks (workflow dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          cd rust-core
+          cargo bench --no-fail-fast
+
+      - name: Upload Criterion results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-criterion-results
+          path: rust-core/target/criterion/
+          retention-days: 30
+
+      - name: Find baseline comparison
+        if: github.event_name == 'pull_request'
+        id: baseline_check
+        run: |
+          cd rust-core/target/criterion
+          if [ -d "*/base" ] && [ -d "*/new" ]; then
+            echo "has_comparison=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_comparison=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Comment PR with benchmark results
+        if: github.event_name == 'pull_request' && steps.baseline_check.outputs.has_comparison == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            let comment = '## 📊 Benchmark Results\n\n';
+            comment += '### Rust Benchmarks (Criterion)\n\n';
+
+            // Parse criterion output (simplified)
+            const criterionDir = 'rust-core/target/criterion';
+            comment += `Criterion results saved. Check the artifacts for detailed reports.\n\n`;
+            comment += `📈 [Download Criterion Reports](${context.payload.pull_request.html_url}/checks)\n`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  swift-benchmarks:
+    name: Swift Performance Tests
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust-core/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust core
+        run: |
+          cd rust-core
+          cargo build --release
+
+      - name: Run Swift performance tests
+        run: |
+          swift test --filter Performance 2>&1 | tee swift_perf_results.txt
+        continue-on-error: true
+
+      - name: Upload Swift performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swift-performance-results
+          path: swift_perf_results.txt
+          retention-days: 30
+
+      - name: Extract performance metrics
+        id: extract_metrics
+        run: |
+          if [ -f swift_perf_results.txt ]; then
+            # Extract test results
+            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt || true)
+            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt || true)
+            # Set default to 0 if empty
+            PASSED=${PASSED:-0}
+            FAILED=${FAILED:-0}
+            echo "passed=${PASSED}" >> "$GITHUB_OUTPUT"
+            echo "failed=${FAILED}" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=0" >> "$GITHUB_OUTPUT"
+            echo "failed=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment PR with Swift results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = '${{ steps.extract_metrics.outputs.passed }}';
+            const failed = '${{ steps.extract_metrics.outputs.failed }}';
+
+            let comment = '## 🚀 Swift Performance Test Results\n\n';
+            comment += `- ✅ Passed: ${passed}\n`;
+            comment += `- ❌ Failed: ${failed}\n\n`;
+            comment += '📈 [Download Full Results](${context.payload.pull_request.html_url}/checks)\n';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  benchmark-summary:
+    name: Benchmark Summary
+    runs-on: macos-latest
+    needs: [rust-benchmarks, swift-benchmarks]
+    if: always()
+
+    steps:
+      - name: Download Rust results
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-criterion-results
+          path: rust-results
+        continue-on-error: true
+
+      - name: Download Swift results
+        uses: actions/download-artifact@v4
+        with:
+          name: swift-performance-results
+          path: swift-results
+        continue-on-error: true
+
+      - name: Create summary
+        run: |
+          echo "## Benchmark Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Rust benchmarks: ${{ needs.rust-benchmarks.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Swift performance tests: ${{ needs.swift-benchmarks.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All artifacts have been uploaded for detailed analysis." >> $GITHUB_STEP_SUMMARY
