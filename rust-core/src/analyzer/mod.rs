@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_disk_analyzer_with_custom_home() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
         let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf());
 
         assert_eq!(analyzer.home_path, temp.path());
@@ -226,19 +226,22 @@ mod tests {
         let result = analyzer.get_disk_space();
 
         assert!(result.is_ok());
-        let space = result.unwrap();
+        let space = result.expect("Failed to get disk space");
         assert!(space.total_bytes > 0);
         assert!(space.available_bytes > 0);
     }
 
     #[test]
     fn test_home_directory_analysis() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
 
         // Create some test directories
-        std::fs::create_dir(temp.path().join("Documents")).unwrap();
-        std::fs::create_dir(temp.path().join("Downloads")).unwrap();
-        std::fs::write(temp.path().join("Documents/test.txt"), "hello").unwrap();
+        std::fs::create_dir(temp.path().join("Documents"))
+            .expect("Failed to create Documents dir");
+        std::fs::create_dir(temp.path().join("Downloads"))
+            .expect("Failed to create Downloads dir");
+        std::fs::write(temp.path().join("Documents/test.txt"), "hello")
+            .expect("Failed to write test.txt");
 
         let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf());
         let dirs = analyzer.analyze_home_directory(10);
@@ -248,14 +251,15 @@ mod tests {
 
     #[test]
     fn test_cleanable_estimation() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
 
         // Create Library/Caches structure
         let caches_path = temp.path().join("Library/Caches");
-        std::fs::create_dir_all(&caches_path).unwrap();
+        std::fs::create_dir_all(&caches_path).expect("Failed to create Caches directory");
         let app_cache = caches_path.join("com.test.app");
-        std::fs::create_dir(&app_cache).unwrap();
-        std::fs::write(app_cache.join("cache.dat"), "test cache data").unwrap();
+        std::fs::create_dir(&app_cache).expect("Failed to create app cache dir");
+        std::fs::write(app_cache.join("cache.dat"), "test cache data")
+            .expect("Failed to write cache.dat");
 
         let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf());
         let cleanable = analyzer.estimate_cleanable();
