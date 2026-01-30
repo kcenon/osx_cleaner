@@ -86,10 +86,23 @@ impl AppNameCache {
     fn get_or_lookup(&self, bundle_id: &str) -> Option<String> {
         // Check cache first (read lock)
         {
-            let cache = self.cache.read().unwrap();
-            if let Some(entry) = cache.get(bundle_id) {
-                if entry.expires_at > Instant::now() {
-                    return entry.value.clone();
+            match self.cache.read() {
+                Ok(cache) => {
+                    if let Some(entry) = cache.get(bundle_id) {
+                        if entry.expires_at > Instant::now() {
+                            return entry.value.clone();
+                        }
+                    }
+                }
+                Err(poisoned) => {
+                    log::warn!("Cache read lock poisoned, recovering: {}", poisoned);
+                    // Recover from poison and continue
+                    let cache = poisoned.into_inner();
+                    if let Some(entry) = cache.get(bundle_id) {
+                        if entry.expires_at > Instant::now() {
+                            return entry.value.clone();
+                        }
+                    }
                 }
             }
         }
@@ -99,14 +112,29 @@ impl AppNameCache {
 
         // Store in cache (write lock)
         {
-            let mut cache = self.cache.write().unwrap();
-            cache.insert(
-                bundle_id.to_string(),
-                CacheEntry {
-                    value: result.clone(),
-                    expires_at: Instant::now() + self.ttl,
-                },
-            );
+            match self.cache.write() {
+                Ok(mut cache) => {
+                    cache.insert(
+                        bundle_id.to_string(),
+                        CacheEntry {
+                            value: result.clone(),
+                            expires_at: Instant::now() + self.ttl,
+                        },
+                    );
+                }
+                Err(poisoned) => {
+                    log::warn!("Cache write lock poisoned, recovering: {}", poisoned);
+                    // Recover from poison and continue
+                    let mut cache = poisoned.into_inner();
+                    cache.insert(
+                        bundle_id.to_string(),
+                        CacheEntry {
+                            value: result.clone(),
+                            expires_at: Instant::now() + self.ttl,
+                        },
+                    );
+                }
+            }
         }
 
         result
@@ -151,9 +179,18 @@ impl AppNameCache {
     /// Clear expired cache entries
     #[allow(dead_code)]
     fn clear_expired(&self) {
-        let mut cache = self.cache.write().unwrap();
-        let now = Instant::now();
-        cache.retain(|_, entry| entry.expires_at > now);
+        match self.cache.write() {
+            Ok(mut cache) => {
+                let now = Instant::now();
+                cache.retain(|_, entry| entry.expires_at > now);
+            }
+            Err(poisoned) => {
+                log::warn!("Cache write lock poisoned while clearing, recovering: {}", poisoned);
+                let mut cache = poisoned.into_inner();
+                let now = Instant::now();
+                cache.retain(|_, entry| entry.expires_at > now);
+            }
+        }
     }
 }
 

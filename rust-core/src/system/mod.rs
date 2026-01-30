@@ -20,7 +20,7 @@ pub use paths::{CleanupMethod, SpecialTarget, VersionPaths};
 pub use version::{known_versions, Version};
 
 use serde::{Deserialize, Serialize};
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::process::Command;
 use std::ptr;
@@ -138,8 +138,11 @@ impl Default for SystemInfo {
 pub extern "C" fn osx_system_info() -> *mut c_char {
     let info = SystemInfo::detect();
     match serde_json::to_string(&info) {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
-        Err(_) => ptr::null_mut(),
+        Ok(json) => crate::safe_cstring_or_null(json),
+        Err(e) => {
+            log::error!("Failed to serialize system info: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -150,7 +153,7 @@ pub extern "C" fn osx_system_info() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn osx_macos_version() -> *mut c_char {
     let version = Version::detect().unwrap_or_default();
-    CString::new(version.to_string()).unwrap().into_raw()
+    crate::safe_cstring_or_null(version.to_string())
 }
 
 /// Get macOS codename (e.g., "Sequoia")
@@ -160,7 +163,7 @@ pub extern "C" fn osx_macos_version() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn osx_macos_codename() -> *mut c_char {
     let version = Version::detect().unwrap_or_default();
-    CString::new(version.codename()).unwrap().into_raw()
+    crate::safe_cstring_or_null(version.codename())
 }
 
 /// Get CPU architecture (0=AppleSilicon, 1=Intel, 2=Unknown)
@@ -211,8 +214,11 @@ pub extern "C" fn osx_version_specific_paths() -> *mut c_char {
     let paths = VersionPaths::for_version(&version);
 
     match serde_json::to_string(&paths) {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
-        Err(_) => ptr::null_mut(),
+        Ok(json) => crate::safe_cstring_or_null(json),
+        Err(e) => {
+            log::error!("Failed to serialize version paths: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -227,8 +233,11 @@ pub extern "C" fn osx_special_targets() -> *mut c_char {
     let targets: Vec<&SpecialTarget> = paths.targets_for_version(&version);
 
     match serde_json::to_string(&targets) {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
-        Err(_) => ptr::null_mut(),
+        Ok(json) => crate::safe_cstring_or_null(json),
+        Err(e) => {
+            log::error!("Failed to serialize special targets: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 

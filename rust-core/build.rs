@@ -5,11 +5,13 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let crate_dir = env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR not set - required for build");
     let output_dir = PathBuf::from(&crate_dir).join("..").join("include");
 
     // Create output directory if it doesn't exist
-    std::fs::create_dir_all(&output_dir).unwrap();
+    std::fs::create_dir_all(&output_dir)
+        .expect("Failed to create output directory for C headers");
 
     // Generate C header
     let config =
