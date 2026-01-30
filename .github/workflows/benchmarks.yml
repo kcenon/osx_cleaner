@@ -151,13 +151,16 @@ jobs:
         run: |
           if [ -f swift_perf_results.txt ]; then
             # Extract test results
-            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt || echo "0")
-            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt || echo "0")
-            echo "passed=$PASSED" >> $GITHUB_OUTPUT
-            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt || true)
+            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt || true)
+            # Set default to 0 if empty
+            PASSED=${PASSED:-0}
+            FAILED=${FAILED:-0}
+            echo "passed=${PASSED}" >> "$GITHUB_OUTPUT"
+            echo "failed=${FAILED}" >> "$GITHUB_OUTPUT"
           else
-            echo "passed=0" >> $GITHUB_OUTPUT
-            echo "failed=0" >> $GITHUB_OUTPUT
+            echo "passed=0" >> "$GITHUB_OUTPUT"
+            echo "failed=0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Comment PR with Swift results
