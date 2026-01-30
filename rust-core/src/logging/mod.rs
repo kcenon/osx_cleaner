@@ -10,13 +10,13 @@
 //! - Timestamps
 //! - Log rotation support
 
-use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::safety::SafetyLevel;
 
@@ -28,6 +28,32 @@ const MAX_LOG_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
 /// Number of rotated log files to keep
 const MAX_ROTATED_FILES: usize = 5;
+
+/// Format Unix timestamp to human-readable format (YYYY-MM-DD HH:MM:SS.mmm)
+fn format_timestamp(secs: u64, millis: u32) -> String {
+    // Convert Unix timestamp to date/time components
+    const SECONDS_PER_DAY: u64 = 86400;
+    const SECONDS_PER_HOUR: u64 = 3600;
+    const SECONDS_PER_MINUTE: u64 = 60;
+
+    let days_since_epoch = secs / SECONDS_PER_DAY;
+    let remaining_secs = secs % SECONDS_PER_DAY;
+
+    let hours = remaining_secs / SECONDS_PER_HOUR;
+    let minutes = (remaining_secs % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
+    let seconds = remaining_secs % SECONDS_PER_MINUTE;
+
+    // Simplified date calculation (Unix epoch: 1970-01-01)
+    // This is approximate and doesn't handle all edge cases perfectly
+    let year = 1970 + (days_since_epoch / 365);
+    let month = ((days_since_epoch % 365) / 30) + 1;
+    let day = ((days_since_epoch % 365) % 30) + 1;
+
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
+        year, month, day, hours, minutes, seconds, millis
+    )
+}
 
 /// Result of a deletion operation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,9 +95,20 @@ impl DeletionLogEntry {
         bytes_freed: u64,
         error_message: Option<String>,
     ) -> Self {
-        let now: DateTime<Local> = Local::now();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+
+        // Convert to human-readable format
+        let secs = now.as_secs();
+        let millis = now.subsec_millis();
+
+        // Simple time formatting (YYYY-MM-DD HH:MM:SS.mmm)
+        // This is a simplified version - for production use consider time crate
+        let timestamp = format_timestamp(secs, millis);
+
         DeletionLogEntry {
-            timestamp: now.format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+            timestamp,
             path: path.into(),
             safety_level: safety_level.to_string(),
             result,

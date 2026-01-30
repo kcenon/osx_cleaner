@@ -32,12 +32,6 @@ env_logger = "0.10"
 # System information
 sysinfo = "0.30"
 
-# Date/time handling
-chrono = "0.4"
-
-# Regex for pattern matching
-regex = "1.10"
-
 # Glob pattern matching
 glob = "0.3"
 
