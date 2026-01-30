@@ -37,9 +37,7 @@ impl FFIResult {
         FFIResult {
             success: true,
             error_message: ptr::null_mut(),
-            data: data
-                .map(|s| Self::safe_cstring(s))
-                .unwrap_or(ptr::null_mut()),
+            data: data.map(Self::safe_cstring).unwrap_or(ptr::null_mut()),
         }
     }
 
