@@ -37,40 +37,47 @@ impl FFIResult {
         FFIResult {
             success: true,
             error_message: ptr::null_mut(),
-            data: data
-                .map(|s| {
-                    CString::new(s)
-                        .unwrap_or_else(|e| {
-                            log::error!(
-                            "FFI string conversion failed (NUL at position {}): returning empty",
-                            e.nul_position()
-                        );
-                            CString::new("").unwrap() // Safe: empty string has no NUL
-                        })
-                        .into_raw()
-                })
-                .unwrap_or(ptr::null_mut()),
+            data: data.map(Self::safe_cstring).unwrap_or(ptr::null_mut()),
         }
     }
 
     pub fn err(message: String) -> Self {
-        let error_message = CString::new(message.clone())
-            .unwrap_or_else(|e| {
-                log::error!(
-                    "FFI error message conversion failed (NUL at position {}): returning sanitized",
-                    e.nul_position()
-                );
-                let sanitized: String = message.chars().filter(|&c| c != '\0').collect();
-                CString::new(sanitized).unwrap() // Safe: NUL bytes removed
-            })
-            .into_raw();
-
         FFIResult {
             success: false,
-            error_message,
+            error_message: Self::safe_cstring(message),
             data: ptr::null_mut(),
         }
     }
+
+    /// Safely convert a Rust string to a C string pointer, handling NUL bytes
+    fn safe_cstring(s: String) -> *mut c_char {
+        CString::new(s.clone())
+            .unwrap_or_else(|e| {
+                log::error!(
+                    "FFI string conversion failed (NUL at position {}): sanitizing string",
+                    e.nul_position()
+                );
+                let sanitized: String = s.chars().filter(|&c| c != '\0').collect();
+                // Safe: NUL bytes have been removed
+                CString::new(sanitized).expect("sanitized string should not contain NUL bytes")
+            })
+            .into_raw()
+    }
+}
+
+/// Helper function to safely convert any string to a C string pointer
+/// Returns null pointer if conversion fails.
+pub(crate) fn safe_cstring_or_null(s: impl Into<String>) -> *mut c_char {
+    let string = s.into();
+    CString::new(string.clone())
+        .map(|cs| cs.into_raw())
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "C string conversion failed (NUL at position {}): returning null",
+                e.nul_position()
+            );
+            ptr::null_mut()
+        })
 }
 
 /// Initialize the Rust core library
@@ -89,15 +96,7 @@ pub extern "C" fn osx_core_init() -> bool {
 #[no_mangle]
 pub extern "C" fn osx_core_version() -> *mut c_char {
     let version = env!("CARGO_PKG_VERSION");
-    CString::new(version)
-        .unwrap_or_else(|e| {
-            log::error!(
-                "Version string conversion failed (NUL at position {}): returning fallback",
-                e.nul_position()
-            );
-            CString::new("unknown").unwrap() // Safe: "unknown" has no NUL
-        })
-        .into_raw()
+    safe_cstring_or_null(version)
 }
 
 /// Analyzes the specified path for cleanup opportunities.
@@ -1524,15 +1523,15 @@ mod tests {
 
     #[test]
     fn test_ffi_result_with_nul_byte() {
-        // Test that FFIResult::ok handles NUL bytes gracefully
+        // Test that FFIResult::ok handles NUL bytes gracefully by sanitizing them
         let data_with_nul = "hello\0world".to_string();
         let result = FFIResult::ok(Some(data_with_nul));
         assert!(result.success);
         assert!(!result.data.is_null());
-        // Should return empty string instead of panicking
+        // Should return sanitized string with NUL bytes removed
         unsafe {
             let data_str = CStr::from_ptr(result.data).to_str().unwrap();
-            assert_eq!(data_str, "");
+            assert_eq!(data_str, "helloworld"); // NUL byte removed
             osx_free_string(result.data);
         }
     }
