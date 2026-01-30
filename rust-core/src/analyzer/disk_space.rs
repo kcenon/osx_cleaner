@@ -150,7 +150,7 @@ mod tests {
         let result = get_disk_space(Path::new("/"));
 
         assert!(result.is_ok());
-        let space = result.unwrap();
+        let space = result.expect("Failed to get disk space");
 
         assert!(space.total_bytes > 0);
         assert!(space.available_bytes > 0);

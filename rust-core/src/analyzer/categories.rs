@@ -404,16 +404,18 @@ mod tests {
 
     #[test]
     fn test_analyze_home_directory() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
 
         // Create test directories
-        fs::create_dir(temp.path().join("Documents")).unwrap();
-        fs::create_dir(temp.path().join("Downloads")).unwrap();
-        fs::create_dir(temp.path().join(".hidden")).unwrap();
+        fs::create_dir(temp.path().join("Documents")).expect("Failed to create Documents dir");
+        fs::create_dir(temp.path().join("Downloads")).expect("Failed to create Downloads dir");
+        fs::create_dir(temp.path().join(".hidden")).expect("Failed to create .hidden dir");
 
         // Add some files
-        fs::write(temp.path().join("Documents/test.txt"), "hello").unwrap();
-        fs::write(temp.path().join("Downloads/big_file.zip"), "x".repeat(1000)).unwrap();
+        fs::write(temp.path().join("Documents/test.txt"), "hello")
+            .expect("Failed to write test.txt");
+        fs::write(temp.path().join("Downloads/big_file.zip"), "x".repeat(1000))
+            .expect("Failed to write big_file.zip");
 
         let dirs = analyze_home_directory(temp.path(), 10);
 
@@ -424,18 +426,20 @@ mod tests {
 
     #[test]
     fn test_analyze_caches() {
-        let temp = tempdir().unwrap();
+        let temp = tempdir().expect("Failed to create temp directory");
         let caches = temp.path().join("Library/Caches");
-        fs::create_dir_all(&caches).unwrap();
+        fs::create_dir_all(&caches).expect("Failed to create Caches directory");
 
         // Create test cache directories
         let safari_cache = caches.join("com.apple.Safari");
-        fs::create_dir(&safari_cache).unwrap();
-        fs::write(safari_cache.join("cache.db"), "test data").unwrap();
+        fs::create_dir(&safari_cache).expect("Failed to create Safari cache dir");
+        fs::write(safari_cache.join("cache.db"), "test data")
+            .expect("Failed to write Safari cache.db");
 
         let chrome_cache = caches.join("com.google.Chrome");
-        fs::create_dir(&chrome_cache).unwrap();
-        fs::write(chrome_cache.join("data"), "x".repeat(100)).unwrap();
+        fs::create_dir(&chrome_cache).expect("Failed to create Chrome cache dir");
+        fs::write(chrome_cache.join("data"), "x".repeat(100))
+            .expect("Failed to write Chrome cache data");
 
         let result = analyze_caches(&caches);
 
@@ -470,9 +474,9 @@ mod tests {
 
     #[test]
     fn test_calculate_dir_size() {
-        let temp = tempdir().unwrap();
-        fs::write(temp.path().join("a.txt"), "hello").unwrap(); // 5 bytes
-        fs::write(temp.path().join("b.txt"), "world!").unwrap(); // 6 bytes
+        let temp = tempdir().expect("Failed to create temp directory");
+        fs::write(temp.path().join("a.txt"), "hello").expect("Failed to write a.txt");
+        fs::write(temp.path().join("b.txt"), "world!").expect("Failed to write b.txt");
 
         let size = calculate_dir_size(temp.path());
         assert_eq!(size, 11);
