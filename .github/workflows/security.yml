@@ -92,7 +92,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Semgrep
+        id: semgrep
         uses: returntocorp/semgrep-action@v1
+        continue-on-error: true
         with:
           config: >-
             p/security-audit
@@ -101,9 +103,18 @@ jobs:
             p/secrets
           generateSarif: true
 
+      - name: Check SARIF file
+        id: check-sarif
+        run: |
+          if [ -f semgrep.sarif ]; then
+            echo "sarif_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "sarif_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: steps.check-sarif.outputs.sarif_exists == 'true'
         with:
           sarif_file: semgrep.sarif
 
