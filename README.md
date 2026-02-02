@@ -7,6 +7,7 @@
 [![Status](https://img.shields.io/badge/Status-Development-orange.svg)]()
 [![codecov](https://codecov.io/gh/kcenon/osx_cleaner/branch/main/graph/badge.svg)](https://codecov.io/gh/kcenon/osx_cleaner)
 [![CI](https://github.com/kcenon/osx_cleaner/workflows/CI/badge.svg)](https://github.com/kcenon/osx_cleaner/actions)
+[![Security](https://github.com/kcenon/osx_cleaner/workflows/Security%20Scanning/badge.svg)](https://github.com/kcenon/osx_cleaner/actions/workflows/security.yml)
 
 ---
 
@@ -641,6 +642,47 @@ osxcleaner/
   - YAML-based team configuration
   - Shared cleanup policies
   - Remote configuration sync
+
+---
+
+## Security
+
+OSX Cleaner takes security seriously. We use comprehensive automated security scanning to protect users and maintain code quality.
+
+### Security Scanning
+
+| Scanner | Purpose | Frequency |
+|---------|---------|-----------|
+| **cargo-audit** | Rust dependency vulnerability audits | Daily + Every push |
+| **cargo-deny** | License compliance & banned dependencies | Every push/PR |
+| **Semgrep** | Static Application Security Testing (SAST) | Every push/PR |
+| **Gitleaks** | Secret detection in commits | Every push/PR |
+| **SwiftLint** | Security-focused linting for Swift | Every push/PR |
+| **Dependabot** | Automated dependency updates | Weekly |
+
+### CI/CD Security Standards
+
+The build pipeline fails if:
+
+- ❌ Any known vulnerability in dependencies (cargo-audit)
+- ❌ GPL/AGPL licensed or yanked crates (cargo-deny)
+- ❌ High/Critical security findings (Semgrep)
+- ❌ Secrets detected in commits (Gitleaks)
+- ❌ Security rule violations in Swift (SwiftLint)
+
+### Security Features
+
+- **Memory-safe Rust core**: Core logic implemented in Rust for memory safety
+- **Safe FFI boundary**: Validated data passing between Rust and Swift
+- **Input validation**: Comprehensive path and argument validation
+- **Protected paths**: System-critical paths are never modified
+- **Cloud storage detection**: Safe identification without modification
+
+### Reporting Vulnerabilities
+
+Please report security vulnerabilities to **security@kcenon.com**. Do not open public issues for security concerns.
+
+See [SECURITY.md](SECURITY.md) for detailed security policy and reporting guidelines.
 
 ---
 

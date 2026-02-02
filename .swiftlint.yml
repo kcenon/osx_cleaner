@@ -34,6 +34,18 @@ opt_in_rules:
   - unused_declaration
   - vertical_parameter_alignment_on_call
   - yoda_condition
+  # Security-focused rules
+  - explicit_init
+  - file_header
+  - force_try
+  - legacy_hashing
+  - nslocalizedstring_key
+  - nslocalizedstring_require_bundle
+  - private_over_fileprivate
+  - strict_fileprivate
+  - unneeded_parentheses_in_closure_argument
+  - weak_delegate
+  - xct_specific_matcher
 
 # Rule configurations
 line_length:
@@ -99,6 +111,37 @@ trailing_whitespace:
 
 vertical_whitespace:
   max_empty_lines: 2
+
+# Custom security rules
+custom_rules:
+  # Detect hardcoded secrets or sensitive data
+  hardcoded_secrets:
+    name: "Hardcoded Secrets"
+    regex: '(?i)(password|secret|token|api[_-]?key|apikey|private[_-]?key)\s*=\s*"[^"]{8,}"'
+    message: "Avoid hardcoding secrets, passwords, or API keys in source code"
+    severity: error
+    match_kinds: string
+
+  # Detect unsafe shell command execution
+  shell_injection:
+    name: "Potential Shell Injection"
+    regex: 'Process\(\)\.run\(|system\(|popen\('
+    message: "Potential shell injection vulnerability - validate inputs carefully"
+    severity: warning
+
+  # Detect unsafe force casting
+  unsafe_force_cast:
+    name: "Unsafe Force Cast in Critical Code"
+    regex: 'as!\s*\w+'
+    message: "Force casting can cause runtime crashes - use optional binding instead"
+    severity: warning
+
+  # Detect direct file path construction without validation
+  unsafe_path_construction:
+    name: "Unsafe Path Construction"
+    regex: '"\\/[^"]*"\s*\+|String\(format:\s*"\/[^"]*"'
+    message: "Validate and sanitize file paths to prevent directory traversal"
+    severity: warning
 
 # Reporter type (xcode, json, csv, checkstyle, junit, html, emoji, sonarqube, markdown, github-actions-logging)
 reporter: "xcode"

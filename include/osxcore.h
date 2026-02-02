@@ -689,7 +689,7 @@ char *osx_special_targets(void);
 bool osx_has_known_bug(const char *bug_name);
 
 #ifdef __cplusplus
-} // extern "C"
-#endif // __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
-#endif /* OSXCORE_H */
+#endif  /* OSXCORE_H */

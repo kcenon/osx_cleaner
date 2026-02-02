@@ -1,0 +1,47 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# The path where the advisory databases are cloned/fetched into
+db-path = "~/.cargo/advisory-dbs"
+# The url(s) of the advisory databases to use
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Check unmaintained crates: all = check all, workspace = only workspace, transitive = transitive deps, none = skip
+unmaintained = "all"
+# Deny crates that have been yanked from crates.io
+yanked = "deny"
+# Ignore specific advisories (use sparingly)
+ignore = []
+
+[licenses]
+# Allow these licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "MPL-2.0",
+]
+# Default confidence threshold for license detection
+confidence-threshold = 0.8
+
+[bans]
+# Warn about multiple versions of the same crate
+multiple-versions = "warn"
+# Deny wildcard dependencies (e.g., "*" or ">=1.0")
+wildcards = "deny"
+# Allow multiple versions for these crates (they change frequently)
+skip = []
+# Allow specific duplicate versions with justification
+skip-tree = []
+
+[sources]
+# Deny crates from unknown registries
+unknown-registry = "deny"
+# Deny crates from unknown git repositories
+unknown-git = "deny"
+# Allowed git sources (if needed)
+allow-git = []
