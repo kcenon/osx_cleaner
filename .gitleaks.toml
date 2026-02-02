@@ -1,0 +1,96 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "OSX Cleaner Secret Scanning"
+
+# AWS Access Key
+[[rules]]
+description = "AWS Access Key"
+id = "aws-access-key"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["key", "AWS"]
+
+# AWS Secret Key
+[[rules]]
+description = "AWS Secret Key"
+id = "aws-secret-key"
+regex = '''(?i)aws(.{0,20})?(?-i)['\"][0-9a-zA-Z\/+]{40}['\"]'''
+tags = ["key", "AWS"]
+
+# Private Keys
+[[rules]]
+description = "Private Key"
+id = "private-key"
+regex = '''-----BEGIN (RSA|OPENSSH|DSA|EC|PGP) PRIVATE KEY-----'''
+tags = ["key", "private"]
+
+# Generic API Key
+[[rules]]
+description = "Generic API Key"
+id = "generic-api-key"
+regex = '''(?i)(api[_-]?key|apikey)[^a-z0-9]*[=:]\s*['\"]?([a-z0-9_\-]{32,})['\"]?'''
+tags = ["api", "key"]
+
+# Generic Secret
+[[rules]]
+description = "Generic Secret"
+id = "generic-secret"
+regex = '''(?i)(secret|password|passwd|pwd)[^a-z0-9]*[=:]\s*['\"]?([a-z0-9_\-]{16,})['\"]?'''
+tags = ["secret"]
+
+# GitHub Token
+[[rules]]
+description = "GitHub Token"
+id = "github-token"
+regex = '''ghp_[0-9a-zA-Z]{36}'''
+tags = ["key", "GitHub"]
+
+# GitHub OAuth
+[[rules]]
+description = "GitHub OAuth"
+id = "github-oauth"
+regex = '''gho_[0-9a-zA-Z]{36}'''
+tags = ["key", "GitHub"]
+
+# Slack Token
+[[rules]]
+description = "Slack Token"
+id = "slack-token"
+regex = '''xox[baprs]-([0-9a-zA-Z]{10,48})'''
+tags = ["key", "Slack"]
+
+# Slack Webhook
+[[rules]]
+description = "Slack Webhook"
+id = "slack-webhook"
+regex = '''https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}'''
+tags = ["webhook", "Slack"]
+
+# JWT Token
+[[rules]]
+description = "JWT Token"
+id = "jwt-token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*'''
+tags = ["token", "JWT"]
+
+# Allowlist
+[allowlist]
+# Allow false positives in these paths
+paths = [
+    '''.swiftlint.yml''',
+    '''.github/workflows/''',
+    '''Tests/''',
+    '''rust-core/tests/''',
+    '''docs/''',
+    '''.gitleaks.toml''',  # This file contains example patterns
+]
+
+# Allow these regexes (known false positives)
+regexes = [
+    '''test[_-]?key''',
+    '''example[_-]?secret''',
+    '''dummy[_-]?token''',
+]
+
+# Allow commits before this date (useful for initial scan)
+# commitBeforeDate = "2025-01-01T00:00:00Z"
