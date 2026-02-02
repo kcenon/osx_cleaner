@@ -170,7 +170,7 @@ jobs:
         with:
           files: ./coverage-swift.lcov
           flags: swift
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload Rust coverage to Codecov
@@ -178,12 +178,12 @@ jobs:
         with:
           files: ./coverage-rust.lcov
           flags: rust
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload combined coverage report
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage-swift.lcov,./coverage-rust.lcov
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
