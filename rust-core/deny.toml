@@ -1,0 +1,60 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# Deny crates with known security vulnerabilities
+vulnerability = "deny"
+# Warn about unmaintained crates
+unmaintained = "warn"
+# Deny crates that have been yanked from crates.io
+yanked = "deny"
+# Warn about security notices
+notice = "warn"
+# Ignore specific advisories (use sparingly)
+ignore = []
+
+[licenses]
+# Deny packages without a license
+unlicensed = "deny"
+# Allow these licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+]
+# Deny these licenses (copyleft licenses that may cause issues)
+deny = [
+    "GPL-3.0",
+    "AGPL-3.0",
+]
+# Warn about these licenses (review required)
+copyleft = "warn"
+# Allow OSI-approved or FSF Free/Libre licenses
+allow-osi-fsf-free = "neither"
+# Default confidence threshold for license detection
+confidence-threshold = 0.8
+
+[bans]
+# Warn about multiple versions of the same crate
+multiple-versions = "warn"
+# Deny wildcard dependencies (e.g., "*" or ">=1.0")
+wildcards = "deny"
+# Allow multiple versions for these crates (they change frequently)
+skip = []
+# Allow specific duplicate versions with justification
+skip-tree = []
+
+[sources]
+# Deny crates from unknown registries
+unknown-registry = "deny"
+# Deny crates from unknown git repositories
+unknown-git = "deny"
+# Allowed git sources (if needed)
+allow-git = []
+# Allow crates from these registries
+[sources.allow-org]
+# Allow crates from crates.io
+github = []
