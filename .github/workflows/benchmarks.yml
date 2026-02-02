@@ -243,14 +243,23 @@ jobs:
         id: extract_metrics
         run: |
           if [ -f swift_perf_results.txt ]; then
-            # Extract test results
-            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt || echo "0")
-            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt || echo "0")
+            # Extract test results using subshell to ensure clean single-line output
+            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt 2>/dev/null) || PASSED=0
+            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt 2>/dev/null) || FAILED=0
+            # Ensure numeric values by stripping any whitespace
+            PASSED=$(echo "$PASSED" | tr -d '[:space:]')
+            FAILED=$(echo "$FAILED" | tr -d '[:space:]')
+            PASSED=${PASSED:-0}
+            FAILED=${FAILED:-0}
             TOTAL=$((PASSED + FAILED))
 
             # Extract SLO test results
-            SLO_PASSED=$(grep -c "testSLO.*passed" swift_perf_results.txt || echo "0")
-            SLO_FAILED=$(grep -c "testSLO.*failed" swift_perf_results.txt || echo "0")
+            SLO_PASSED=$(grep -c "testSLO.*passed" swift_perf_results.txt 2>/dev/null) || SLO_PASSED=0
+            SLO_FAILED=$(grep -c "testSLO.*failed" swift_perf_results.txt 2>/dev/null) || SLO_FAILED=0
+            SLO_PASSED=$(echo "$SLO_PASSED" | tr -d '[:space:]')
+            SLO_FAILED=$(echo "$SLO_FAILED" | tr -d '[:space:]')
+            SLO_PASSED=${SLO_PASSED:-0}
+            SLO_FAILED=${SLO_FAILED:-0}
 
             echo "passed=${PASSED}" >> "$GITHUB_OUTPUT"
             echo "failed=${FAILED}" >> "$GITHUB_OUTPUT"
