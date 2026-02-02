@@ -45,10 +45,14 @@ final class FileOperationRetryTests: XCTestCase {
         // Should complete successfully (no file to remove)
         do {
             try await FileOperationRetry.remove(nonExistentFile, maxAttempts: 1)
-        } catch {
-            // Expected behavior - file not found
-            XCTAssertTrue(error.localizedDescription.contains("doesn't exist") ||
-                         error.localizedDescription.contains("No such file"))
+        } catch let error as NSError {
+            // Expected behavior - file not found (NSFileNoSuchFileError)
+            // Check error code instead of localized message for consistency across locales
+            XCTAssertTrue(
+                (error.domain == NSCocoaErrorDomain && error.code == 4) ||  // NSFileNoSuchFileError
+                (error.domain == NSPOSIXErrorDomain && error.code == Int(ENOENT)),  // POSIX ENOENT
+                "Expected file not found error, got: \(error)"
+            )
         }
     }
 
