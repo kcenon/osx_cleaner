@@ -208,7 +208,8 @@ public final class CleanerService: CleanerServiceProtocol {
         let size = try calculateSize(at: target.path)
 
         if !dryRun {
-            try fileManager.removeItem(atPath: target.path)
+            // Use FileOperationRetry for resilient file removal
+            try await FileOperationRetry.remove(target.path)
         }
 
         AppLogger.shared.info("Cleaned: \(target.path) (\(size) bytes)")
