@@ -1,0 +1,184 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 2 AM UTC (11 AM KST)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Rust dependency vulnerability scanning
+  cargo-audit:
+    name: Rust Dependency Audit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-audit-
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit Rust dependencies
+        working-directory: rust-core
+        run: |
+          cargo audit --deny warnings
+          cargo audit --json > ../audit-report.json
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cargo-audit-report
+          path: audit-report.json
+          retention-days: 30
+
+  # License compliance and banned dependencies
+  cargo-deny:
+    name: License & Dependency Compliance
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-deny-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-deny-
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check licenses and bans
+        working-directory: rust-core
+        run: cargo deny check
+
+  # SAST with Semgrep
+  semgrep:
+    name: SAST Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/swift
+            p/rust
+            p/secrets
+          generateSarif: true
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+  # Secret detection
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive secret scanning
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # SwiftLint security checks
+  swiftlint-security:
+    name: SwiftLint Security Rules
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint --strict --reporter json > swiftlint-report.json || true
+
+      - name: Check for security violations
+        run: |
+          if [ -f swiftlint-report.json ]; then
+            VIOLATIONS=$(jq '[.[] | select(.severity == "error")] | length' swiftlint-report.json)
+            if [ "$VIOLATIONS" -gt 0 ]; then
+              echo "Found $VIOLATIONS SwiftLint security violations"
+              jq '[.[] | select(.severity == "error")]' swiftlint-report.json
+              exit 1
+            fi
+          fi
+
+      - name: Upload SwiftLint report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swiftlint-report
+          path: swiftlint-report.json
+          retention-days: 30
+
+  # Security summary
+  security-summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [cargo-audit, cargo-deny, semgrep, secret-scan, swiftlint-security]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scanner | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Cargo Audit | ${{ needs.cargo-audit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cargo Deny | ${{ needs.cargo-deny.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep SAST | ${{ needs.semgrep.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SwiftLint Security | ${{ needs.swiftlint-security.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check overall security status
+        run: |
+          if [[ "${{ needs.cargo-audit.result }}" != "success" ]] || \
+             [[ "${{ needs.cargo-deny.result }}" != "success" ]] || \
+             [[ "${{ needs.semgrep.result }}" != "success" ]] || \
+             [[ "${{ needs.secret-scan.result }}" != "success" ]] || \
+             [[ "${{ needs.swiftlint-security.result }}" != "success" ]]; then
+            echo "Security scan failed - check individual job results"
+            exit 1
+          fi
