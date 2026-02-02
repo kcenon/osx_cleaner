@@ -15,13 +15,13 @@
 //! | Batch validation | <1ms | 100 paths |
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use std::hint::black_box;
 use osxcore::{
-    osx_analyze_path, osx_calculate_safety, osx_clean_path, osx_classify_path, osx_core_version,
+    osx_analyze_path, osx_calculate_safety, osx_classify_path, osx_clean_path, osx_core_version,
     osx_free_string, osx_get_disk_space, osx_is_protected, osx_validate_batch, FFIResult,
 };
 use std::ffi::CString;
 use std::fs::{self, File};
+use std::hint::black_box;
 use std::io::Write;
 use std::path::Path;
 use tempfile::TempDir;
@@ -37,8 +37,7 @@ fn create_test_files(temp_dir: &Path, count: usize) {
 
     for i in 0..count {
         let file_path = cache_dir.join(format!("cache_file_{}.tmp", i));
-        let mut file =
-            File::create(&file_path).expect("Failed to create test file for benchmark");
+        let mut file = File::create(&file_path).expect("Failed to create test file for benchmark");
         write!(file, "Cache data for file {}", i).expect("Failed to write test file content");
     }
 }
@@ -262,8 +261,7 @@ fn bench_ffi_validate_batch(c: &mut Criterion) {
 
     for count in [10, 50, 100].iter() {
         let paths = generate_test_paths(*count);
-        let paths_json =
-            serde_json::to_string(&paths).expect("Failed to serialize paths to JSON");
+        let paths_json = serde_json::to_string(&paths).expect("Failed to serialize paths to JSON");
         let paths_cstring = CString::new(paths_json).expect("Failed to create CString");
 
         group.bench_with_input(

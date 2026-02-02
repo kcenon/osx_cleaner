@@ -15,10 +15,10 @@
 //! | Memory usage | <100MB | Peak for 100K files |
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use std::hint::black_box;
 use osxcore::analyzer::DiskAnalyzer;
 use osxcore::{cleaner, scanner};
 use std::fs::{self, File};
+use std::hint::black_box;
 use std::io::Write;
 use std::path::Path;
 use tempfile::TempDir;
@@ -34,8 +34,7 @@ fn create_test_files(temp_dir: &Path, count: usize) {
 
     for i in 0..count {
         let file_path = cache_dir.join(format!("cache_file_{}.tmp", i));
-        let mut file =
-            File::create(&file_path).expect("Failed to create test file for benchmark");
+        let mut file = File::create(&file_path).expect("Failed to create test file for benchmark");
         // Write some data to make files realistic
         write!(file, "Cache data for file {}", i).expect("Failed to write test file content");
     }
@@ -48,8 +47,7 @@ fn create_varied_size_files(temp_dir: &Path, count: usize) {
 
     for i in 0..count {
         let file_path = cache_dir.join(format!("cache_file_{}.tmp", i));
-        let mut file =
-            File::create(&file_path).expect("Failed to create test file for benchmark");
+        let mut file = File::create(&file_path).expect("Failed to create test file for benchmark");
 
         // Vary file sizes: small (100B), medium (1KB), large (10KB)
         let size = match i % 3 {
@@ -229,18 +227,14 @@ fn bench_cleanup_dry_run(c: &mut Criterion) {
 
 /// Benchmark DiskAnalyzer creation
 fn bench_disk_analyzer_creation(c: &mut Criterion) {
-    c.bench_function("disk_analyzer_new", |b| {
-        b.iter(|| DiskAnalyzer::new())
-    });
+    c.bench_function("disk_analyzer_new", |b| b.iter(|| DiskAnalyzer::new()));
 }
 
 /// Benchmark disk space query
 fn bench_disk_space_query(c: &mut Criterion) {
     let analyzer = DiskAnalyzer::new();
 
-    c.bench_function("disk_space_query", |b| {
-        b.iter(|| analyzer.get_disk_space())
-    });
+    c.bench_function("disk_space_query", |b| b.iter(|| analyzer.get_disk_space()));
 }
 
 /// Benchmark home directory analysis
@@ -272,7 +266,11 @@ fn bench_cache_analysis(c: &mut Criterion) {
 
     // Create realistic cache structure
     let caches_dir = temp.path().join("Library/Caches");
-    for app in ["com.apple.Safari", "com.google.Chrome", "com.spotify.client"] {
+    for app in [
+        "com.apple.Safari",
+        "com.google.Chrome",
+        "com.spotify.client",
+    ] {
         let app_dir = caches_dir.join(app);
         fs::create_dir_all(&app_dir).expect("Failed to create app cache directory");
 
@@ -285,9 +283,7 @@ fn bench_cache_analysis(c: &mut Criterion) {
 
     let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf());
 
-    c.bench_function("cache_analysis", |b| {
-        b.iter(|| analyzer.analyze_caches())
-    });
+    c.bench_function("cache_analysis", |b| b.iter(|| analyzer.analyze_caches()));
 }
 
 /// Benchmark developer tools analysis
@@ -312,9 +308,7 @@ fn bench_full_analysis(c: &mut Criterion) {
 
     let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf());
 
-    c.bench_function("full_disk_analysis", |b| {
-        b.iter(|| analyzer.analyze())
-    });
+    c.bench_function("full_disk_analysis", |b| b.iter(|| analyzer.analyze()));
 }
 
 // =============================================================================
@@ -330,16 +324,12 @@ fn bench_parallelism_scaling(c: &mut Criterion) {
     create_test_files(temp.path(), 5000);
 
     for threads in [1, 2, 4, 8].iter() {
-        let analyzer = DiskAnalyzer::with_home_path(temp.path().to_path_buf())
-            .with_parallelism(*threads);
+        let analyzer =
+            DiskAnalyzer::with_home_path(temp.path().to_path_buf()).with_parallelism(*threads);
 
-        group.bench_with_input(
-            BenchmarkId::new("threads", threads),
-            threads,
-            |b, _| {
-                b.iter(|| analyzer.analyze_home_directory(10))
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("threads", threads), threads, |b, _| {
+            b.iter(|| analyzer.analyze_home_directory(10))
+        });
     }
 
     group.finish();
