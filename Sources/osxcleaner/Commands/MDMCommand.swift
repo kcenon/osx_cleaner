@@ -55,53 +55,10 @@ extension MDMCommand {
             let status = await mdmService.getStatus()
 
             if json {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                encoder.dateEncodingStrategy = .iso8601
-                let data = try encoder.encode(status)
-                print(String(data: data, encoding: .utf8) ?? "{}")
+                try OutputFormatter.printJSON(status)
             } else {
-                printStatus(status, progressView: progressView)
+                MDMOutputHelpers.printStatus(status, progressView: progressView)
             }
-        }
-
-        private func printStatus(_ status: MDMConnectionStatus, progressView: ProgressView) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-
-            progressView.display(message: "")
-            progressView.display(message: "═══════════════════════════════════════════════════════════")
-            progressView.display(message: "                    MDM CONNECTION STATUS                   ")
-            progressView.display(message: "═══════════════════════════════════════════════════════════")
-            progressView.display(message: "")
-
-            if let provider = status.provider {
-                progressView.display(message: "  Provider:        \(provider.displayName)")
-            } else {
-                progressView.display(message: "  Provider:        Not configured")
-            }
-
-            if let serverURL = status.serverURL {
-                progressView.display(message: "  Server URL:      \(serverURL)")
-            } else {
-                progressView.display(message: "  Server URL:      -")
-            }
-
-            let stateIcon = status.isConnected ? "✓" : "○"
-            let stateText = status.isConnected ? "Connected" : "Disconnected"
-            progressView.display(message: "  Status:          \(stateIcon) \(stateText)")
-
-            if let lastSync = status.lastSyncAt {
-                progressView.display(message: "  Last Sync:       \(formatter.string(from: lastSync))")
-            } else {
-                progressView.display(message: "  Last Sync:       Never")
-            }
-
-            progressView.display(message: "  Policies:        \(status.policiesCount)")
-            progressView.display(message: "  Pending Cmds:    \(status.pendingCommandsCount)")
-
-            progressView.display(message: "")
-            progressView.display(message: "═══════════════════════════════════════════════════════════")
         }
     }
 }
@@ -260,11 +217,7 @@ extension MDMCommand {
                 let policies = try await mdmService.syncPolicies()
 
                 if json {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    encoder.dateEncodingStrategy = .iso8601
-                    let data = try encoder.encode(policies)
-                    print(String(data: data, encoding: .utf8) ?? "[]")
+                    try OutputFormatter.printJSON(policies)
                 } else {
                     progressView.display(message: "")
                     progressView.displaySuccess("Synced \(policies.count) policies")
@@ -326,40 +279,9 @@ extension MDMCommand {
             }
 
             if json {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                encoder.dateEncodingStrategy = .iso8601
-                let data = try encoder.encode(policies)
-                print(String(data: data, encoding: .utf8) ?? "[]")
+                try OutputFormatter.printJSON(policies)
             } else {
-                progressView.display(message: "")
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
-                progressView.display(message: "                        MDM POLICIES                        ")
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
-                progressView.display(message: "")
-
-                if policies.isEmpty {
-                    progressView.display(message: "  No policies found")
-                } else {
-                    for policy in policies.sorted(by: { $0.priority > $1.priority }) {
-                        let statusIcon = policy.enabled ? "✓" : "○"
-                        progressView.display(message: "  \(statusIcon) \(policy.name)")
-                        progressView.display(message: "      ID: \(policy.id)")
-                        progressView.display(message: "      Version: \(policy.version)")
-                        progressView.display(message: "      Priority: \(policy.priority)")
-                        if !policy.targets.isEmpty {
-                            progressView.display(message: "      Targets: \(policy.targets.joined(separator: ", "))")
-                        }
-                        if let schedule = policy.schedule {
-                            progressView.display(message: "      Schedule: \(schedule)")
-                        }
-                        progressView.display(message: "")
-                    }
-                }
-
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
-                progressView.display(message: "  Total: \(policies.count) policies")
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
+                MDMOutputHelpers.printPolicies(policies, progressView: progressView)
             }
         }
     }
@@ -444,55 +366,9 @@ extension MDMCommand {
             }
 
             if json {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                encoder.dateEncodingStrategy = .iso8601
-                let data = try encoder.encode(complianceReport)
-                print(String(data: data, encoding: .utf8) ?? "{}")
+                try OutputFormatter.printJSON(complianceReport)
             } else {
-                progressView.display(message: "")
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
-                progressView.display(message: "                    COMPLIANCE STATUS                       ")
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
-                progressView.display(message: "")
-
-                let statusIcon: String
-                switch overallStatus {
-                case .compliant:
-                    statusIcon = "✓"
-                case .nonCompliant:
-                    statusIcon = "✗"
-                case .unknown:
-                    statusIcon = "?"
-                case .error:
-                    statusIcon = "!"
-                }
-
-                progressView.display(message: "  Overall Status:  \(statusIcon) \(overallStatus.rawValue.capitalized)")
-                progressView.display(message: "")
-                progressView.display(message: "  Policy Compliance:")
-
-                for policy in policyReports {
-                    let icon: String
-                    switch policy.status {
-                    case .compliant:
-                        icon = "✓"
-                    case .nonCompliant:
-                        icon = "✗"
-                    case .unknown:
-                        icon = "?"
-                    case .error:
-                        icon = "!"
-                    }
-
-                    progressView.display(message: "    \(icon) \(policy.policyName)")
-                    for issue in policy.issues {
-                        progressView.display(message: "        - \(issue)")
-                    }
-                }
-
-                progressView.display(message: "")
-                progressView.display(message: "═══════════════════════════════════════════════════════════")
+                MDMOutputHelpers.printComplianceReport(complianceReport, progressView: progressView)
             }
         }
 
@@ -546,29 +422,12 @@ extension MDMCommand {
                 }
 
                 if json && !execute {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    encoder.dateEncodingStrategy = .iso8601
-                    let data = try encoder.encode(commands)
-                    print(String(data: data, encoding: .utf8) ?? "[]")
+                    try OutputFormatter.printJSON(commands)
                     return
                 }
 
                 if !execute {
-                    progressView.display(message: "")
-                    progressView.display(message: "Pending Commands (\(commands.count)):")
-                    progressView.display(message: "")
-
-                    for command in commands.sorted(by: { $0.priority > $1.priority }) {
-                        progressView.display(message: "  [\(command.priority)] \(command.type.rawValue)")
-                        progressView.display(message: "      ID: \(command.id)")
-                        if !command.parameters.isEmpty {
-                            progressView.display(message: "      Params: \(command.parameters)")
-                        }
-                        progressView.display(message: "")
-                    }
-
-                    progressView.display(message: "Use --execute to run these commands")
+                    MDMOutputHelpers.printCommands(commands, progressView: progressView)
                     return
                 }
 
@@ -592,10 +451,7 @@ extension MDMCommand {
                     try await mdmService.reportCommandResult(result)
                 }
 
-                progressView.display(message: "")
-
-                let successCount = results.filter { $0.success }.count
-                progressView.displaySuccess("Executed \(successCount)/\(commands.count) commands successfully")
+                MDMOutputHelpers.printCommandResults(results, progressView: progressView)
 
             } catch {
                 progressView.display(message: "✗ Failed: \(error.localizedDescription)")
