@@ -5,6 +5,8 @@
 [![macOS](https://img.shields.io/badge/macOS-10.15--15.x-blue.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Development-orange.svg)]()
+[![codecov](https://codecov.io/gh/kcenon/osx_cleaner/branch/main/graph/badge.svg)](https://codecov.io/gh/kcenon/osx_cleaner)
+[![CI](https://github.com/kcenon/osx_cleaner/workflows/CI/badge.svg)](https://github.com/kcenon/osx_cleaner/actions)
 
 ---
 

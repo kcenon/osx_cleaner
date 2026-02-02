@@ -139,13 +139,51 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-coverage-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-coverage-
+
+      - name: Build Rust core (required for Swift tests)
+        run: cd rust-core && cargo build --release
+
+      - name: Run Swift tests with coverage
+        run: swift test --enable-code-coverage
+
+      - name: Generate Swift coverage report
+        run: |
+          xcrun llvm-cov export --format=lcov \
+            --instr-profile=.build/debug/codecov/default.profdata \
+            .build/debug/osxcleanerPackageTests.xctest/Contents/MacOS/osxcleanerPackageTests \
+            > coverage-swift.lcov
+
       - name: Generate Rust coverage
         run: |
           cd rust-core
-          cargo llvm-cov --lcov --output-path lcov.info
+          cargo llvm-cov --all-features --lcov --output-path ../coverage-rust.lcov
 
-      - name: Upload coverage to Codecov
+      - name: Upload Swift coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: rust-core/lcov.info
+          files: ./coverage-swift.lcov
+          flags: swift
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload Rust coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage-rust.lcov
+          flags: rust
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload combined coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage-swift.lcov,./coverage-rust.lcov
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,0 +1,101 @@
+# Codecov Configuration
+# Test coverage tracking and enforcement for OSX Cleaner
+# See: https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    # Overall project coverage
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+        base: auto
+        if_ci_failed: error
+        informational: false
+
+    # Per-PR patch coverage
+    patch:
+      default:
+        target: 85%
+        threshold: 5%
+        base: auto
+        if_ci_failed: error
+        informational: false
+
+  # Files and directories to ignore in coverage calculations
+  ignore:
+    # Test files
+    - "Tests/**"
+    - "**/*Tests.swift"
+    - "**/*Test.swift"
+    - "rust-core/tests/**"
+    - "rust-core/benches/**"
+
+    # Build artifacts
+    - ".build/**"
+    - "target/**"
+    - "unified_system/**"
+
+    # Documentation
+    - "docs/**"
+    - "**/*.md"
+
+# PR comment configuration
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+# Flag-based coverage for different components
+flags:
+  swift:
+    paths:
+      - "Sources/**/*.swift"
+    carryforward: true
+
+  rust:
+    paths:
+      - "rust-core/src/**/*.rs"
+    carryforward: true
+
+# Component-specific coverage (optional, for future use)
+component_management:
+  individual_components:
+    # Critical services requiring ≥80% coverage
+    - component_id: cleaner_service
+      name: "CleanerService"
+      paths:
+        - "Sources/osxcleaner/Services/CleanerService.swift"
+
+    - component_id: analyzer_service
+      name: "AnalyzerService"
+      paths:
+        - "Sources/osxcleaner/Services/AnalyzerService.swift"
+
+    - component_id: rust_bridge
+      name: "RustBridge (FFI)"
+      paths:
+        - "Sources/osxcleaner/Core/RustBridge.swift"
+        - "rust-core/src/lib.rs"
+
+    - component_id: safety_validator
+      name: "SafetyValidator"
+      paths:
+        - "rust-core/src/safety/**"
+        - "rust-core/src/validator.rs"
+
+    - component_id: mdm_service
+      name: "MDMService"
+      paths:
+        - "Sources/osxcleaner/Services/MDMService.swift"
+
+    - component_id: policy_engine
+      name: "PolicyEngine"
+      paths:
+        - "rust-core/src/policy/**"
