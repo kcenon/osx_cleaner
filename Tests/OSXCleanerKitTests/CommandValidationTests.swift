@@ -58,7 +58,7 @@ final class CommandValidationTests: XCTestCase {
     func testConflictingOptions_ErrorMessage() throws {
         let error = ValidationError.conflictingOptions("test conflict")
         XCTAssertEqual(error.errorDescription, "Conflicting options: test conflict")
-        XCTAssertEqual(error.recoverySuggestion, "Remove conflicting command-line options")
+        XCTAssertEqual(error.recoverySuggestion, "Remove one of the conflicting options and try again.")
     }
 
     // MARK: - Numeric Parameter Validation Tests
@@ -79,15 +79,15 @@ final class CommandValidationTests: XCTestCase {
     func testInsecureServerURL_ThrowsError() throws {
         let error = ValidationError.insecureMDMURL
         XCTAssertEqual(error.errorDescription, "MDM server URL must use HTTPS protocol")
-        XCTAssertEqual(error.recoverySuggestion, "Use HTTPS protocol for MDM server URL (e.g., https://example.com)")
+        XCTAssertEqual(error.recoverySuggestion, "Use HTTPS protocol for MDM server URL (e.g., https://mdm.example.com)")
     }
 
     // MARK: - Configuration Validation Tests
 
     func testMissingRequiredField() throws {
         let error = ValidationError.missingRequiredField("api_key")
-        XCTAssertEqual(error.errorDescription, "Missing required field: api_key")
-        XCTAssertEqual(error.recoverySuggestion, "Provide the required field in configuration")
+        XCTAssertEqual(error.errorDescription, "Missing required field: 'api_key'")
+        XCTAssertEqual(error.recoverySuggestion, "Provide the 'api_key' field in your configuration or command.")
     }
 
     // MARK: - Batch Validation Tests
