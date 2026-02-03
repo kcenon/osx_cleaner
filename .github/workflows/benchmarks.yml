@@ -6,10 +6,22 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+    inputs:
+      compare_baseline:
+        description: 'Compare against main baseline'
+        required: false
+        default: 'true'
+        type: boolean
+      regression_threshold:
+        description: 'Regression threshold percentage'
+        required: false
+        default: '10'
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  REGRESSION_THRESHOLD: ${{ inputs.regression_threshold || '10' }}
 
 jobs:
   rust-benchmarks:
@@ -39,11 +51,29 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-bench-
 
+      - name: Restore baseline benchmark results
+        if: github.event_name == 'pull_request'
+        uses: actions/cache@v5
+        with:
+          path: rust-core/target/criterion/baseline
+          key: benchmark-baseline-${{ github.base_ref }}
+          restore-keys: |
+            benchmark-baseline-main
+
       - name: Run Rust benchmarks (PR)
         if: github.event_name == 'pull_request'
+        id: pr_bench
         run: |
           cd rust-core
-          cargo bench --no-fail-fast -- --save-baseline pr
+          # Run benchmarks and save as PR baseline
+          cargo bench --no-fail-fast -- --save-baseline pr 2>&1 | tee ../bench_output.txt
+
+          # Extract key metrics for summary
+          echo "## Benchmark Results Summary" > ../bench_summary.md
+          echo "" >> ../bench_summary.md
+
+          # Parse benchmark names and times
+          grep -E "^(analyze_|cleanup_|ffi_|safety_)" ../bench_output.txt | head -20 >> ../bench_summary.md || true
         continue-on-error: true
 
       - name: Run Rust benchmarks (main)
@@ -51,6 +81,13 @@ jobs:
         run: |
           cd rust-core
           cargo bench --no-fail-fast -- --save-baseline main
+
+      - name: Save baseline for future comparisons
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: rust-core/target/criterion/baseline
+          key: benchmark-baseline-main-${{ github.sha }}
 
       - name: Run Rust benchmarks (workflow dispatch)
         if: github.event_name == 'workflow_dispatch'
@@ -63,36 +100,70 @@ jobs:
         if: always()
         with:
           name: rust-criterion-results
-          path: rust-core/target/criterion/
+          path: |
+            rust-core/target/criterion/
+            bench_summary.md
           retention-days: 30
 
-      - name: Find baseline comparison
+      - name: Generate benchmark report
         if: github.event_name == 'pull_request'
-        id: baseline_check
+        id: bench_report
         run: |
+          # Generate a summary report
           cd rust-core/target/criterion
-          if [ -d "*/base" ] && [ -d "*/new" ]; then
-            echo "has_comparison=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_comparison=false" >> $GITHUB_OUTPUT
-          fi
+
+          echo "## Criterion Benchmark Report" > ../../../criterion_report.md
+          echo "" >> ../../../criterion_report.md
+          echo "| Benchmark | Time | Status |" >> ../../../criterion_report.md
+          echo "|-----------|------|--------|" >> ../../../criterion_report.md
+
+          # Find all benchmark results and extract timing info
+          find . -name "estimates.json" -type f 2>/dev/null | while read f; do
+            bench_name=$(dirname "$f" | sed 's|^./||' | sed 's|/new||')
+            if [ -f "$f" ]; then
+              # Extract mean time from JSON (simplified)
+              mean=$(grep -o '"mean":{[^}]*}' "$f" | grep -o '"point_estimate":[0-9.]*' | head -1 | cut -d: -f2)
+              if [ -n "$mean" ]; then
+                # Convert nanoseconds to human-readable format
+                mean_ns=$(printf "%.0f" "$mean")
+                if [ "$mean_ns" -gt 1000000000 ]; then
+                  time_str="$(echo "scale=2; $mean_ns/1000000000" | bc)s"
+                elif [ "$mean_ns" -gt 1000000 ]; then
+                  time_str="$(echo "scale=2; $mean_ns/1000000" | bc)ms"
+                elif [ "$mean_ns" -gt 1000 ]; then
+                  time_str="$(echo "scale=2; $mean_ns/1000" | bc)us"
+                else
+                  time_str="${mean_ns}ns"
+                fi
+                echo "| $bench_name | $time_str | - |" >> ../../../criterion_report.md
+              fi
+            fi
+          done
+
+          echo "has_report=true" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Comment PR with benchmark results
-        if: github.event_name == 'pull_request' && steps.baseline_check.outputs.has_comparison == 'true'
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
 
-            let comment = '## 📊 Benchmark Results\n\n';
+            let comment = '## Benchmark Results\n\n';
             comment += '### Rust Benchmarks (Criterion)\n\n';
 
-            // Parse criterion output (simplified)
-            const criterionDir = 'rust-core/target/criterion';
-            comment += `Criterion results saved. Check the artifacts for detailed reports.\n\n`;
-            comment += `📈 [Download Criterion Reports](${context.payload.pull_request.html_url}/checks)\n`;
+            // Try to read the criterion report
+            try {
+              const report = fs.readFileSync('criterion_report.md', 'utf8');
+              comment += report + '\n\n';
+            } catch (e) {
+              comment += 'Criterion results saved. Check the artifacts for detailed reports.\n\n';
+            }
+
+            comment += '**Download Artifacts**: Check the Actions tab for detailed Criterion HTML reports.\n\n';
+            comment += '---\n';
+            comment += '_Benchmark results are approximate and may vary between runs._';
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -134,8 +205,28 @@ jobs:
           cargo build --release
 
       - name: Run Swift performance tests
+        id: swift_tests
         run: |
+          # Run all performance tests
           swift test --filter Performance 2>&1 | tee swift_perf_results.txt
+
+          # Extract timing information from XCTest output
+          echo "## Swift Performance Test Results" > swift_perf_summary.md
+          echo "" >> swift_perf_summary.md
+          echo "| Test | Time | Status |" >> swift_perf_summary.md
+          echo "|------|------|--------|" >> swift_perf_summary.md
+
+          # Parse test results
+          grep -E "Test Case.*passed|Test Case.*failed" swift_perf_results.txt | while read line; do
+            test_name=$(echo "$line" | sed "s/.*'\([^']*\)'.*/\1/")
+            status="passed"
+            if echo "$line" | grep -q "failed"; then
+              status="failed"
+            fi
+            # Extract time if available
+            time=$(echo "$line" | grep -o '([0-9.]*' | tr -d '(' || echo "-")
+            echo "| $test_name | ${time}s | $status |" >> swift_perf_summary.md
+          done
         continue-on-error: true
 
       - name: Upload Swift performance results
@@ -143,24 +234,55 @@ jobs:
         if: always()
         with:
           name: swift-performance-results
-          path: swift_perf_results.txt
+          path: |
+            swift_perf_results.txt
+            swift_perf_summary.md
           retention-days: 30
 
       - name: Extract performance metrics
         id: extract_metrics
         run: |
           if [ -f swift_perf_results.txt ]; then
-            # Extract test results
-            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt || true)
-            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt || true)
-            # Set default to 0 if empty
+            # Extract test results using subshell to ensure clean single-line output
+            PASSED=$(grep -c "Test Case.*passed" swift_perf_results.txt 2>/dev/null) || PASSED=0
+            FAILED=$(grep -c "Test Case.*failed" swift_perf_results.txt 2>/dev/null) || FAILED=0
+            # Ensure numeric values by stripping any whitespace
+            PASSED=$(echo "$PASSED" | tr -d '[:space:]')
+            FAILED=$(echo "$FAILED" | tr -d '[:space:]')
             PASSED=${PASSED:-0}
             FAILED=${FAILED:-0}
+            TOTAL=$((PASSED + FAILED))
+
+            # Extract SLO test results
+            SLO_PASSED=$(grep -c "testSLO.*passed" swift_perf_results.txt 2>/dev/null) || SLO_PASSED=0
+            SLO_FAILED=$(grep -c "testSLO.*failed" swift_perf_results.txt 2>/dev/null) || SLO_FAILED=0
+            SLO_PASSED=$(echo "$SLO_PASSED" | tr -d '[:space:]')
+            SLO_FAILED=$(echo "$SLO_FAILED" | tr -d '[:space:]')
+            SLO_PASSED=${SLO_PASSED:-0}
+            SLO_FAILED=${SLO_FAILED:-0}
+
             echo "passed=${PASSED}" >> "$GITHUB_OUTPUT"
             echo "failed=${FAILED}" >> "$GITHUB_OUTPUT"
+            echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
+            echo "slo_passed=${SLO_PASSED}" >> "$GITHUB_OUTPUT"
+            echo "slo_failed=${SLO_FAILED}" >> "$GITHUB_OUTPUT"
           else
             echo "passed=0" >> "$GITHUB_OUTPUT"
             echo "failed=0" >> "$GITHUB_OUTPUT"
+            echo "total=0" >> "$GITHUB_OUTPUT"
+            echo "slo_passed=0" >> "$GITHUB_OUTPUT"
+            echo "slo_failed=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check SLO compliance
+        id: slo_check
+        run: |
+          SLO_FAILED=${{ steps.extract_metrics.outputs.slo_failed }}
+          if [ "$SLO_FAILED" -gt "0" ]; then
+            echo "slo_status=failed" >> "$GITHUB_OUTPUT"
+            echo "::warning::SLO tests failed! Performance may have regressed."
+          else
+            echo "slo_status=passed" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Comment PR with Swift results
@@ -168,13 +290,33 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
             const passed = '${{ steps.extract_metrics.outputs.passed }}';
             const failed = '${{ steps.extract_metrics.outputs.failed }}';
+            const total = '${{ steps.extract_metrics.outputs.total }}';
+            const sloStatus = '${{ steps.slo_check.outputs.slo_status }}';
 
-            let comment = '## 🚀 Swift Performance Test Results\n\n';
-            comment += `- ✅ Passed: ${passed}\n`;
-            comment += `- ❌ Failed: ${failed}\n\n`;
-            comment += '📈 [Download Full Results](${context.payload.pull_request.html_url}/checks)\n';
+            let comment = '## Swift Performance Test Results\n\n';
+            comment += `| Metric | Value |\n`;
+            comment += `|--------|-------|\n`;
+            comment += `| Total Tests | ${total} |\n`;
+            comment += `| Passed | ${passed} |\n`;
+            comment += `| Failed | ${failed} |\n`;
+            comment += `| SLO Compliance | ${sloStatus === 'passed' ? 'Passing' : 'FAILED'} |\n\n`;
+
+            // Try to read the summary
+            try {
+              const summary = fs.readFileSync('swift_perf_summary.md', 'utf8');
+              comment += summary + '\n';
+            } catch (e) {
+              // Summary not available
+            }
+
+            if (sloStatus === 'failed') {
+              comment += '\n**Warning**: Some SLO tests failed. Please review performance.\n';
+            }
+
+            comment += '\n---\n_Download artifacts for detailed test output._';
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,

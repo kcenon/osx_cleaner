@@ -5,7 +5,8 @@
 //!
 //! Tests performance of path classification with large numbers of paths.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 use std::path::{Path, PathBuf};
 
 use osxcore::safety::SafetyValidator;
