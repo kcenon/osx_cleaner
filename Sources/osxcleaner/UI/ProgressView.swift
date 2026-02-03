@@ -2,13 +2,16 @@
 // Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
 
 import Foundation
+import OSXCleanerKit
 
 /// Simple progress display for CLI output
 public struct ProgressView {
     private let output: FileHandle
+    private let useColors: Bool
 
-    public init(output: FileHandle = .standardOutput) {
+    public init(output: FileHandle = .standardOutput, useColors: Bool? = nil) {
         self.output = output
+        self.useColors = useColors ?? ErrorFormatter.terminalSupportsColors
     }
 
     public func display(message: String) {
@@ -37,15 +40,15 @@ public struct ProgressView {
     }
 
     public func displayError(_ error: Error) {
-        let message = "Error: \(error.localizedDescription)\n"
+        let message = ErrorFormatter.format(error, useColors: useColors) + "\n"
         FileHandle.standardError.write(Data(message.utf8))
     }
 
     public func displayWarning(_ warning: String) {
-        display(message: "⚠️  Warning: \(warning)")
+        display(message: "Warning: \(warning)")
     }
 
     public func displaySuccess(_ message: String) {
-        display(message: "✅ \(message)")
+        display(message: "Success: \(message)")
     }
 }
