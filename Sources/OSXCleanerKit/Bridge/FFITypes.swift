@@ -174,7 +174,7 @@ public enum CleanupLevel: Int32, CaseIterable {
 // MARK: - Bridge Errors
 
 /// Errors from the Rust bridge
-public enum RustBridgeError: LocalizedError {
+public enum RustBridgeError: DetailedError {
     case initializationFailed
     case nullPointer
     case invalidUTF8
@@ -182,20 +182,79 @@ public enum RustBridgeError: LocalizedError {
     case rustError(String)
     case jsonParsingError(String)
 
-    public var errorDescription: String? {
+    // MARK: - DetailedError Implementation
+
+    public var problem: String {
         switch self {
         case .initializationFailed:
-            return "Failed to initialize Rust core library"
+            return "Rust core initialization failed"
         case .nullPointer:
-            return "Received null pointer from Rust"
+            return "Received null pointer from Rust core"
         case .invalidUTF8:
-            return "Invalid UTF-8 string from Rust"
+            return "Invalid UTF-8 string from Rust core"
         case .invalidString(let message):
-            return "Invalid string for FFI: \(message)"
+            return "Invalid string for Rust core: \(message)"
         case .rustError(let message):
-            return "Rust error: \(message)"
+            return "Rust operation failed: \(message)"
         case .jsonParsingError(let message):
-            return "JSON parsing error: \(message)"
+            return "Failed to parse Rust response: \(message)"
         }
+    }
+
+    public var context: String? {
+        switch self {
+        case .initializationFailed:
+            return """
+                The high-performance Rust core could not be loaded.
+                This may be due to:
+                - Missing dylib file
+                - Incompatible architecture
+                - Corrupted installation
+                """
+        case .nullPointer:
+            return "The Rust core returned an invalid memory reference."
+        case .invalidUTF8:
+            return "The Rust core returned a string with invalid UTF-8 encoding."
+        case .invalidString:
+            return "The path contains characters that cannot be processed by the Rust core."
+        case .rustError:
+            return "An error occurred in the native code layer."
+        case .jsonParsingError:
+            return "The response from the Rust core could not be decoded."
+        }
+    }
+
+    public var solution: String? {
+        switch self {
+        case .initializationFailed:
+            return """
+                Try these steps:
+                1. Reinstall: brew reinstall osxcleaner
+                2. Check architecture: file /opt/homebrew/lib/libosx_cleaner_rust.dylib
+                3. Use fallback mode: osxcleaner --no-rust clean ~/Library/Caches
+
+                Report issue: https://github.com/kcenon/osx_cleaner/issues/new
+                """
+        case .nullPointer:
+            return "This is likely a bug. Please report this issue with the command you ran."
+        case .invalidUTF8:
+            return "Ensure the path only contains valid UTF-8 characters."
+        case .invalidString:
+            return """
+                Ensure the path:
+                - Contains only UTF-8 characters
+                - Has no null bytes
+                - Is less than 4096 characters
+                - Exists and is accessible
+                """
+        case .rustError:
+            return "Try running with --verbose for more details."
+        case .jsonParsingError:
+            return "This is likely a bug. Please report this issue with the command you ran."
+        }
+    }
+
+    public var documentation: URL? {
+        URL(string: "https://github.com/kcenon/osx_cleaner/wiki/Troubleshooting#rust-core-errors")
     }
 }
