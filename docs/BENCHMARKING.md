@@ -236,6 +236,143 @@ For benchmarks creating many files:
    ```
 5. Document improvements in commit message
 
+## Benchmark Tracking System
+
+The benchmark tracking system enables historical performance analysis by storing benchmark results and generating comparison reports.
+
+### Running with Tracking
+
+```bash
+# Run all benchmarks and save results
+./scripts/track-benchmarks.sh
+
+# Run only Rust benchmarks
+./scripts/track-benchmarks.sh --rust-only
+
+# Run only Swift performance tests
+./scripts/track-benchmarks.sh --swift-only
+
+# Run and generate comparison report
+./scripts/track-benchmarks.sh --compare
+
+# Save results as baseline
+./scripts/track-benchmarks.sh --baseline
+
+# Custom output directory
+./scripts/track-benchmarks.sh -o ./my-benchmark-results
+
+# Verbose output
+./scripts/track-benchmarks.sh --verbose
+```
+
+### Comparing Results
+
+```bash
+# Compare latest results with baseline
+python3 scripts/compare-benchmarks.py
+
+# Compare specific runs
+python3 scripts/compare-benchmarks.py --latest 20260203-120000-abc1234 --baseline 20260202-100000-def5678
+
+# Generate JSON report
+python3 scripts/compare-benchmarks.py --format json
+
+# Set custom regression threshold (default: 5%)
+python3 scripts/compare-benchmarks.py --threshold 10.0
+
+# Save to custom location
+python3 scripts/compare-benchmarks.py -o ./my-report.md
+```
+
+### Output Structure
+
+```
+benchmark-results/
+  rust-20260203-120000-abc1234.json       # Rust benchmark results
+  swift-20260203-120000-abc1234.txt       # Swift test output
+  swift-20260203-120000-abc1234.json      # Swift parsed results
+  metadata-20260203-120000-abc1234.json   # Run metadata
+  criterion-20260203-120000-abc1234.tar.gz # Detailed Criterion data
+  report-20260203-120000-abc1234.md       # Comparison report
+  rust-baseline.json                       # Baseline Rust results
+  swift-baseline.txt                       # Baseline Swift results
+```
+
+### Comparison Report Format
+
+The comparison report includes:
+
+- **Environment**: Commit hash, branch, date, system info
+- **Summary**: Total tests, improvements, regressions
+- **Rust Benchmarks**: Table with baseline, current, and change percentage
+- **Swift Performance Tests**: Table with baseline, current, and change percentage
+- **Regressions**: Detailed list of benchmarks exceeding threshold
+- **Improvements**: List of benchmarks showing improvement
+
+Example output:
+
+```markdown
+# Performance Comparison Report
+
+## Summary
+- Total benchmarks: 25
+- Improvements: 3
+- Regressions: 1
+- Unchanged: 21
+
+## Rust Benchmarks
+| Benchmark | Baseline | Current | Change |
+|-----------|----------|---------|--------|
+| classify_10000_paths | 85.23ms | 82.15ms | -3.61% (improvement) |
+| ffi_call_overhead | 45.12us | 48.34us | +7.14% (regression) |
+```
+
+### CI/CD Integration
+
+Add benchmark tracking to your CI workflow:
+
+```yaml
+# .github/workflows/benchmark.yml
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  benchmark:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Benchmarks
+        run: ./scripts/track-benchmarks.sh --compare
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+
+      - name: Check for Regressions
+        run: |
+          if python3 scripts/compare-benchmarks.py --threshold 10.0; then
+            echo "No significant regressions"
+          else
+            echo "Performance regressions detected!"
+            exit 1
+          fi
+```
+
+### Best Practices for Tracking
+
+1. **Consistent Environment**: Run benchmarks on the same hardware/OS when possible
+2. **Save Baselines**: Save baseline after significant changes with `--baseline`
+3. **Monitor Trends**: Review historical data periodically to catch gradual regressions
+4. **Document Changes**: Include performance impact in commit messages when relevant
+5. **Clean State**: Ensure system is in consistent state before running benchmarks
+
 ## Related Documentation
 
 - [TESTING.md](TESTING.md) - General testing guide
