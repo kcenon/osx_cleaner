@@ -118,7 +118,7 @@ jobs:
         run: .build/release/osxcleaner --version
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: osxcleaner-macos
           path: .build/release/osxcleaner
