@@ -333,14 +333,14 @@ jobs:
 
     steps:
       - name: Download Rust results
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: rust-criterion-results
           path: rust-results
         continue-on-error: true
 
       - name: Download Swift results
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: swift-performance-results
           path: swift-results
