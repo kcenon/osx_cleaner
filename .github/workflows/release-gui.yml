@@ -216,7 +216,7 @@ jobs:
           echo "DMG notarization complete!"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: OSXCleaner-GUI-${{ steps.version.outputs.version }}
           path: |
