@@ -10,6 +10,7 @@
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -166,12 +167,12 @@ pub fn analyze_with_config(path: &str, config: &ScanConfig) -> Result<AnalysisRe
 
     // Get top 10 largest files
     let mut largest = file_infos.clone();
-    largest.sort_by(|a, b| b.size.cmp(&a.size));
+    largest.sort_by_key(|entry| Reverse(entry.size));
     let largest_items: Vec<FileInfo> = largest.into_iter().take(10).collect();
 
     // Get top 10 oldest files
     let mut oldest = file_infos;
-    oldest.sort_by(|a, b| a.modified.cmp(&b.modified));
+    oldest.sort_by_key(|entry| entry.modified);
     let oldest_items: Vec<FileInfo> = oldest.into_iter().take(10).collect();
 
     Ok(AnalysisResult {
