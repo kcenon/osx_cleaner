@@ -2,7 +2,7 @@
 
 > **macOS 시스템 정리 도구** - 안전하게 불필요한 파일을 정리하여 디스크 공간을 확보합니다.
 
-[![macOS](https://img.shields.io/badge/macOS-10.15--15.x-blue.svg)](https://www.apple.com/macos/)
+[![macOS](https://img.shields.io/badge/macOS-14.0%2B-blue.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Development-orange.svg)]()
 
@@ -18,7 +18,7 @@
 |-----|------|
 | **안전 최우선** | 4단계 안전 등급 시스템으로 시스템 손상 방지 |
 | **개발자 친화적** | Xcode, Docker, npm, Homebrew 등 개발 도구 캐시 전문 관리 (50-150GB 절약 가능) |
-| **버전 호환성** | macOS Catalina(10.15)부터 Sequoia(15.x)까지 완벽 지원 |
+| **버전 호환성** | macOS Sonoma(14.0) 이상 지원 (Sequoia 15.x까지 검증 완료) |
 | **자동화 지원** | launchd 기반 스케줄링 및 CI/CD 파이프라인 통합 |
 
 ---
@@ -479,7 +479,7 @@ osxcleaner clean --level deep --dry-run --format json
 ## 시스템 요구사항
 
 ### 지원 플랫폼
-- **macOS 버전**: 10.15 (Catalina) ~ 15.x (Sequoia)
+- **macOS 버전**: 14.0 (Sonoma) 이상 (15.x Sequoia까지 검증)
 - **아키텍처**: Intel x64, Apple Silicon (arm64)
 
 ### 권장 사양

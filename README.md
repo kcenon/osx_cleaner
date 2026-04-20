@@ -2,7 +2,7 @@
 
 > **macOS System Cleaning Tool** - Safely clean unnecessary files to free up disk space.
 
-[![macOS](https://img.shields.io/badge/macOS-10.15--15.x-blue.svg)](https://www.apple.com/macos/)
+[![macOS](https://img.shields.io/badge/macOS-14.0%2B-blue.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Development-orange.svg)]()
 [![codecov](https://codecov.io/gh/kcenon/osx_cleaner/branch/main/graph/badge.svg)](https://codecov.io/gh/kcenon/osx_cleaner)
@@ -21,7 +21,7 @@
 |-------|-------------|
 | **Safety First** | 4-level safety classification system prevents system damage |
 | **Developer-Focused** | Specialized management of development tool caches including Xcode, Docker, npm, Homebrew (can save 50-150GB) |
-| **Version Compatibility** | Full support from macOS Catalina (10.15) to Sequoia (15.x) |
+| **Version Compatibility** | Supports macOS Sonoma (14.0) and later, including Sequoia (15.x) |
 | **Automation Support** | launchd-based scheduling and CI/CD pipeline integration |
 
 ---
@@ -482,7 +482,7 @@ The `--format json` flag outputs machine-readable results for CI/CD integration:
 ## System Requirements
 
 ### Supported Platforms
-- **macOS Version**: 10.15 (Catalina) ~ 15.x (Sequoia)
+- **macOS Version**: 14.0 (Sonoma) or later (tested through 15.x Sequoia)
 - **Architecture**: Intel x64, Apple Silicon (arm64)
 
 ### Recommended Specifications
