@@ -10,6 +10,7 @@
 //! This module scans all application caches and provides
 //! intelligent cleanup options based on size and safety.
 
+use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -370,7 +371,7 @@ impl AppCacheCleaner {
     /// Get top N caches by size
     pub fn get_top_caches(&self, n: usize) -> Vec<AppCacheEntry> {
         let mut caches = self.scan_all_caches();
-        caches.sort_by(|a, b| b.size.cmp(&a.size));
+        caches.sort_by_key(|cache| Reverse(cache.size));
         caches.into_iter().take(n).collect()
     }
 

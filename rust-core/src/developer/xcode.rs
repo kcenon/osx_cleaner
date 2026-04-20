@@ -10,6 +10,7 @@
 //! - iOS Device Support (20-100GB): Debug symbols for devices
 //! - watchOS Device Support (5-20GB): Debug symbols for watches
 
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -252,7 +253,7 @@ impl XcodeCleaner {
         }
 
         // Sort by version descending (newest first)
-        results.sort_by(|a, b| b.version.cmp(&a.version));
+        results.sort_by_key(|xcode| Reverse(xcode.version.clone()));
 
         results
     }

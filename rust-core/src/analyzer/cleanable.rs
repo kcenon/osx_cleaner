@@ -5,6 +5,7 @@
 //!
 //! Calculates and categorizes cleanable space by safety level.
 
+use std::cmp::Reverse;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -186,7 +187,7 @@ pub fn estimate_cleanable(
     }
 
     // Sort items by size descending
-    items.sort_by(|a, b| b.size.cmp(&a.size));
+    items.sort_by_key(|item| Reverse(item.size));
 
     let total_bytes = safe_bytes + caution_bytes + warning_bytes;
 
