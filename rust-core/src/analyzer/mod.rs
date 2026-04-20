@@ -19,6 +19,7 @@ pub use categories::{CacheInfo, CategoryScanner, DeveloperComponentInfo, Directo
 pub use cleanable::{CleanableEstimate, CleanableItem};
 pub use disk_space::DiskSpace;
 
+use std::cmp::Reverse;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -183,7 +184,7 @@ impl DiskAnalyzer {
         ];
 
         // Sort by size descending
-        summaries.sort_by(|a, b| b.size.cmp(&a.size));
+        summaries.sort_by_key(|summary| Reverse(summary.size));
         summaries
     }
 }

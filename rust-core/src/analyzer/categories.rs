@@ -8,6 +8,7 @@
 //! - Application caches analysis
 //! - Developer tools analysis
 
+use std::cmp::Reverse;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -158,7 +159,7 @@ pub fn analyze_home_directory(home_path: &Path, top_n: usize) -> Vec<DirectoryIn
         .collect();
 
     // Sort by size descending
-    dirs.sort_by(|a, b| b.size.cmp(&a.size));
+    dirs.sort_by_key(|dir| Reverse(dir.size));
 
     // Return top N
     dirs.into_iter().take(top_n).collect()
@@ -209,7 +210,7 @@ pub fn analyze_caches(caches_path: &Path) -> Vec<CacheInfo> {
         .collect();
 
     // Sort by size descending
-    caches.sort_by(|a, b| b.size.cmp(&a.size));
+    caches.sort_by_key(|cache| Reverse(cache.size));
     caches
 }
 
@@ -323,7 +324,7 @@ pub fn analyze_developer(developer_path: &Path) -> Vec<DeveloperComponentInfo> {
     }
 
     // Sort by size descending
-    components.sort_by(|a, b| b.size.cmp(&a.size));
+    components.sort_by_key(|comp| Reverse(comp.size));
     components
 }
 
