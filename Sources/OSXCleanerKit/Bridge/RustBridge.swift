@@ -50,8 +50,20 @@ public final class RustBridge {
     /// Whether the Rust core has been initialized
     private var isInitialized = false
 
-    /// Whether operating in fallback mode (Swift-only)
-    private var isFallbackMode = false
+    /// Whether operating in fallback mode (Swift-only).
+    ///
+    /// Publicly readable so that UI layers (GUI banner, CLI warning) can
+    /// surface the degraded state to the user. Mutated only from inside
+    /// `initQueue.sync` during initialization.
+    public private(set) var isFallbackMode = false
+
+    /// The error that triggered fallback mode, if any.
+    ///
+    /// `nil` while Rust core initialization is pending or succeeded. Set
+    /// alongside `isFallbackMode` when all initialization retries have
+    /// failed. UI layers use the `localizedDescription` to explain to the
+    /// user why the app is running in compatibility mode.
+    public private(set) var fallbackError: Error?
 
     /// Maximum number of initialization retry attempts
     private let maxRetryAttempts = 3
@@ -136,13 +148,21 @@ public final class RustBridge {
     /// - Throws: `RustBridgeError.initializationFailed` if fallback mode setup fails
     private func enterFallbackMode(lastError: Error) throws {
         isFallbackMode = true
+        fallbackError = lastError
 
-        // Log fallback mode activation
         AppLogger.shared.error("Entering fallback mode. Last error: \(lastError)")
 
-        // Note: User notification implementation will be added when
-        // the UserNotification system is available in the codebase
-        // For now, we log the event for monitoring
+        // Print a stderr warning so CLI users see the degraded state even
+        // when they are not tailing logs. GUI builds redirect stderr into
+        // the unified log, so this is effectively log-only there; the GUI
+        // surfaces the state through `isFallbackMode` instead.
+        let warning = """
+        WARNING: osx_cleaner is running in compatibility mode.
+                 Rust performance core unavailable: \(lastError.localizedDescription)
+                 Run 'osxcleaner diagnose' for details.
+
+        """
+        FileHandle.standardError.write(Data(warning.utf8))
 
         // Mark initialization as complete (in fallback mode)
         isInitialized = true
