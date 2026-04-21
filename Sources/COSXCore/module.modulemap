@@ -1,5 +1,0 @@
-module COSXCore {
-    header "../../include/osxcore.h"
-    link "osxcore"
-    export *
-}

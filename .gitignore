@@ -71,6 +71,9 @@ Cargo.lock
 *.app
 *.dSYM/
 
+# XCFramework built locally by scripts/build-xcframework.sh
+Frameworks/
+
 # =============================================================================
 # Test & Coverage
 # =============================================================================

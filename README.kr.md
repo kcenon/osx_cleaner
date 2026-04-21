@@ -333,15 +333,23 @@ osxcleaner metrics stop
 ### 수동 빌드
 
 ```bash
-# 전체 빌드
+# 전체 빌드 (universal XCFramework + Swift release)
 make all
 
-# 테스트 실행
+# 테스트 실행 (Swift 테스트는 자동으로 XCFramework를 먼저 빌드)
 make test
 
-# 개발용 빌드
+# 개발용 빌드 (Swift debug; XCFramework 필요)
 make debug
+
+# Universal XCFramework만 재빌드 (Frameworks/COSXCore.xcframework)
+make xcframework
 ```
+
+Swift 패키지는 `Frameworks/COSXCore.xcframework`(arm64 + x86_64 universal
+static lib)를 SwiftPM `binaryTarget`으로 소비합니다. 이 아티팩트는 저장소에
+포함되지 않으므로, 클린 체크아웃에서는 `swift build`/`swift test` 전에
+`make xcframework`(또는 의존하는 다른 타겟)를 반드시 실행해야 합니다.
 
 ---
 

@@ -29,39 +29,35 @@ check_xcodegen() {
     log_info "XcodeGen found: $(which xcodegen)"
 }
 
-# Check if Rust library exists
+# Check if the universal XCFramework wrapping the Rust core exists
 check_rust_library() {
-    local rust_lib="${PROJECT_ROOT}/rust-core/target/release/libosxcore.a"
-    local rust_dylib="${PROJECT_ROOT}/rust-core/target/release/libosxcore.dylib"
+    local xcframework="${PROJECT_ROOT}/Frameworks/COSXCore.xcframework"
 
-    if [[ ! -f "${rust_lib}" ]] && [[ ! -f "${rust_dylib}" ]]; then
-        log_warning "Rust library not found. Building..."
+    if [[ ! -d "${xcframework}" ]]; then
+        log_warning "COSXCore.xcframework not found. Building..."
         build_rust_library
     else
-        log_info "Rust library found"
+        log_info "COSXCore.xcframework found"
     fi
 }
 
-# Build Rust library
+# Build the universal XCFramework via the canonical build script
 build_rust_library() {
-    log_info "Building Rust core library..."
-    cd "${PROJECT_ROOT}/rust-core"
+    log_info "Building COSXCore.xcframework..."
 
     if ! command -v cargo &> /dev/null; then
         log_error "Cargo is not installed. Please install Rust."
         exit 1
     fi
 
-    cargo build --release
+    "${PROJECT_ROOT}/scripts/build-xcframework.sh"
 
-    if [[ -f "target/release/libosxcore.a" ]] || [[ -f "target/release/libosxcore.dylib" ]]; then
-        log_success "Rust library built successfully"
+    if [[ -d "${PROJECT_ROOT}/Frameworks/COSXCore.xcframework" ]]; then
+        log_success "COSXCore.xcframework built successfully"
     else
-        log_error "Failed to build Rust library"
+        log_error "Failed to build COSXCore.xcframework"
         exit 1
     fi
-
-    cd "${PROJECT_ROOT}"
 }
 
 # Generate Xcode project using XcodeGen

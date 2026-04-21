@@ -56,6 +56,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Cargo registry
         uses: actions/cache@v5
@@ -76,8 +78,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swift-
 
-      - name: Build Rust core
-        run: cd rust-core && cargo build --release
+      - name: Build XCFramework (universal arm64 + x86_64)
+        run: make xcframework
 
       - name: Build Swift
         run: swift build
@@ -95,6 +97,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache dependencies
         uses: actions/cache@v5
@@ -135,6 +139,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
@@ -147,8 +152,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swift-coverage-
 
-      - name: Build Rust core (required for Swift tests)
-        run: cd rust-core && cargo build --release
+      - name: Build XCFramework (required for Swift tests)
+        run: make xcframework
 
       - name: Run Swift tests with coverage
         run: swift test --enable-code-coverage

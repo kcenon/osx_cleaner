@@ -41,10 +41,10 @@ let package = Package(
                 .process("Resources")
             ]
         ),
-        // Rust Core C Bridge
-        .systemLibrary(
+        // Rust Core C Bridge — universal XCFramework built by scripts/build-xcframework.sh
+        .binaryTarget(
             name: "COSXCore",
-            path: "Sources/COSXCore"
+            path: "Frameworks/COSXCore.xcframework"
         ),
         // Swift Library with Rust FFI Bridge
         .target(
@@ -55,11 +55,7 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Yams", package: "Yams")
             ],
-            path: "Sources/OSXCleanerKit",
-            linkerSettings: [
-                .unsafeFlags(["-L", "rust-core/target/release"]),
-                .linkedLibrary("osxcore")
-            ]
+            path: "Sources/OSXCleanerKit"
         ),
         // Tests
         .testTarget(

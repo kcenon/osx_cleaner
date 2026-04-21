@@ -336,15 +336,24 @@ For detailed documentation, see [Monitoring Guide](docs/monitoring/MONITORING.md
 ### Manual Build
 
 ```bash
-# Build everything
+# Build everything (universal XCFramework + Swift release binaries)
 make all
 
-# Run tests
+# Run tests (Rust + Swift; Swift step automatically builds the XCFramework first)
 make test
 
-# Build for development
+# Build for development (Swift debug; still requires the XCFramework)
 make debug
+
+# Rebuild only the universal XCFramework (Frameworks/COSXCore.xcframework)
+make xcframework
 ```
+
+The Swift package consumes the Rust core through
+`Frameworks/COSXCore.xcframework`, a universal (`arm64` + `x86_64`) static
+library wrapped via SwiftPM's `binaryTarget`. It is **not** committed to the
+repository, so a clean checkout must run `make xcframework` (or any target
+that depends on it) before `swift build`/`swift test`.
 
 ---
 
@@ -515,8 +524,8 @@ osxcleaner/
 │   │   ├── Services/           # Business logic
 │   │   ├── Config/             # Configuration
 │   │   └── Logger/             # Logging
-│   └── COSXCore/               # C module for Rust FFI
-│       └── module.modulemap    # Module definition
+├── Frameworks/                 # Built XCFramework wrapping the Rust core (gitignored)
+│   └── COSXCore.xcframework/   # Universal arm64 + x86_64 static lib + headers
 ├── rust-core/                  # Rust sources
 │   ├── Cargo.toml
 │   ├── cbindgen.toml           # FFI header generation
@@ -548,6 +557,7 @@ osxcleaner/
 ├── scripts/                    # Shell scripts
 │   ├── install.sh
 │   ├── uninstall.sh
+│   ├── build-xcframework.sh    # Builds Frameworks/COSXCore.xcframework
 │   └── launchd/                # launchd agent
 ├── Tests/                      # Test files
 └── docs/                       # Documentation
