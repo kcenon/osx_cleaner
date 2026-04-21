@@ -2,6 +2,7 @@
 // Copyright (c) 2021-2025, 🍀☀🌕🌥 🌊
 
 import Foundation
+import Crypto
 import Logging
 
 // MARK: - JWT Errors
@@ -11,6 +12,7 @@ public enum JWTError: LocalizedError, Equatable {
     case invalidToken
     case tokenExpired
     case invalidSignature
+    case unsupportedAlgorithm(String)
     case missingClaim(String)
     case invalidClaim(String)
     case encodingFailed
@@ -24,6 +26,8 @@ public enum JWTError: LocalizedError, Equatable {
             return "JWT token has expired"
         case .invalidSignature:
             return "JWT signature verification failed"
+        case .unsupportedAlgorithm(let alg):
+            return "Unsupported JWT algorithm: \(alg)"
         case .missingClaim(let claim):
             return "Missing required claim: \(claim)"
         case .invalidClaim(let claim):
@@ -43,6 +47,8 @@ public enum JWTError: LocalizedError, Equatable {
              (.encodingFailed, .encodingFailed),
              (.decodingFailed, .decodingFailed):
             return true
+        case (.unsupportedAlgorithm(let l), .unsupportedAlgorithm(let r)):
+            return l == r
         case (.missingClaim(let l), .missingClaim(let r)),
              (.invalidClaim(let l), .invalidClaim(let r)):
             return l == r
@@ -240,13 +246,22 @@ public struct JWTProviderConfig: Sendable {
 
 // MARK: - JWT Provider
 
-/// Actor responsible for JWT token generation and validation
+/// Actor responsible for JWT token generation and validation.
+///
+/// Signing and verification use Apple's `swift-crypto` (`Crypto.HMAC<SHA256>`),
+/// which performs constant-time authentication-code comparison and receives
+/// CVE tracking through the `apple/swift-crypto` repository.
+///
+/// Only the HS256 algorithm is accepted. Tokens presenting `alg: none` or any
+/// other algorithm are rejected during header parsing to defend against
+/// algorithm-confusion attacks.
 public actor JWTProvider {
 
     // MARK: - Properties
 
     private let configuration: JWTProviderConfig
     private let logger: Logger
+    private let signingKey: SymmetricKey
 
     /// Revoked token IDs (jti)
     private var revokedTokens: Set<String> = []
@@ -254,11 +269,17 @@ public actor JWTProvider {
     /// Maximum revoked tokens to store (for memory management)
     private let maxRevokedTokens: Int = 10000
 
+    /// The only algorithm this provider accepts. Hard-coded so that
+    /// `alg: none` and algorithm-confusion attacks are structurally rejected.
+    private static let supportedAlgorithm = "HS256"
+
     // MARK: - Initialization
 
     public init(configuration: JWTProviderConfig) {
         self.configuration = configuration
         self.logger = Logger(label: "com.osxcleaner.jwt-provider")
+        let keyData = Data(configuration.secret.utf8)
+        self.signingKey = SymmetricKey(data: keyData)
     }
 
     // MARK: - Token Generation
@@ -326,7 +347,6 @@ public actor JWTProvider {
     public func validate(token: String) throws -> JWTClaims {
         let claims = try decode(token: token)
 
-        // Check if token is revoked
         if revokedTokens.contains(claims.jti) {
             logger.warning("Attempted to use revoked token", metadata: [
                 "jti": "\(claims.jti)"
@@ -334,7 +354,6 @@ public actor JWTProvider {
             throw JWTError.invalidToken
         }
 
-        // Check expiration
         if claims.isExpired {
             logger.debug("Token expired", metadata: [
                 "jti": "\(claims.jti)",
@@ -343,7 +362,6 @@ public actor JWTProvider {
             throw JWTError.tokenExpired
         }
 
-        // Check not before
         if let nbf = claims.nbf {
             let now = Int(Date().timeIntervalSince1970)
             if now < nbf {
@@ -351,12 +369,10 @@ public actor JWTProvider {
             }
         }
 
-        // Check issuer
         if claims.iss != configuration.issuer {
             throw JWTError.invalidClaim("iss")
         }
 
-        // Check audience if configured
         if let expectedAudience = configuration.audience {
             if claims.aud != expectedAudience {
                 throw JWTError.invalidClaim("aud")
@@ -370,15 +386,12 @@ public actor JWTProvider {
     public func refresh(token: String, user: User) throws -> TokenPair {
         let claims = try validate(token: token)
 
-        // Ensure it's a refresh token
         guard claims.tokenType == .refresh else {
             throw JWTError.invalidClaim("tokenType")
         }
 
-        // Revoke the old refresh token
         revoke(tokenId: claims.jti)
 
-        // Generate new token pair
         return try generateTokenPair(for: user)
     }
 
@@ -388,9 +401,7 @@ public actor JWTProvider {
     public func revoke(tokenId: String) {
         revokedTokens.insert(tokenId)
 
-        // Memory management: remove oldest if over limit
         if revokedTokens.count > maxRevokedTokens {
-            // In production, would use a proper LRU cache
             revokedTokens.removeFirst()
         }
 
@@ -424,7 +435,7 @@ public actor JWTProvider {
     // MARK: - Private Methods
 
     private func encode(claims: JWTClaims) throws -> String {
-        let header = JWTHeader()
+        let header = JWTHeader(alg: Self.supportedAlgorithm)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
@@ -434,35 +445,45 @@ public actor JWTProvider {
             throw JWTError.encodingFailed
         }
 
-        let headerBase64 = base64URLEncode(headerData)
-        let claimsBase64 = base64URLEncode(claimsData)
+        let headerBase64 = Self.base64URLEncode(headerData)
+        let claimsBase64 = Self.base64URLEncode(claimsData)
 
         let signatureInput = "\(headerBase64).\(claimsBase64)"
-        let signature = sign(signatureInput)
+        let signatureBase64 = Self.base64URLEncode(mac(for: signatureInput))
 
-        return "\(signatureInput).\(signature)"
+        return "\(signatureInput).\(signatureBase64)"
     }
 
     private func decode(token: String) throws -> JWTClaims {
-        let parts = token.split(separator: ".").map(String.init)
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 3 else {
             throw JWTError.invalidToken
         }
 
         let headerBase64 = parts[0]
         let claimsBase64 = parts[1]
-        let signature = parts[2]
+        let signatureBase64 = parts[2]
 
-        // Verify signature
+        // Reject algorithm-confusion attacks (including alg:none) before
+        // touching the signature or payload.
+        try verifyHeader(base64URL: headerBase64)
+
+        // Constant-time HMAC verification via swift-crypto. The signature and
+        // claims are only considered authentic after this check succeeds.
+        guard let providedSignature = Self.base64URLDecode(signatureBase64) else {
+            throw JWTError.invalidSignature
+        }
         let signatureInput = "\(headerBase64).\(claimsBase64)"
-        let expectedSignature = sign(signatureInput)
-
-        guard signature == expectedSignature else {
+        let signatureData = Data(signatureInput.utf8)
+        guard HMAC<SHA256>.isValidAuthenticationCode(
+            providedSignature,
+            authenticating: signatureData,
+            using: signingKey
+        ) else {
             throw JWTError.invalidSignature
         }
 
-        // Decode claims
-        guard let claimsData = base64URLDecode(claimsBase64) else {
+        guard let claimsData = Self.base64URLDecode(claimsBase64) else {
             throw JWTError.decodingFailed
         }
 
@@ -476,66 +497,44 @@ public actor JWTProvider {
         }
     }
 
-    private func sign(_ input: String) -> String {
-        guard let inputData = input.data(using: .utf8),
-              let keyData = configuration.secret.data(using: .utf8) else {
-            return ""
+    private func verifyHeader(base64URL: String) throws {
+        guard let headerData = Self.base64URLDecode(base64URL) else {
+            throw JWTError.invalidToken
         }
-
-        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-
-        // HMAC-SHA256
-        keyData.withUnsafeBytes { keyBytes in
-            inputData.withUnsafeBytes { inputBytes in
-                CCHmac(
-                    CCHmacAlgorithm(kCCHmacAlgSHA256),
-                    keyBytes.baseAddress,
-                    keyData.count,
-                    inputBytes.baseAddress,
-                    inputData.count,
-                    &hash
-                )
-            }
+        let header: JWTHeader
+        do {
+            header = try JSONDecoder().decode(JWTHeader.self, from: headerData)
+        } catch {
+            throw JWTError.invalidToken
         }
-
-        return base64URLEncode(Data(hash))
+        guard header.alg == Self.supportedAlgorithm else {
+            throw JWTError.unsupportedAlgorithm(header.alg)
+        }
     }
 
-    private func base64URLEncode(_ data: Data) -> String {
+    private func mac(for input: String) -> Data {
+        let authCode = HMAC<SHA256>.authenticationCode(
+            for: Data(input.utf8),
+            using: signingKey
+        )
+        return Data(authCode)
+    }
+
+    private static func base64URLEncode(_ data: Data) -> String {
         data.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
 
-    private func base64URLDecode(_ string: String) -> Data? {
+    private static func base64URLDecode(_ string: String) -> Data? {
         var base64 = string
             .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
 
-        // Add padding if necessary
         let paddingLength = (4 - base64.count % 4) % 4
         base64 += String(repeating: "=", count: paddingLength)
 
         return Data(base64Encoded: base64)
     }
 }
-
-// MARK: - CommonCrypto Bridge
-
-import Darwin
-
-private let CC_SHA256_DIGEST_LENGTH: Int32 = 32
-
-@_silgen_name("CCHmac")
-private func CCHmac(
-    _ algorithm: CCHmacAlgorithm,
-    _ key: UnsafeRawPointer?,
-    _ keyLength: Int,
-    _ data: UnsafeRawPointer?,
-    _ dataLength: Int,
-    _ macOut: UnsafeMutableRawPointer?
-)
-
-private typealias CCHmacAlgorithm = UInt32
-private let kCCHmacAlgSHA256: CCHmacAlgorithm = 2
