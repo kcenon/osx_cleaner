@@ -48,6 +48,9 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams.git
     from: "6.2.0"
+  Crypto:
+    url: https://github.com/apple/swift-crypto.git
+    from: "3.0.0"
 
 targets:
   OSXCleanerGUI:
@@ -152,6 +155,8 @@ targets:
     dependencies:
       - package: Logging
       - package: Yams
+      - package: Crypto
+        product: Crypto
     settings:
       base:
         PRODUCT_NAME: OSXCleanerKit
