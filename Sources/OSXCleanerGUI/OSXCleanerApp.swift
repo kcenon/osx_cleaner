@@ -38,6 +38,15 @@ final class AppState: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var lastError: String?
 
+    /// True when the Rust performance core failed to initialize and the
+    /// app is running the Swift fallback. Drives the compatibility-mode
+    /// banner in `ContentView`.
+    @Published var rustFallbackActive: Bool = false
+
+    /// Human-readable reason for fallback activation. `nil` when the Rust
+    /// core initialized normally.
+    @Published var rustFallbackReason: String?
+
     let cleanerService: CleanerService
     let analyzerService: AnalyzerService
     let diskMonitoringService: DiskMonitoringService
@@ -50,6 +59,13 @@ final class AppState: ObservableObject {
         self.diskMonitoringService = DiskMonitoringService.shared
         self.schedulerService = SchedulerService()
         self.configurationService = ConfigurationService()
+
+        // Eagerly initialize the Rust bridge so that `isFallbackMode` is
+        // known before the first view renders. Failures here are already
+        // swallowed into fallback mode by RustBridge itself.
+        try? RustBridge.shared.initialize()
+        self.rustFallbackActive = RustBridge.shared.isFallbackMode
+        self.rustFallbackReason = RustBridge.shared.fallbackError?.localizedDescription
     }
 
     func getDiskSpace() -> DiskSpaceInfo? {

@@ -198,3 +198,9 @@
 "common.save" = "저장";
 "common.loading" = "로딩 중...";
 "common.error" = "오류";
+
+// MARK: - Fallback mode banner
+
+"banner.fallback.title" = "호환 모드로 실행 중";
+"banner.fallback.body" = "Rust 성능 코어를 사용할 수 없습니다. 일부 작업이 느려집니다.";
+"banner.fallback.reason" = "Rust 성능 코어 사용 불가: %@";

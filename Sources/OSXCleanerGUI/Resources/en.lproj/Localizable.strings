@@ -198,3 +198,9 @@
 "common.save" = "Save";
 "common.loading" = "Loading...";
 "common.error" = "Error";
+
+// MARK: - Fallback mode banner
+
+"banner.fallback.title" = "Running in compatibility mode";
+"banner.fallback.body" = "The Rust performance core is unavailable. Some operations will be slower.";
+"banner.fallback.reason" = "Rust performance core unavailable: %@";
