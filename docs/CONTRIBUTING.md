@@ -136,8 +136,8 @@ osx_cleaner/
 │       └── fs/             # Filesystem utilities
 ├── Sources/                # Swift sources
 │   ├── osxcleaner/         # CLI application
-│   ├── OSXCleanerKit/      # Swift library
-│   └── COSXCore/           # C module for FFI
+│   └── OSXCleanerKit/      # Swift library
+├── Frameworks/             # Built XCFramework wrapping the Rust core (gitignored)
 ├── Tests/                  # Test files
 ├── docs/                   # Documentation
 ├── scripts/                # Shell scripts

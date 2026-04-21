@@ -1,7 +1,7 @@
 # OSX Cleaner - Unified Build System
 # This Makefile provides targets for building the Swift + Rust hybrid project
 
-.PHONY: all swift rust clean test format lint help install uninstall
+.PHONY: all swift rust xcframework clean test format lint help install uninstall
 
 # Default target
 all: rust swift
@@ -16,6 +16,10 @@ INCLUDE_DIR := include
 SWIFT_BUILD_DIR := .build
 SWIFT_CONFIG := release
 
+# XCFramework build artifacts
+XCFRAMEWORK_DIR := Frameworks/COSXCore.xcframework
+XCFRAMEWORK_BUILD_DIR := build/xcframework
+
 # Colors for output
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
@@ -27,26 +31,31 @@ NC := \033[0m # No Color
 # =============================================================================
 
 ## Build everything
-all: rust swift
+all: xcframework swift
 	@echo "$(GREEN)Build complete!$(NC)"
 
-## Build only Rust core
+## Build only Rust core (host architecture, used for tests and dev)
 rust:
 	@echo "$(YELLOW)Building Rust core...$(NC)"
 	@mkdir -p $(INCLUDE_DIR)
 	cd $(RUST_DIR) && cargo build --release
 	@echo "$(GREEN)Rust build complete$(NC)"
 
-## Build only Swift (requires Rust to be built first)
-swift: rust
+## Build the universal XCFramework consumed by SwiftPM and Xcode
+xcframework:
+	@echo "$(YELLOW)Building XCFramework...$(NC)"
+	./scripts/build-xcframework.sh
+	@echo "$(GREEN)XCFramework build complete$(NC)"
+
+## Build only Swift (requires the XCFramework to exist)
+swift: xcframework
 	@echo "$(YELLOW)Building Swift...$(NC)"
 	swift build -c $(SWIFT_CONFIG)
 	@echo "$(GREEN)Swift build complete$(NC)"
 
 ## Build for debug
-debug:
+debug: xcframework
 	@echo "$(YELLOW)Building debug...$(NC)"
-	cd $(RUST_DIR) && cargo build
 	swift build
 	@echo "$(GREEN)Debug build complete$(NC)"
 
@@ -65,7 +74,7 @@ test-rust:
 	@echo "$(GREEN)Rust tests passed$(NC)"
 
 ## Run Swift tests
-test-swift:
+test-swift: xcframework
 	@echo "$(YELLOW)Running Swift tests...$(NC)"
 	swift test
 	@echo "$(GREEN)Swift tests passed$(NC)"
@@ -115,9 +124,14 @@ lint-swift:
 # =============================================================================
 
 ## Clean all build artifacts
-clean: clean-rust clean-swift
+clean: clean-rust clean-swift clean-xcframework
 	@rm -rf $(INCLUDE_DIR)/osxcore.h
 	@echo "$(GREEN)Clean complete$(NC)"
+
+## Clean the XCFramework and its staging directory
+clean-xcframework:
+	@echo "$(YELLOW)Cleaning XCFramework...$(NC)"
+	@rm -rf $(XCFRAMEWORK_DIR) $(XCFRAMEWORK_BUILD_DIR)
 
 ## Clean Rust build artifacts
 clean-rust:
@@ -159,7 +173,7 @@ headers:
 	@echo "$(GREEN)Headers generated at $(INCLUDE_DIR)/osxcore.h$(NC)"
 
 ## Check all code without building
-check:
+check: xcframework
 	@echo "$(YELLOW)Checking Rust...$(NC)"
 	cd $(RUST_DIR) && cargo check
 	@echo "$(YELLOW)Checking Swift...$(NC)"

@@ -19,16 +19,6 @@ settings:
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
     ENABLE_HARDENED_RUNTIME: YES
-    OTHER_LDFLAGS:
-      - "-L$(PROJECT_DIR)/rust-core/target/release"
-      - "-losxcore"
-    LIBRARY_SEARCH_PATHS:
-      - "$(PROJECT_DIR)/rust-core/target/release"
-    SWIFT_INCLUDE_PATHS:
-      - "$(PROJECT_DIR)/include"
-      - "$(PROJECT_DIR)/Sources/COSXCore"
-    HEADER_SEARCH_PATHS:
-      - "$(PROJECT_DIR)/include"
     CLANG_ENABLE_MODULES: YES
   configs:
     Debug:
@@ -157,6 +147,8 @@ targets:
       - package: Yams
       - package: Crypto
         product: Crypto
+      - framework: Frameworks/COSXCore.xcframework
+        embed: false
     settings:
       base:
         PRODUCT_NAME: OSXCleanerKit
