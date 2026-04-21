@@ -81,7 +81,7 @@ runs:
           echo "Building from source..."
           git clone --depth 1 https://github.com/kcenon/osx_cleaner.git /tmp/osx_cleaner
           cd /tmp/osx_cleaner
-          swift build -c release
+          make all
           sudo cp .build/release/osxcleaner /usr/local/bin/
         else
           # Download pre-built binary

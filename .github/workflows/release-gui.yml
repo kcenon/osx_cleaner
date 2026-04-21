@@ -52,6 +52,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Cargo registry
         uses: actions/cache@v5
@@ -124,10 +126,8 @@ jobs:
           echo "Available signing identities:"
           security find-identity -v -p codesigning "${KEYCHAIN_PATH}"
 
-      - name: Build Rust core
-        run: |
-          cd rust-core
-          cargo build --release
+      - name: Build XCFramework (required by project.yml)
+        run: make xcframework
 
       - name: Build and sign app
         env:
