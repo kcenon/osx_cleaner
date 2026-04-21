@@ -47,7 +47,7 @@ packages:
     from: "1.5.0"
   Yams:
     url: https://github.com/jpsim/Yams.git
-    from: "5.0.0"
+    from: "6.2.0"
 
 targets:
   OSXCleanerGUI:
