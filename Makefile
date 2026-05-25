@@ -1,7 +1,7 @@
 # OSX Cleaner - Unified Build System
 # This Makefile provides targets for building the Swift + Rust hybrid project
 
-.PHONY: all build bootstrap swift rust xcframework clean test test-rust test-swift format format-rust format-swift lint lint-rust lint-swift help install uninstall debug headers check docs ci clean-rust clean-swift clean-xcframework
+.PHONY: all build bootstrap swift rust xcframework clean test test-rust test-swift test-cli format format-rust format-swift lint lint-rust lint-swift help install uninstall debug headers check docs ci clean-rust clean-swift clean-xcframework
 
 # Default target
 all: build
@@ -79,8 +79,16 @@ test-rust:
 ## Run Swift tests
 test-swift: xcframework
 	@echo "$(YELLOW)Running Swift tests...$(NC)"
-	swift test
+	swift build --product osxcleaner
+	OSXCLEANER_CLI_PATH="$$(swift build --show-bin-path)/osxcleaner" swift test
 	@echo "$(GREEN)Swift tests passed$(NC)"
+
+## Run CLI integration tests
+test-cli: xcframework
+	@echo "$(YELLOW)Running CLI integration tests...$(NC)"
+	swift build --product osxcleaner
+	OSXCLEANER_CLI_PATH="$$(swift build --show-bin-path)/osxcleaner" swift test --filter osxcleanerCLITests
+	@echo "$(GREEN)CLI integration tests passed$(NC)"
 
 # =============================================================================
 # Quality Targets

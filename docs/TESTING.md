@@ -53,7 +53,7 @@ osx_cleaner/
 │   │   ├── Services/
 │   │   ├── Core/
 │   │   └── Utilities/
-│   └── osxcleanerTests/       # CLI tests
+│   └── osxcleanerCLITests/    # CLI integration tests
 └── benchmarks/                # Performance benchmarks
 ```
 
@@ -75,6 +75,9 @@ cd rust-core && cargo test
 
 # Run only Swift tests; generates the XCFramework first
 make test-swift
+
+# Run only CLI integration tests
+make test-cli
 
 # Run Swift coverage after the XCFramework bootstrap
 make xcframework
@@ -120,7 +123,8 @@ make test-swift
 
 # Or bootstrap once, then run SwiftPM directly
 make xcframework
-swift test
+swift build --product osxcleaner
+OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
 
 # Run specific test class
 swift test --filter SafetyTests
@@ -144,6 +148,9 @@ make test
 
 # Test CLI directly
 .build/release/osxcleaner --dry-run --level light
+
+# Run subprocess-based CLI regression tests
+make test-cli
 ```
 
 ---

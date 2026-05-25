@@ -248,10 +248,11 @@ struct CleanCommand: AsyncParsableCommand {
     // MARK: - Private Methods
 
     private func buildConfiguration() throws -> CleanerConfiguration {
-        let includeSystem = target == .all
-        let includeDeveloper = target == .developer || target == .all
-        let includeBrowser = target == .browser || target == .all
-        let includeLogs = target == .logs || target == .all
+        let hasSpecificPaths = !paths.isEmpty
+        let includeSystem = !hasSpecificPaths && target == .all
+        let includeDeveloper = !hasSpecificPaths && (target == .developer || target == .all)
+        let includeBrowser = !hasSpecificPaths && (target == .browser || target == .all)
+        let includeLogs = !hasSpecificPaths && (target == .logs || target == .all)
 
         // Check for team configuration
         let teamService = TeamConfigService.shared

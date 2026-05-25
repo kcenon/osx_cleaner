@@ -255,7 +255,13 @@ osxcleaner clean --target logs
 
 # Clean all targets
 osxcleaner clean --target all
+
+# Clean only explicit paths
+osxcleaner clean --level deep ~/Library/Containers/com.example.app
 ```
+
+When path arguments are provided, `clean` restricts execution to those
+canonicalized paths instead of adding broad category targets implicitly.
 
 ### Safety Options
 

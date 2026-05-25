@@ -86,7 +86,8 @@ jobs:
         run: swift build
 
       - name: Run Swift tests
-        run: swift test
+        run: |
+          OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
 
   # Full build and integration test
   build:
@@ -156,8 +157,13 @@ jobs:
       - name: Build XCFramework (required for Swift tests)
         run: make xcframework
 
+      - name: Build CLI for integration tests
+        run: swift build --product osxcleaner
+
       - name: Run Swift tests with coverage
-        run: swift test --enable-code-coverage
+        run: |
+          OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" \
+            swift test --enable-code-coverage
 
       - name: Generate Swift coverage report
         run: |
