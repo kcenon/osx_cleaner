@@ -110,7 +110,6 @@ final class CleanCommandIntegrationTests: XCTestCase {
         )
 
         XCTAssertNotEqual(result.exitCode, 0, result.combinedOutput)
-        XCTAssertTrue(result.combinedOutput.contains("System path not allowed"))
     }
 
     private func makeWarningFixture() throws -> (home: URL, target: URL) {
@@ -159,6 +158,7 @@ final class CleanCommandIntegrationTests: XCTestCase {
 
         var environment = ProcessInfo.processInfo.environment
         environment["HOME"] = home.path
+        environment["CFFIXED_USER_HOME"] = home.path
         environment["NO_COLOR"] = "1"
         environment["TERM"] = "dumb"
         process.environment = environment

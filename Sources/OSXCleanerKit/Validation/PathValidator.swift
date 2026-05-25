@@ -130,6 +130,12 @@ public struct PathValidator {
         }
 
         // 5. Create URL and standardize (resolve symbolic links, remove .. components)
+        if !NSString(string: processedPath).isAbsolutePath {
+            processedPath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(processedPath)
+                .path
+        }
+
         let url = URL(fileURLWithPath: processedPath)
         let standardizedURL = url.resolvingSymlinksInPath().standardized
 
