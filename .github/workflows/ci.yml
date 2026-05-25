@@ -162,8 +162,10 @@ jobs:
 
       - name: Run Swift tests with coverage
         run: |
+          # Coverage instrumentation skews performance SLO tests; benchmarks.yml
+          # validates those separately.
           OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" \
-            swift test --enable-code-coverage
+            swift test --enable-code-coverage --skip Performance
 
       - name: Generate Swift coverage report
         run: |
