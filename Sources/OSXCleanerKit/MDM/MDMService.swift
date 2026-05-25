@@ -21,13 +21,23 @@ public actor MDMService {
     private var lastSyncAt: Date?
     private var syncTimer: Task<Void, Never>?
     private let cleanerService: any CleanerServiceProtocol
+    private let cleanupConfiguration: CleanerConfiguration
 
     // MARK: - Initialization
 
     /// Initialize MDM service with optional dependency injection
     /// - Parameter cleanerService: CleanerService implementation (defaults to CleanerService())
-    public init(cleanerService: any CleanerServiceProtocol = CleanerService()) {
+    /// - Parameter cleanupConfiguration: Configuration used for MDM cleanup commands.
+    public init(
+        cleanerService: any CleanerServiceProtocol = CleanerService(),
+        cleanupConfiguration: CleanerConfiguration = CleanerConfiguration(
+            cleanupLevel: .normal,
+            dryRun: false,
+            includeSystemCaches: true
+        )
+    ) {
         self.cleanerService = cleanerService
+        self.cleanupConfiguration = cleanupConfiguration
     }
 
     // MARK: - Connection Management
@@ -314,12 +324,7 @@ public actor MDMService {
         do {
             switch command.type {
             case .cleanup:
-                let cleanerConfig = CleanerConfiguration(
-                    cleanupLevel: .normal,
-                    dryRun: false,
-                    includeSystemCaches: true
-                )
-                let result = try await self.cleanerService.clean(with: cleanerConfig)
+                let result = try await self.cleanerService.clean(with: cleanupConfiguration)
 
                 return MDMCommandResult(
                     commandId: command.id,
