@@ -63,6 +63,11 @@
 "clean.noResults.description" = "Click 'Scan' to find items to clean up.";
 "clean.items" = "%d items";
 "clean.total" = "Total: %@";
+"clean.selectedItems" = "%d of %d items selected";
+"clean.selectedTotal" = "Selected: %@";
+"clean.emptySelection" = "Select at least one item to clean.";
+"clean.selectAll" = "Select All";
+"clean.deselectAll" = "Deselect All";
 
 // MARK: - Cleanup Levels
 
@@ -87,6 +92,7 @@
 
 "confirmCleanup.title" = "Confirm Cleanup";
 "confirmCleanup.message" = "This will delete %d items. This action cannot be undone.";
+"confirmCleanup.selectedMessage" = "This will delete %d selected items (%@). This action cannot be undone.";
 "confirmCleanup.cancel" = "Cancel";
 "confirmCleanup.clean" = "Clean";
 

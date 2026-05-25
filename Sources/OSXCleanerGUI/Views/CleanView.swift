@@ -41,7 +41,7 @@ struct CleanView: View {
                 } label: {
                     Label(L("clean.cleanButton"), systemImage: "trash")
                 }
-                .disabled(scanResults.isEmpty || isCleaning)
+                .disabled(scanResults.isEmpty || !selectedCleanupSummary.hasSelection || isCleaning)
             }
         }
         .alert(L("confirmCleanup.title"), isPresented: $showConfirmation) {
@@ -50,7 +50,11 @@ struct CleanView: View {
                 Task { await performCleanup() }
             }
         } message: {
-            Text(L("confirmCleanup.message", scanResults.count))
+            Text(L(
+                "confirmCleanup.selectedMessage",
+                selectedCleanupSummary.selectedItemCount,
+                formatSize(selectedCleanupSummary.selectedTotalSize)
+            ))
         }
     }
 
@@ -80,13 +84,7 @@ struct CleanView: View {
                         ForEach(CleanupTarget.allCases, id: \.self) { target in
                             Toggle(isOn: Binding(
                                 get: { selectedTargets.contains(target) },
-                                set: { isSelected in
-                                    if isSelected {
-                                        selectedTargets.insert(target)
-                                    } else {
-                                        selectedTargets.remove(target)
-                                    }
-                                }
+                                set: { setCleanupTarget(target, isSelected: $0) }
                             )) {
                                 Label(target.displayName, systemImage: target.icon)
                             }
@@ -116,22 +114,94 @@ struct CleanView: View {
                     description: Text(L("clean.noResults.description"))
                 )
             } else {
-                List(scanResults) { item in
-                    CleanupItemRow(item: item)
+                List {
+                    ForEach($scanResults) { $item in
+                        CleanupItemRow(item: $item)
+                    }
                 }
                 .listStyle(.inset)
 
                 // Summary
-                HStack {
-                    Text(L("clean.items", scanResults.count))
-                    Spacer()
-                    Text(L("clean.total", formatTotalSize()))
-                        .fontWeight(.semibold)
+                VStack(spacing: 8) {
+                    HStack {
+                        Button {
+                            setAllScanResultsSelected(true)
+                        } label: {
+                            Label(L("clean.selectAll"), systemImage: "checkmark.circle")
+                        }
+                        .disabled(scanResults.allSatisfy(\.isSelected))
+
+                        Button {
+                            setAllScanResultsSelected(false)
+                        } label: {
+                            Label(L("clean.deselectAll"), systemImage: "circle")
+                        }
+                        .disabled(scanResults.allSatisfy { !$0.isSelected })
+
+                        Spacer()
+                    }
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L(
+                                "clean.selectedItems",
+                                selectedCleanupSummary.selectedItemCount,
+                                scanResults.count
+                            ))
+
+                            if !selectedCleanupSummary.hasSelection {
+                                Text(L("clean.emptySelection"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        Text(L("clean.selectedTotal", formatSize(selectedCleanupSummary.selectedTotalSize)))
+                            .fontWeight(.semibold)
+                    }
                 }
                 .padding()
                 .background(Color(nsColor: .controlBackgroundColor))
             }
         }
+    }
+
+    private var cleanupSelectionItems: [ScannedCleanupSelectionItem] {
+        scanResults.map(\.selectionItem)
+    }
+
+    private var selectedCleanupSummary: CleanupSelectionSummary {
+        ScannedCleanupSelection.summary(for: cleanupSelectionItems)
+    }
+
+    private func setCleanupTarget(_ target: CleanupTarget, isSelected: Bool) {
+        if target == .all {
+            selectedTargets = isSelected ? [.all] : []
+            return
+        }
+
+        if isSelected {
+            selectedTargets.remove(.all)
+            selectedTargets.insert(target)
+        } else {
+            selectedTargets.remove(target)
+        }
+    }
+
+    private func setAllScanResultsSelected(_ isSelected: Bool) {
+        for index in scanResults.indices {
+            scanResults[index].isSelected = isSelected
+        }
+    }
+
+    private func shouldIncludeCategory(_ categoryName: String) -> Bool {
+        guard let target = CleanupTarget(categoryName: categoryName) else {
+            return false
+        }
+
+        return selectedTargets.contains(.all) || selectedTargets.contains(target)
     }
 
     // MARK: - Actions
@@ -151,13 +221,16 @@ struct CleanView: View {
             let result = try await appState.analyzerService.analyze(with: config)
 
             // Convert analysis results to cleanup items
-            scanResults = result.categories.flatMap { category in
+            scanResults = result.categories.filter { category in
+                shouldIncludeCategory(category.name)
+            }.flatMap { category in
                 category.topItems.map { item in
                     CleanupItem(
                         name: item.path.components(separatedBy: "/").last ?? item.path,
                         path: item.path,
                         size: item.size,
-                        safety: safetyLevel(for: category.name)
+                        safety: safetyLevel(for: category.name),
+                        isSelected: true
                     )
                 }
             }
@@ -176,15 +249,13 @@ struct CleanView: View {
         }
 
         do {
-            let config = CleanerConfiguration(
+            guard let config = ScannedCleanupSelection.makeConfiguration(
                 cleanupLevel: selectedLevel.toBackendLevel(),
-                dryRun: false,
-                includeSystemCaches: selectedTargets.contains(.system) || selectedTargets.contains(.all),
-                includeDeveloperCaches: selectedTargets.contains(.developer) || selectedTargets.contains(.all),
-                includeBrowserCaches: selectedTargets.contains(.browser) || selectedTargets.contains(.all),
-                includeLogsCaches: selectedTargets.contains(.logs) || selectedTargets.contains(.all),
-                specificPaths: []
-            )
+                items: cleanupSelectionItems
+            ) else {
+                appState.lastError = L("clean.emptySelection")
+                return
+            }
 
             let result = try await appState.cleanerService.clean(with: config)
             lastCleanResult = result
@@ -209,11 +280,10 @@ struct CleanView: View {
         }
     }
 
-    private func formatTotalSize() -> String {
-        let total = scanResults.reduce(0) { $0 + $1.size }
+    private func formatSize(_ bytes: UInt64) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(total))
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 }
 
@@ -266,6 +336,21 @@ enum CleanupTarget: String, CaseIterable {
     case logs
     case system
 
+    init?(categoryName: String) {
+        switch categoryName.lowercased() {
+        case let name where name.contains("browser"):
+            self = .browser
+        case let name where name.contains("developer"):
+            self = .developer
+        case let name where name.contains("log"):
+            self = .logs
+        case let name where name.contains("system"):
+            self = .system
+        default:
+            return nil
+        }
+    }
+
     var displayName: String {
         switch self {
         case .all: return L("cleanupTargets.all")
@@ -288,11 +373,32 @@ enum CleanupTarget: String, CaseIterable {
 }
 
 struct CleanupItem: Identifiable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let path: String
     let size: UInt64
     let safety: SafetyLevel
+    var isSelected: Bool
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        path: String,
+        size: UInt64,
+        safety: SafetyLevel,
+        isSelected: Bool = true
+    ) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.size = size
+        self.safety = safety
+        self.isSelected = isSelected
+    }
+
+    var selectionItem: ScannedCleanupSelectionItem {
+        ScannedCleanupSelectionItem(path: path, size: size, isSelected: isSelected)
+    }
 }
 
 // MARK: - Supporting Views
@@ -325,28 +431,30 @@ struct CleanupLevelRow: View {
 }
 
 struct CleanupItemRow: View {
-    let item: CleanupItem
+    @Binding var item: CleanupItem
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(item.name)
-                    .font(.headline)
-                Text(item.path)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+        Toggle(isOn: $item.isSelected) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(item.name)
+                        .font(.headline)
+                    Text(item.path)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-            Spacer()
+                Spacer()
 
-            VStack(alignment: .trailing) {
-                Text(formatSize(item.size))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(item.safety.displayText)
-                    .font(.caption2)
-                    .foregroundStyle(item.safety.color)
+                VStack(alignment: .trailing) {
+                    Text(formatSize(item.size))
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(item.safety.displayText)
+                        .font(.caption2)
+                        .foregroundStyle(item.safety.color)
+                }
             }
         }
         .padding(.vertical, 4)

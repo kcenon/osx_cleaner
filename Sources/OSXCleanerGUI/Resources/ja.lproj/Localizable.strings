@@ -63,6 +63,11 @@
 "clean.noResults.description" = "「スキャン」をクリックしてクリーンアップする項目を見つけてください。";
 "clean.items" = "%d 項目";
 "clean.total" = "合計: %@";
+"clean.selectedItems" = "%d/%d 項目を選択";
+"clean.selectedTotal" = "選択合計: %@";
+"clean.emptySelection" = "クリーンアップする項目を1つ以上選択してください。";
+"clean.selectAll" = "すべて選択";
+"clean.deselectAll" = "すべて解除";
 
 // MARK: - Cleanup Levels
 
@@ -87,6 +92,7 @@
 
 "confirmCleanup.title" = "クリーンアップの確認";
 "confirmCleanup.message" = "%d個の項目が削除されます。この操作は元に戻せません。";
+"confirmCleanup.selectedMessage" = "選択した%d個の項目（%@）が削除されます。この操作は元に戻せません。";
 "confirmCleanup.cancel" = "キャンセル";
 "confirmCleanup.clean" = "クリーン";
 
