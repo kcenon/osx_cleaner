@@ -229,6 +229,7 @@ osxcleaner schedule enable daily
 | `--format` | clean, analyze, schedule | Output format (text, json) |
 | `--dry-run` | clean | Preview without actual deletion |
 | `--non-interactive` | clean | Skip confirmation prompts (for CI/CD) |
+| `--force` | clean | Explicitly approve warning/system cleanup in non-interactive mode |
 | `--verbose` | clean, analyze | Show detailed output |
 | `--quiet` | clean, analyze | Minimal output |
 | `--ignore-team` | clean | Ignore team configuration policies |
@@ -336,7 +337,10 @@ For detailed documentation, see [Monitoring Guide](docs/monitoring/MONITORING.md
 ### Manual Build
 
 ```bash
-# Build everything (universal XCFramework + Swift release binaries)
+# Fresh clone first build (universal XCFramework + Swift release binaries)
+make build
+
+# Backward-compatible alias for the same full build
 make all
 
 # Run tests (Rust + Swift; Swift step automatically builds the XCFramework first)
@@ -352,8 +356,14 @@ make xcframework
 The Swift package consumes the Rust core through
 `Frameworks/COSXCore.xcframework`, a universal (`arm64` + `x86_64`) static
 library wrapped via SwiftPM's `binaryTarget`. It is **not** committed to the
-repository, so a clean checkout must run `make xcframework` (or any target
-that depends on it) before `swift build`/`swift test`.
+repository, so the supported clean-checkout path is `make build` (or `make`
+with no target). Direct `swift build`/`swift test` commands are supported only
+after `make xcframework` has generated the local binary target.
+
+Dependency lockfiles are committed for reproducibility:
+`Package.resolved` pins SwiftPM dependencies and `rust-core/Cargo.lock` pins
+Rust dependencies. When changing dependencies, update and commit the matching
+lockfile with the manifest change.
 
 ---
 
@@ -446,7 +456,7 @@ See [Fastlane Plugin README](integrations/fastlane/README.md) for installation a
 osxcleaner clean --level normal --non-interactive --format json
 
 # Cleanup only if available space is below 20GB
-osxcleaner clean --level deep --non-interactive --min-space 20 --format json
+osxcleaner clean --level deep --non-interactive --force --min-space 20 --format json
 
 # Preview cleanup in CI logs
 osxcleaner clean --level deep --dry-run --format json
@@ -502,7 +512,14 @@ The `--format json` flag outputs machine-readable results for CI/CD integration:
 ### Build Requirements
 - **Swift**: 5.9+
 - **Rust**: 1.75+
-- **Xcode**: 15+
+- **Rust targets**: `aarch64-apple-darwin` and `x86_64-apple-darwin`
+- **Xcode**: 15+ or Xcode Command Line Tools (`lipo`, `xcodebuild`)
+
+Source builds target macOS 14.0 and later. `rustup` is recommended because
+`scripts/build-xcframework.sh` can install missing Rust targets automatically;
+Homebrew Rust can work when both Apple target standard libraries are already
+available. Use `./scripts/build-xcframework.sh --check` to diagnose local
+prerequisites without building.
 
 ---
 

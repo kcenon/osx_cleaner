@@ -22,8 +22,8 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 
 1. **Never delete what you can't recover** - System files and user documents are always protected
 2. **Classify before delete** - Every path is classified before any action is taken
-3. **User confirmation for risky operations** - Warning-level items require explicit approval
-4. **Dry-run by default** - Encourage previewing before actual cleanup
+3. **Confirm risky operations** - Warning-level items require explicit approval
+4. **Preview before cleanup** - Use `--dry-run` to inspect planned changes before deletion
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,7 +34,7 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 │      ↓            ↓           ↓           ↓         ↓            │
 │   Validate    4-Level     Match with   Require    Execute        │
 │   Existence   System      Cleanup      Approval   Safely         │
-│                           Level        if Warning                 │
+│                           Level        if Warning                │
 │                                                                   │
 │  At any step: DANGER paths → IMMEDIATE BLOCK (never delete)      │
 │                                                                   │
@@ -162,6 +162,10 @@ osxcleaner clean --level deep
 
 **Best for:** Pre-release cleanup, disk space emergency
 
+Deep cleanup can include Warning-level targets. Interactive runs ask for `yes`
+before deletion. Non-interactive runs fail closed for Warning-level cleanup
+unless `--force` is also provided.
+
 ### Level 4: System
 
 ```bash
@@ -177,7 +181,9 @@ sudo osxcleaner clean --level system
 
 **Best for:** Expert users only, system maintenance
 
-> **Note:** Even at System level, Danger paths are NEVER deleted.
+> **Note:** System-level cleanup also requires confirmation, or
+> `--non-interactive --force` in automation. Even at System level, Danger paths
+> are NEVER deleted.
 
 ---
 
@@ -271,6 +277,11 @@ These paths are Warning level and require confirmation before deletion:
 | Docker images need to be pulled again | Depends on images |
 | npm/pip packages need reinstall | project-dependent |
 
+Developer cleanup commands, such as Docker prune or package manager cache
+cleanup, have a default 10 minute execution timeout. Dry-runs do not execute
+these external cleanup commands. If a cleanup command times out, the target is
+reported as a cleanup error and is not counted as cleaned or freed space.
+
 ### After System Cleanup
 
 | Change | Duration |
@@ -289,6 +300,9 @@ These paths are Warning level and require confirmation before deletion:
    ```bash
    osxcleaner clean --level deep --dry-run
    ```
+
+   Dry-run output reports the planned target count, highest safety level, and
+   estimated reclaimable space without deleting files.
 
 2. **Create a Time Machine backup**
    ```bash
@@ -350,7 +364,7 @@ docker pull your-image-name
 
 **A:**
 1. OSX Cleaner won't delete Danger paths
-2. Warning paths require confirmation
+2. Confirm Warning paths before deletion, especially before Deep or System cleanup
 3. Use Time Machine for recovery
 4. Most cleaned items regenerate automatically
 

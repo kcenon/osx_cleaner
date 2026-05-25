@@ -9,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
 
 jobs:
   # Rust jobs
@@ -85,7 +86,8 @@ jobs:
         run: swift build
 
       - name: Run Swift tests
-        run: swift test
+        run: |
+          OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
 
   # Full build and integration test
   build:
@@ -112,8 +114,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-full-
 
-      - name: Build all
-        run: make all
+      - name: Build from clean checkout
+        run: make build
 
       - name: Run all tests
         run: make test
@@ -155,8 +157,15 @@ jobs:
       - name: Build XCFramework (required for Swift tests)
         run: make xcframework
 
+      - name: Build CLI for integration tests
+        run: swift build --product osxcleaner
+
       - name: Run Swift tests with coverage
-        run: swift test --enable-code-coverage
+        run: |
+          # Coverage instrumentation skews performance SLO tests; benchmarks.yml
+          # validates those separately.
+          OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" \
+            swift test --enable-code-coverage --skip Performance
 
       - name: Generate Swift coverage report
         run: |

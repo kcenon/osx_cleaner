@@ -15,14 +15,20 @@ public struct PathValidator {
         "/System",
         "/Library/System",
         "/private/var/db",
+        "/private/etc",
         "/dev",
         "/etc",
         "/bin",
         "/sbin",
         "/usr/bin",
         "/usr/sbin",
+        "/usr/lib",
+        "/usr/libexec",
         "/var/db",
-        "/var/root"
+        "/var/root",
+        "/private/var/root",
+        "/Library/Extensions",
+        "/Library/Frameworks"
     ]
 
     /// Sensitive user directories that require extra caution
@@ -124,8 +130,14 @@ public struct PathValidator {
         }
 
         // 5. Create URL and standardize (resolve symbolic links, remove .. components)
+        if !NSString(string: processedPath).isAbsolutePath {
+            processedPath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(processedPath)
+                .path
+        }
+
         let url = URL(fileURLWithPath: processedPath)
-        let standardizedURL = url.standardized
+        let standardizedURL = url.resolvingSymlinksInPath().standardized
 
         // 6. Check system path protection
         if !options.allowSystemPaths {
@@ -160,6 +172,28 @@ public struct PathValidator {
     ) throws -> String {
         let url = try validate(path, options: options)
         return url.path
+    }
+
+    /// Classifies a path using the Swift safety policy.
+    ///
+    /// This classifier mirrors the cleanup-level contract used when the Rust
+    /// core is unavailable, so fallback cleanup cannot bypass protected paths.
+    ///
+    /// - Parameter path: The path string to classify
+    /// - Returns: Safety level for the canonical path
+    /// - Throws: ValidationError if the path is structurally invalid
+    public static func safetyLevel(for path: String) throws -> SafetyLevel {
+        let canonicalPath = try validatePath(
+            path,
+            options: ValidationOptions(
+                checkExistence: false,
+                checkReadability: false,
+                allowSystemPaths: true,
+                expandTilde: true
+            )
+        )
+
+        return safetyLevelForCanonicalPath(canonicalPath)
     }
 
     // MARK: - Individual Check Methods
@@ -282,11 +316,107 @@ public struct PathValidator {
     /// - Parameter path: Path to check
     /// - Returns: true if path is sensitive
     public static func isSensitivePath(_ path: String) -> Bool {
-        for sensitivePath in sensitiveUserPaths {
-            if path.hasPrefix(sensitivePath) {
-                return true
-            }
+        matchesAny(path, in: sensitiveUserPaths)
+    }
+
+    // MARK: - Safety Classification
+
+    private static func safetyLevelForCanonicalPath(_ path: String) -> SafetyLevel {
+        if isSystemProtectedPath(path) || matchesAny(path, in: dangerPaths()) {
+            return .danger
         }
-        return false
+
+        if matchesAny(path, in: warningPaths()) || isSensitivePath(path) {
+            return .warning
+        }
+
+        if matchesAny(path, in: safePaths()) {
+            return .safe
+        }
+
+        if matchesAny(path, in: cautionPaths()) {
+            return .caution
+        }
+
+        // Unknown custom paths are intentionally conservative. The CLI can
+        // still clean them at a higher cleanup level after explicit approval.
+        return .warning
+    }
+
+    private static func dangerPaths() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/Library/Keychains",
+            "\(home)/Library/Application Support",
+            "\(home)/Library/Mail",
+            "\(home)/Library/Messages",
+            "\(home)/Library/Preferences",
+            "\(home)/Library/Accounts",
+            "\(home)/Library/Cookies",
+            "\(home)/Library/Calendars",
+            "\(home)/Library/Contacts",
+            "\(home)/Library/Safari/Bookmarks.plist",
+            "\(home)/Library/Safari/History.db",
+            "\(home)/Documents",
+            "\(home)/Desktop",
+            "\(home)/Pictures",
+            "\(home)/Movies",
+            "\(home)/Music",
+            "\(home)/Downloads",
+            "/Library/Keychains",
+            "/Library/Security"
+        ]
+    }
+
+    private static func warningPaths() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/Library/Developer/Xcode/DerivedData",
+            "\(home)/Library/Developer/Xcode/Archives",
+            "\(home)/Library/Developer/Xcode/iOS DeviceSupport",
+            "\(home)/Library/Developer/Xcode/watchOS DeviceSupport",
+            "\(home)/Library/Developer/Xcode/tvOS DeviceSupport",
+            "\(home)/Library/Containers",
+            "\(home)/Library/Group Containers",
+            "\(home)/.docker",
+            "\(home)/.gradle/caches",
+            "\(home)/.npm/_cacache",
+            "\(home)/.cargo/registry/cache",
+            "/Library/Caches"
+        ]
+    }
+
+    private static func safePaths() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .resolvingSymlinksInPath()
+            .standardized
+            .path
+        return [
+            "/tmp",
+            "/private/tmp",
+            "/var/tmp",
+            "/private/var/tmp",
+            temporaryDirectory,
+            "\(home)/Library/Caches/com.apple.Safari",
+            "\(home)/Library/Caches/Google/Chrome",
+            "\(home)/Library/Caches/Firefox"
+        ]
+    }
+
+    private static func cautionPaths() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/Library/Caches",
+            "\(home)/Library/Logs",
+            "\(home)/Library/Saved Application State"
+        ]
+    }
+
+    private static func matchesAny(_ path: String, in roots: [String]) -> Bool {
+        roots.contains { root in
+            let normalizedRoot = root.hasSuffix("/") ? String(root.dropLast()) : root
+            return path == normalizedRoot || path.hasPrefix(normalizedRoot + "/")
+        }
     }
 }

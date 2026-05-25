@@ -62,6 +62,11 @@ let package = Package(
             name: "OSXCleanerKitTests",
             dependencies: ["OSXCleanerKit"],
             path: "Tests/OSXCleanerKitTests"
+        ),
+        .testTarget(
+            name: "osxcleanerCLITests",
+            dependencies: [],
+            path: "Tests/osxcleanerCLITests"
         )
     ]
 )

@@ -30,6 +30,12 @@ OSX Cleaner uses a hybrid testing approach combining:
 3. **Isolation**: Tests should not depend on external state
 4. **Clarity**: Test names describe what they verify
 
+### Safety Contract
+
+Tests must not clean real user data. Cleanup tests that perform deletion must
+use temporary directories or injected test fixtures, and CLI smoke checks should
+prefer `--dry-run` unless the test owns every path it removes.
+
 ---
 
 ## Test Structure
@@ -47,7 +53,7 @@ osx_cleaner/
 │   │   ├── Services/
 │   │   ├── Core/
 │   │   └── Utilities/
-│   └── osxcleanerTests/       # CLI tests
+│   └── osxcleanerCLITests/    # CLI integration tests
 └── benchmarks/                # Performance benchmarks
 ```
 
@@ -58,18 +64,31 @@ osx_cleaner/
 ### Quick Commands
 
 ```bash
+# Fresh clone first build; generates Frameworks/COSXCore.xcframework
+make build
+
 # Run all tests (Rust + Swift)
 make test
 
 # Run only Rust tests
 cd rust-core && cargo test
 
-# Run only Swift tests
-swift test
+# Run only Swift tests; generates the XCFramework first
+make test-swift
 
-# Run with coverage
-make test-coverage
+# Run only CLI integration tests
+make test-cli
+
+# Run Swift coverage after the XCFramework bootstrap
+make xcframework
+swift test --enable-code-coverage
 ```
+
+The Swift package has a local binary target at
+`Frameworks/COSXCore.xcframework`. It is generated, not committed, so direct
+`swift build` or `swift test` commands require a prior `make xcframework`.
+Use `./scripts/build-xcframework.sh --check` when diagnosing missing local
+build prerequisites.
 
 ### Detailed Commands
 
@@ -99,8 +118,13 @@ cargo llvm-cov --all-features
 #### Swift Tests
 
 ```bash
-# Run all tests
-swift test
+# Run all tests from a clean checkout
+make test-swift
+
+# Or bootstrap once, then run SwiftPM directly
+make xcframework
+swift build --product osxcleaner
+OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
 
 # Run specific test class
 swift test --filter SafetyTests
@@ -119,11 +143,14 @@ swift test --no-parallel
 
 ```bash
 # Build and test full integration
-make all
+make build
 make test
 
 # Test CLI directly
 .build/release/osxcleaner --dry-run --level light
+
+# Run subprocess-based CLI regression tests
+make test-cli
 ```
 
 ---
@@ -300,6 +327,7 @@ final class SafetyTests: XCTestCase {
 **Swift:**
 ```bash
 # Run tests with coverage
+make xcframework
 swift test --enable-code-coverage
 
 # Generate lcov report
@@ -365,10 +393,12 @@ The `.github/workflows/ci.yml` runs:
    - Unit tests (`cargo test`)
 
 2. **Swift Check**
+   - XCFramework bootstrap (`make xcframework`)
    - Build (`swift build`)
    - Unit tests (`swift test`)
 
 3. **Coverage**
+   - XCFramework bootstrap (`make xcframework`)
    - Swift coverage with llvm-cov
    - Rust coverage with cargo-llvm-cov
    - Upload to Codecov
@@ -414,7 +444,7 @@ coverage:
 4. **Test Edge Cases**: Empty inputs, max values, null pointers
 5. **Test Error Paths**: Ensure error handling is covered
 6. **Isolate Tests**: No shared state, use setup/teardown
-7. **Mock External Dependencies**: FFI, file system, network
+7. **Mock External Dependencies**: FFI, file system, network, cleanup commands
 
 ### Don'ts ❌
 

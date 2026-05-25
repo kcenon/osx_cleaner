@@ -123,7 +123,7 @@ public final class CleanerService: CleanerServiceProtocol {
                 if useRustCore {
                     result = try await cleanTargetWithRust(target, config: config)
                 } else {
-                    result = try await cleanTargetWithSwift(target, dryRun: config.dryRun)
+                    result = try await cleanTargetWithSwift(target, config: config)
                 }
                 totalFreed += result.freedBytes
                 filesRemoved += result.filesRemoved
@@ -200,21 +200,84 @@ public final class CleanerService: CleanerServiceProtocol {
 
     // MARK: - Swift Fallback Cleanup
 
-    private func cleanTargetWithSwift(_ target: CleanTarget, dryRun: Bool) async throws -> CleanResult {
-        guard fileManager.fileExists(atPath: target.path) else {
+    private func cleanTargetWithSwift(_ target: CleanTarget, config: CleanerConfiguration) async throws -> CleanResult {
+        let canonicalPath: String
+        do {
+            canonicalPath = try PathValidator.validatePath(
+                target.path,
+                options: PathValidator.ValidationOptions(
+                    checkExistence: true,
+                    checkReadability: false,
+                    allowSystemPaths: true,
+                    expandTilde: true
+                )
+            )
+        } catch ValidationError.pathNotFound(_) {
             return CleanResult(freedBytes: 0, filesRemoved: 0)
+        } catch let error as ValidationError {
+            return skippedTargetResult(path: target.path, reason: error.problem)
         }
 
-        let size = try calculateSize(at: target.path)
+        let safetyLevel = try safetyLevel(for: target, canonicalPath: canonicalPath)
+        guard safetyLevel != .danger else {
+            return skippedTargetResult(
+                path: canonicalPath,
+                reason: "Safety policy blocked danger-level cleanup target"
+            )
+        }
 
-        if !dryRun {
+        guard config.cleanupLevel.canDelete(safetyLevel) else {
+            return skippedTargetResult(
+                path: canonicalPath,
+                reason: """
+                Safety policy requires \(requiredCleanupLevel(for: safetyLevel).description) \
+                for \(safetyLevel.description)
+                """
+            )
+        }
+
+        let size = try calculateSize(at: canonicalPath)
+
+        if !config.dryRun {
             // Use FileOperationRetry for resilient file removal
-            try await FileOperationRetry.remove(target.path)
+            try await FileOperationRetry.remove(canonicalPath)
         }
 
-        AppLogger.shared.info("Cleaned: \(target.path) (\(size) bytes)")
+        AppLogger.shared.info("Cleaned: \(canonicalPath) (\(size) bytes)")
 
         return CleanResult(freedBytes: size, filesRemoved: 1)
+    }
+
+    private func skippedTargetResult(path: String, reason: String) -> CleanResult {
+        CleanResult(
+            freedBytes: 0,
+            filesRemoved: 0,
+            errors: [CleanError(path: path, reason: reason)]
+        )
+    }
+
+    private func safetyLevel(for target: CleanTarget, canonicalPath: String) throws -> SafetyLevel {
+        switch target.category {
+        case .browserCache:
+            return .safe
+        case .logs:
+            return .caution
+        case .systemCache, .developerCache, .custom:
+            return try PathValidator.safetyLevel(for: canonicalPath)
+        }
+    }
+
+    private func requiredCleanupLevel(for safetyLevel: SafetyLevel) -> CleanupLevel {
+        switch safetyLevel {
+        case .safe:
+            return .light
+        case .caution:
+            return .normal
+        case .warning:
+            return .deep
+        case .danger:
+            return .system
+        }
     }
 
     private func collectTargets(from config: CleanerConfiguration) -> [CleanTarget] {
@@ -295,6 +358,28 @@ public final class CleanerService: CleanerServiceProtocol {
     }
 
     private func calculateSize(at path: String) throws -> UInt64 {
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else {
+            return 0
+        }
+
+        if !isDirectory.boolValue {
+            let attrs = try fileManager.attributesOfItem(atPath: path)
+            if let size = attrs[.size] as? UInt64 {
+                return size
+            }
+            if let size = attrs[.size] as? NSNumber {
+                return size.uint64Value
+            }
+            if let size = attrs[.size] as? Int64 {
+                return UInt64(size)
+            }
+            if let size = attrs[.size] as? Int {
+                return UInt64(size)
+            }
+            return 0
+        }
+
         var totalSize: UInt64 = 0
 
         guard let enumerator = fileManager.enumerator(atPath: path) else {
@@ -340,7 +425,7 @@ public final class CleanerService: CleanerServiceProtocol {
 
         Performance Impact:
         - Cleanup operations may be 10-50x slower
-        - Some advanced safety features may be limited
+        - Swift fallback still enforces path safety policy
 
         Reason: \(error.localizedDescription)
 

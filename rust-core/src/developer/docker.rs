@@ -10,18 +10,24 @@
 //! - Build cache (caution)
 //! - All unused images (warning)
 
-use std::process::Command;
+use std::sync::Arc;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CleanupError, CleanupMethod, CleanupResult, CleanupTarget, DeveloperCleaner, DeveloperTool,
-    ScanResult,
+    format_command, CleanupError, CleanupMethod, CleanupResult, CleanupTarget, CommandRunner,
+    DeveloperCleaner, DeveloperCommandError, DeveloperCommandOutput, DeveloperTool, ScanResult,
+    SystemCommandRunner, COMMAND_CLEANUP_TIMEOUT, COMMAND_PROBE_TIMEOUT,
 };
 use crate::safety::SafetyLevel;
 
+const DOCKER_SCAN_COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Docker cleaner
-pub struct DockerCleaner;
+pub struct DockerCleaner {
+    command_runner: Arc<dyn CommandRunner>,
+}
 
 impl Default for DockerCleaner {
     fn default() -> Self {
@@ -32,15 +38,20 @@ impl Default for DockerCleaner {
 impl DockerCleaner {
     /// Create a new Docker cleaner
     pub fn new() -> Self {
-        Self
+        Self {
+            command_runner: Arc::new(SystemCommandRunner),
+        }
+    }
+
+    #[cfg(test)]
+    fn with_command_runner(command_runner: Arc<dyn CommandRunner>) -> Self {
+        Self { command_runner }
     }
 
     /// Check if Docker daemon is running
     pub fn is_daemon_running(&self) -> bool {
-        Command::new("docker")
-            .arg("info")
-            .output()
-            .map(|o| o.status.success())
+        self.run_docker(&["info"], COMMAND_PROBE_TIMEOUT)
+            .map(|o| o.status_success)
             .unwrap_or(false)
     }
 
@@ -50,12 +61,14 @@ impl DockerCleaner {
             return Err(DockerError::DaemonNotRunning);
         }
 
-        let output = Command::new("docker")
-            .args(["system", "df", "-v", "--format", "{{json .}}"])
-            .output()
-            .map_err(|e| DockerError::CommandFailed(e.to_string()))?;
+        let output = self
+            .run_docker(
+                &["system", "df", "-v", "--format", "{{json .}}"],
+                DOCKER_SCAN_COMMAND_TIMEOUT,
+            )
+            .map_err(DockerError::from_developer_command_error)?;
 
-        if !output.status.success() {
+        if !output.status_success {
             return Err(DockerError::CommandFailed(
                 String::from_utf8_lossy(&output.stderr).to_string(),
             ));
@@ -100,18 +113,19 @@ impl DockerCleaner {
 
     /// Get list of dangling images
     pub fn get_dangling_images(&self) -> Vec<DockerImage> {
-        let output = Command::new("docker")
-            .args([
+        let output = self.run_docker(
+            &[
                 "images",
                 "-f",
                 "dangling=true",
                 "--format",
                 "{{.ID}}\t{{.Size}}\t{{.CreatedSince}}",
-            ])
-            .output();
+            ],
+            DOCKER_SCAN_COMMAND_TIMEOUT,
+        );
 
         match output {
-            Ok(o) if o.status.success() => {
+            Ok(o) if o.status_success => {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 stdout
                     .lines()
@@ -136,19 +150,20 @@ impl DockerCleaner {
 
     /// Get list of stopped containers
     pub fn get_stopped_containers(&self) -> Vec<DockerContainer> {
-        let output = Command::new("docker")
-            .args([
+        let output = self.run_docker(
+            &[
                 "ps",
                 "-a",
                 "-f",
                 "status=exited",
                 "--format",
                 "{{.ID}}\t{{.Names}}\t{{.Size}}\t{{.Status}}",
-            ])
-            .output();
+            ],
+            DOCKER_SCAN_COMMAND_TIMEOUT,
+        );
 
         match output {
-            Ok(o) if o.status.success() => {
+            Ok(o) if o.status_success => {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 stdout
                     .lines()
@@ -172,18 +187,52 @@ impl DockerCleaner {
         }
     }
 
+    fn run_docker(
+        &self,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Result<DeveloperCommandOutput, DeveloperCommandError> {
+        self.command_runner.run("docker", args, timeout)
+    }
+
     /// Execute a Docker cleanup command
     fn execute_cleanup(&self, command: &str, dry_run: bool) -> Result<String, DockerError> {
         if dry_run {
             return Ok("Dry run - no changes made".to_string());
         }
 
-        let output = Command::new("sh")
-            .args(["-c", command])
-            .output()
-            .map_err(|e| DockerError::CommandFailed(e.to_string()))?;
+        let output = self
+            .command_runner
+            .run("sh", &["-c", command], COMMAND_CLEANUP_TIMEOUT)
+            .map_err(|error| DockerError::from_cleanup_command_error(command.to_string(), error))?;
 
-        if output.status.success() {
+        if output.status_success {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err(DockerError::CommandFailed(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ))
+        }
+    }
+
+    fn execute_cleanup_with_args(
+        &self,
+        command: &str,
+        args: &[String],
+        dry_run: bool,
+    ) -> Result<String, DockerError> {
+        if dry_run {
+            return Ok("Dry run - no changes made".to_string());
+        }
+
+        let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        let display_command = format_command(command, &arg_refs);
+        let output = self
+            .command_runner
+            .run(command, &arg_refs, COMMAND_CLEANUP_TIMEOUT)
+            .map_err(|error| DockerError::from_cleanup_command_error(display_command, error))?;
+
+        if output.status_success {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
             Err(DockerError::CommandFailed(
@@ -198,19 +247,13 @@ impl DeveloperCleaner for DockerCleaner {
         DeveloperTool::Docker
     }
 
-    fn scan(&self) -> ScanResult {
-        if !DeveloperTool::Docker.is_installed() {
-            return ScanResult::not_installed(DeveloperTool::Docker);
-        }
+    fn is_installed(&self) -> bool {
+        self.is_daemon_running()
+    }
 
-        if !self.is_daemon_running() {
-            return ScanResult {
-                tool: DeveloperTool::Docker,
-                installed: true,
-                total_size: 0,
-                targets: Vec::new(),
-                errors: vec!["Docker daemon is not running".to_string()],
-            };
+    fn scan(&self) -> ScanResult {
+        if !self.is_installed() {
+            return ScanResult::not_installed(DeveloperTool::Docker);
         }
 
         let mut targets = Vec::new();
@@ -332,8 +375,7 @@ impl DeveloperCleaner for DockerCleaner {
             let result = match &target.cleanup_method {
                 CleanupMethod::Command(cmd) => self.execute_cleanup(cmd, dry_run),
                 CleanupMethod::CommandWithArgs(cmd, args) => {
-                    let full_cmd = format!("{} {}", cmd, args.join(" "));
-                    self.execute_cleanup(&full_cmd, dry_run)
+                    self.execute_cleanup_with_args(cmd, args, dry_run)
                 }
                 CleanupMethod::DirectDelete => {
                     // Docker cleanup doesn't use direct delete
@@ -427,6 +469,29 @@ pub enum DockerError {
 
     #[error("Command failed: {0}")]
     CommandFailed(String),
+
+    #[error("Command timed out: {0}")]
+    CommandTimedOut(String),
+}
+
+impl DockerError {
+    fn from_developer_command_error(error: DeveloperCommandError) -> Self {
+        match error {
+            DeveloperCommandError::Io(error) => Self::CommandFailed(error.to_string()),
+            DeveloperCommandError::TimedOut { command, timeout } => {
+                Self::CommandTimedOut(format!("`{}` timed out after {:?}", command, timeout))
+            }
+        }
+    }
+
+    fn from_cleanup_command_error(command: String, error: DeveloperCommandError) -> Self {
+        match error {
+            DeveloperCommandError::Io(error) => Self::CommandFailed(error.to_string()),
+            DeveloperCommandError::TimedOut { timeout, .. } => {
+                Self::CommandTimedOut(format!("`{}` timed out after {:?}", command, timeout))
+            }
+        }
+    }
 }
 
 // JSON structure for docker system df output
@@ -479,6 +544,85 @@ fn parse_size(size_str: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
+    use std::io;
+    use std::sync::Mutex;
+
+    type MockCommandResult = Result<DeveloperCommandOutput, DeveloperCommandError>;
+
+    #[derive(Default)]
+    struct MockCommandRunner {
+        responses: Mutex<VecDeque<MockCommandResult>>,
+        calls: Mutex<Vec<(String, Vec<String>, Duration)>>,
+    }
+
+    impl MockCommandRunner {
+        fn new(responses: Vec<MockCommandResult>) -> Arc<Self> {
+            Arc::new(Self {
+                responses: Mutex::new(responses.into()),
+                calls: Mutex::new(Vec::new()),
+            })
+        }
+
+        fn success(stdout: impl Into<Vec<u8>>) -> MockCommandResult {
+            Ok(DeveloperCommandOutput {
+                status_success: true,
+                stdout: stdout.into(),
+                stderr: Vec::new(),
+            })
+        }
+
+        fn failure(stderr: impl Into<Vec<u8>>) -> MockCommandResult {
+            Ok(DeveloperCommandOutput {
+                status_success: false,
+                stdout: Vec::new(),
+                stderr: stderr.into(),
+            })
+        }
+
+        fn timeout(command: &str, timeout: Duration) -> MockCommandResult {
+            Err(DeveloperCommandError::TimedOut {
+                command: command.to_string(),
+                timeout,
+            })
+        }
+
+        fn calls(&self) -> Vec<(String, Vec<String>, Duration)> {
+            self.calls
+                .lock()
+                .expect("mock calls lock should not be poisoned")
+                .clone()
+        }
+    }
+
+    impl CommandRunner for MockCommandRunner {
+        fn run(
+            &self,
+            program: &str,
+            args: &[&str],
+            timeout: Duration,
+        ) -> Result<DeveloperCommandOutput, DeveloperCommandError> {
+            self.calls
+                .lock()
+                .expect("mock calls lock should not be poisoned")
+                .push((
+                    program.to_string(),
+                    args.iter().map(|arg| arg.to_string()).collect(),
+                    timeout,
+                ));
+
+            self.responses
+                .lock()
+                .expect("mock responses lock should not be poisoned")
+                .pop_front()
+                .unwrap_or_else(|| {
+                    Err(DeveloperCommandError::Io(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "no mock response configured",
+                    )))
+                })
+        }
+    }
 
     #[test]
     fn test_docker_cleaner_creation() {
@@ -600,24 +744,130 @@ mod tests {
             command_error.to_string(),
             "Command failed: permission denied"
         );
+
+        let timeout_error = DockerError::CommandTimedOut("docker info".to_string());
+        assert_eq!(timeout_error.to_string(), "Command timed out: docker info");
+    }
+
+    #[test]
+    fn test_is_daemon_running_success_uses_probe_timeout() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::success("")]);
+        let cleaner = DockerCleaner::with_command_runner(runner.clone());
+
+        assert!(cleaner.is_daemon_running());
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "docker");
+        assert_eq!(calls[0].1, vec!["info"]);
+        assert_eq!(calls[0].2, COMMAND_PROBE_TIMEOUT);
+    }
+
+    #[test]
+    fn test_is_daemon_running_failure_returns_false() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::failure(
+            "Cannot connect to the Docker daemon",
+        )]);
+        let cleaner = DockerCleaner::with_command_runner(runner);
+
+        assert!(!cleaner.is_daemon_running());
+    }
+
+    #[test]
+    fn test_is_daemon_running_timeout_returns_false() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "docker info",
+            COMMAND_PROBE_TIMEOUT,
+        )]);
+        let cleaner = DockerCleaner::with_command_runner(runner);
+
+        assert!(!cleaner.is_daemon_running());
+    }
+
+    #[test]
+    fn test_get_disk_usage_uses_mocked_docker_output() {
+        let df_output = [
+            r#"{"Type":"Images","Size":"1GB","Reclaimable":"500MB (50%)"}"#,
+            r#"{"Type":"Containers","Size":"200MB","Reclaimable":"100MB (50%)"}"#,
+            r#"{"Type":"Local Volumes","Size":"300MB","Reclaimable":"150MB (50%)"}"#,
+            r#"{"Type":"Build Cache","Size":"400MB","Reclaimable":"200MB (50%)"}"#,
+        ]
+        .join("\n");
+        let runner = MockCommandRunner::new(vec![
+            MockCommandRunner::success(""),
+            MockCommandRunner::success(df_output),
+        ]);
+        let cleaner = DockerCleaner::with_command_runner(runner);
+
+        let usage = cleaner
+            .get_disk_usage()
+            .expect("mocked Docker disk usage should parse");
+
+        assert_eq!(usage.images_size, 1024 * 1024 * 1024);
+        assert_eq!(usage.images_reclaimable, 500 * 1024 * 1024);
+        assert_eq!(usage.containers_reclaimable, 100 * 1024 * 1024);
+        assert_eq!(usage.volumes_reclaimable, 150 * 1024 * 1024);
+        assert_eq!(usage.build_cache_reclaimable, 200 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_get_disk_usage_timeout_returns_structured_error() {
+        let runner = MockCommandRunner::new(vec![
+            MockCommandRunner::success(""),
+            MockCommandRunner::timeout("docker system df", DOCKER_SCAN_COMMAND_TIMEOUT),
+        ]);
+        let cleaner = DockerCleaner::with_command_runner(runner);
+
+        let error = cleaner
+            .get_disk_usage()
+            .expect_err("timeout should be surfaced as a Docker error");
+
+        assert!(matches!(error, DockerError::CommandTimedOut(_)));
     }
 
     #[test]
     fn test_scan_returns_valid_result_structure() {
-        let cleaner = DockerCleaner::new();
+        let runner = MockCommandRunner::new(vec![
+            MockCommandRunner::success(""),
+            MockCommandRunner::success(""),
+            MockCommandRunner::success(
+                r#"{"Type":"Images","Size":"1GB","Reclaimable":"500MB (50%)"}"#,
+            ),
+            MockCommandRunner::success("abc123def456\t100MB\t2 days ago\n"),
+            MockCommandRunner::success("container123\tmock-container\t50MB\tExited (0)\n"),
+        ]);
+        let cleaner = DockerCleaner::with_command_runner(runner);
         let result = cleaner.scan();
 
-        // Result should have the correct tool type
         assert_eq!(result.tool, DeveloperTool::Docker);
+        assert!(result.installed);
+        assert!(result.total_size > 0);
+        assert!(result
+            .targets
+            .iter()
+            .any(|target| target.name == "Docker Basic Cleanup"));
+        assert!(result
+            .targets
+            .iter()
+            .any(|target| target.name == "Dangling Image: abc123def456"));
+        assert!(result
+            .targets
+            .iter()
+            .any(|target| target.name == "Stopped Container: mock-container"));
+    }
 
-        // If Docker is not installed, result should indicate that
-        if !DeveloperTool::Docker.is_installed() {
-            assert!(!result.installed);
-            assert!(result.targets.is_empty());
-        }
+    #[test]
+    fn test_scan_timeout_treats_docker_as_unavailable() {
+        let cleaner = DockerCleaner::with_command_runner(MockCommandRunner::new(vec![
+            MockCommandRunner::timeout("docker info", COMMAND_PROBE_TIMEOUT),
+        ]));
 
-        // Result structure should be valid (u64 is always >= 0, so we just verify it exists)
-        let _ = result.total_size;
+        let result = cleaner.scan();
+
+        assert_eq!(result.tool, DeveloperTool::Docker);
+        assert!(!result.installed);
+        assert_eq!(result.total_size, 0);
+        assert!(result.targets.is_empty());
     }
 
     #[test]
@@ -631,6 +881,56 @@ mod tests {
         assert_eq!(result.freed_bytes, 0);
         assert_eq!(result.items_cleaned, 0);
         assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_clean_dry_run_does_not_execute_command() {
+        let runner = MockCommandRunner::new(Vec::new());
+        let cleaner = DockerCleaner::with_command_runner(runner.clone());
+        let target = CleanupTarget::new_command(
+            "Docker Basic Cleanup",
+            "docker system prune -f",
+            SafetyLevel::Safe,
+        )
+        .with_size(1024);
+
+        let result = cleaner.clean(&[target], true);
+
+        assert!(result.dry_run);
+        assert_eq!(result.freed_bytes, 1024);
+        assert_eq!(result.items_cleaned, 1);
+        assert!(result.errors.is_empty());
+        assert!(runner.calls().is_empty());
+    }
+
+    #[test]
+    fn test_clean_prune_timeout_records_structured_error() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "docker system prune -f",
+            COMMAND_CLEANUP_TIMEOUT,
+        )]);
+        let cleaner = DockerCleaner::with_command_runner(runner.clone());
+        let target = CleanupTarget::new_command(
+            "Docker Basic Cleanup",
+            "docker system prune -f",
+            SafetyLevel::Safe,
+        )
+        .with_size(1024);
+
+        let result = cleaner.clean(&[target], false);
+
+        assert!(!result.dry_run);
+        assert_eq!(result.freed_bytes, 0);
+        assert_eq!(result.items_cleaned, 0);
+        assert_eq!(result.errors.len(), 1);
+        assert_eq!(result.errors[0].target, "Docker Basic Cleanup");
+        assert!(result.errors[0].message.contains("timed out"));
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "sh");
+        assert_eq!(calls[0].1, vec!["-c", "docker system prune -f"]);
+        assert_eq!(calls[0].2, COMMAND_CLEANUP_TIMEOUT);
     }
 
     #[test]
@@ -684,9 +984,15 @@ mod tests {
 
     #[test]
     fn test_is_installed_returns_boolean() {
-        let cleaner = DockerCleaner::new();
-        // This should not panic, just return a boolean
-        let _ = cleaner.is_installed();
+        let running = DockerCleaner::with_command_runner(MockCommandRunner::new(vec![
+            MockCommandRunner::success(""),
+        ]));
+        assert!(running.is_installed());
+
+        let unavailable = DockerCleaner::with_command_runner(MockCommandRunner::new(vec![
+            MockCommandRunner::timeout("docker info", COMMAND_PROBE_TIMEOUT),
+        ]));
+        assert!(!unavailable.is_installed());
     }
 
     #[test]

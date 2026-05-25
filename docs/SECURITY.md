@@ -1,7 +1,7 @@
 # Security Documentation
 
 > **Version**: 1.0.0
-> **Last Updated**: 2026-01-30
+> **Last Updated**: 2026-05-25
 > **Scope**: Security architecture and practices for OSXCleaner
 
 ## Overview
@@ -130,6 +130,31 @@ OSXCleaner implements multiple layers of input validation to prevent security vu
 - Prevents man-in-the-middle attacks on MDM communication
 - Ensures configuration integrity
 - Stops invalid or dangerous option combinations
+
+#### Server Credential Storage
+
+**Purpose**: Keep central-management server bearer tokens out of plaintext JSON configuration files.
+
+**Implementation**: `ConfigurationService` migrates legacy `authToken` values
+into a `TokenStore` backed by macOS Keychain.
+
+**Security Measures**:
+
+1. **No Token Encoding**: `AppConfiguration` decodes legacy `authToken`
+   values for migration, but new JSON saves omit bearer token material.
+2. **Keychain Boundary**: Server auth tokens are stored as generic password
+   items under the `com.osxcleaner.server.auth` service, scoped by server URL
+   and agent ID.
+3. **Migration Safety**: If Keychain storage fails during migration, the legacy
+   config is left untouched and the load fails with an actionable Keychain
+   error instead of dropping credentials silently.
+4. **Credential Reset**: Run `osxcleaner server disconnect --force` to clear
+   server metadata and remove the matching Keychain token.
+
+**Security Benefits**:
+- Prevents bearer tokens from being copied through normal config backups or diagnostics
+- Separates secret storage from non-secret server metadata
+- Supports future token rotation without changing the config file format
 
 #### FFI Validation
 

@@ -31,6 +31,20 @@ import Foundation
 /// - ``tokenExpiresAt``
 /// - ``lastHeartbeat``
 public struct AppConfiguration: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case defaultSafetyLevel
+        case autoBackup
+        case logLevel
+        case excludedPaths
+        case showPerformanceWarnings
+        case serverURL
+        case serverTimeout
+        case agentId
+        case authToken
+        case tokenExpiresAt
+        case lastHeartbeat
+    }
+
     public var defaultSafetyLevel: Int
     public var autoBackup: Bool
     public var logLevel: String
@@ -41,6 +55,10 @@ public struct AppConfiguration: Codable {
     public var serverURL: String?
     public var serverTimeout: Int?
     public var agentId: UUID?
+    /// Legacy/transient token material decoded for migration only.
+    ///
+    /// New saves intentionally omit this value from JSON. Use
+    /// ``ConfigurationService`` token helpers for server auth tokens.
     public var authToken: String?
     public var tokenExpiresAt: Date?
     public var lastHeartbeat: Date?
@@ -83,6 +101,35 @@ public struct AppConfiguration: Codable {
         self.authToken = authToken
         self.tokenExpiresAt = tokenExpiresAt
         self.lastHeartbeat = lastHeartbeat
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        defaultSafetyLevel = try container.decode(Int.self, forKey: .defaultSafetyLevel)
+        autoBackup = try container.decode(Bool.self, forKey: .autoBackup)
+        logLevel = try container.decode(String.self, forKey: .logLevel)
+        excludedPaths = try container.decode([String].self, forKey: .excludedPaths)
+        showPerformanceWarnings = try container.decode(Bool.self, forKey: .showPerformanceWarnings)
+        serverURL = try container.decodeIfPresent(String.self, forKey: .serverURL)
+        serverTimeout = try container.decodeIfPresent(Int.self, forKey: .serverTimeout)
+        agentId = try container.decodeIfPresent(UUID.self, forKey: .agentId)
+        authToken = try container.decodeIfPresent(String.self, forKey: .authToken)
+        tokenExpiresAt = try container.decodeIfPresent(Date.self, forKey: .tokenExpiresAt)
+        lastHeartbeat = try container.decodeIfPresent(Date.self, forKey: .lastHeartbeat)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(defaultSafetyLevel, forKey: .defaultSafetyLevel)
+        try container.encode(autoBackup, forKey: .autoBackup)
+        try container.encode(logLevel, forKey: .logLevel)
+        try container.encode(excludedPaths, forKey: .excludedPaths)
+        try container.encode(showPerformanceWarnings, forKey: .showPerformanceWarnings)
+        try container.encodeIfPresent(serverURL, forKey: .serverURL)
+        try container.encodeIfPresent(serverTimeout, forKey: .serverTimeout)
+        try container.encodeIfPresent(agentId, forKey: .agentId)
+        try container.encodeIfPresent(tokenExpiresAt, forKey: .tokenExpiresAt)
+        try container.encodeIfPresent(lastHeartbeat, forKey: .lastHeartbeat)
     }
 }
 
@@ -178,15 +225,24 @@ public struct AnalyzerConfiguration {
 /// Configuration service for loading and saving settings
 public final class ConfigurationService {
     private let configURL: URL
+    private let tokenStore: ServerAuthTokenStoring
 
-    public init() {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        self.configURL = appSupport
-            .appendingPathComponent("osxcleaner")
-            .appendingPathComponent("config.json")
+    public init(
+        configURL: URL? = nil,
+        tokenStore: ServerAuthTokenStoring = KeychainTokenStore()
+    ) {
+        if let configURL {
+            self.configURL = configURL
+        } else {
+            let appSupport = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first!
+            self.configURL = appSupport
+                .appendingPathComponent("osxcleaner")
+                .appendingPathComponent("config.json")
+        }
+        self.tokenStore = tokenStore
     }
 
     public func load() throws -> AppConfiguration {
@@ -195,10 +251,45 @@ public final class ConfigurationService {
         }
 
         let data = try Data(contentsOf: configURL)
-        return try JSONDecoder().decode(AppConfiguration.self, from: data)
+        let config = try JSONDecoder().decode(AppConfiguration.self, from: data)
+        return try migrateLegacyAuthTokenIfNeeded(config)
     }
 
     public func save(_ config: AppConfiguration) throws {
+        var configToSave = config
+        if let token = configToSave.authToken {
+            try saveServerAuthToken(token, for: configToSave)
+            configToSave.authToken = nil
+        }
+
+        try write(configToSave)
+    }
+
+    public func loadServerAuthToken(for config: AppConfiguration) throws -> String? {
+        guard let serverURL = config.serverURL, let agentId = config.agentId else {
+            return nil
+        }
+
+        return try tokenStore.loadToken(serverURL: serverURL, agentId: agentId)
+    }
+
+    public func saveServerAuthToken(_ token: String, for config: AppConfiguration) throws {
+        guard let serverURL = config.serverURL, let agentId = config.agentId else {
+            throw ConfigurationError.missingServerTokenIdentity
+        }
+
+        try tokenStore.saveToken(token, serverURL: serverURL, agentId: agentId)
+    }
+
+    public func deleteServerAuthToken(for config: AppConfiguration) throws {
+        guard let serverURL = config.serverURL, let agentId = config.agentId else {
+            return
+        }
+
+        try tokenStore.deleteToken(serverURL: serverURL, agentId: agentId)
+    }
+
+    private func write(_ config: AppConfiguration) throws {
         let directory = configURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(
             at: directory,
@@ -209,6 +300,18 @@ public final class ConfigurationService {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(config)
         try data.write(to: configURL)
+    }
+
+    private func migrateLegacyAuthTokenIfNeeded(_ config: AppConfiguration) throws -> AppConfiguration {
+        guard let token = config.authToken else {
+            return config
+        }
+
+        var migrated = config
+        try saveServerAuthToken(token, for: migrated)
+        migrated.authToken = nil
+        try write(migrated)
+        return migrated
     }
 
     public func set(key: String, value: String) throws {
@@ -242,6 +345,10 @@ public final class ConfigurationService {
     }
 
     public func reset() throws {
+        let existing = try? load()
+        if let existing {
+            try deleteServerAuthToken(for: existing)
+        }
         try save(.default)
     }
 }
@@ -249,6 +356,7 @@ public final class ConfigurationService {
 public enum ConfigurationError: LocalizedError {
     case unknownKey(String)
     case invalidValue(key: String, value: String)
+    case missingServerTokenIdentity
 
     public var errorDescription: String? {
         switch self {
@@ -256,6 +364,8 @@ public enum ConfigurationError: LocalizedError {
             return "Unknown configuration key: \(key)"
         case .invalidValue(let key, let value):
             return "Invalid value '\(value)' for key '\(key)'"
+        case .missingServerTokenIdentity:
+            return "Cannot store server auth token without both server URL and agent ID"
         }
     }
 }

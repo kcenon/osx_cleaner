@@ -18,11 +18,13 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
+use std::sync::Arc;
 
 use super::{
-    calculate_dir_size, expand_home, CleanupError, CleanupMethod, CleanupResult, CleanupTarget,
-    DeveloperCleaner, DeveloperTool, ScanResult,
+    calculate_dir_size, expand_home, format_command, run_command_with_timeout, CleanupError,
+    CleanupMethod, CleanupResult, CleanupTarget, CommandRunner, DeveloperCleaner,
+    DeveloperCommandError, DeveloperCommandOutput, DeveloperTool, ScanResult, SystemCommandRunner,
+    COMMAND_CLEANUP_TIMEOUT, COMMAND_PROBE_TIMEOUT,
 };
 use crate::safety::SafetyLevel;
 
@@ -30,6 +32,7 @@ use crate::safety::SafetyLevel;
 pub struct PackageManagerCleaner {
     /// List of package manager configurations
     managers: Vec<PackageManager>,
+    command_runner: Arc<dyn CommandRunner>,
 }
 
 impl Default for PackageManagerCleaner {
@@ -131,26 +134,31 @@ impl PackageManagerCleaner {
                     detect_command: Some("mvn".to_string()),
                 },
             ],
+            command_runner: Arc::new(SystemCommandRunner),
+        }
+    }
+
+    #[cfg(test)]
+    fn with_command_runner(command_runner: Arc<dyn CommandRunner>) -> Self {
+        Self {
+            command_runner,
+            ..Self::new()
         }
     }
 
     /// Get Homebrew cache path
     fn get_homebrew_cache_path() -> Option<PathBuf> {
-        Command::new("brew")
-            .arg("--cache")
-            .output()
+        run_command_with_timeout("brew", &["--cache"], COMMAND_PROBE_TIMEOUT)
             .ok()
-            .filter(|o| o.status.success())
+            .filter(|o| o.status_success)
             .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
     }
 
     /// Get pnpm store path
     fn get_pnpm_store_path() -> Option<PathBuf> {
-        Command::new("pnpm")
-            .args(["store", "path"])
-            .output()
+        run_command_with_timeout("pnpm", &["store", "path"], COMMAND_PROBE_TIMEOUT)
             .ok()
-            .filter(|o| o.status.success())
+            .filter(|o| o.status_success)
             .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
     }
 
@@ -260,6 +268,37 @@ impl PackageManagerCleaner {
             )),
         }
     }
+
+    fn execute_cleanup_command(
+        &self,
+        target: &CleanupTarget,
+        command: &str,
+    ) -> Result<(), CleanupError> {
+        let output = self
+            .command_runner
+            .run("sh", &["-c", command], COMMAND_CLEANUP_TIMEOUT)
+            .map_err(|error| {
+                cleanup_error_from_command_error(target, command.to_string(), error)
+            })?;
+
+        cleanup_result_from_output(target, output)
+    }
+
+    fn execute_cleanup_with_args(
+        &self,
+        target: &CleanupTarget,
+        command: &str,
+        args: &[String],
+    ) -> Result<(), CleanupError> {
+        let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        let display_command = format_command(command, &arg_refs);
+        let output = self
+            .command_runner
+            .run(command, &arg_refs, COMMAND_CLEANUP_TIMEOUT)
+            .map_err(|error| cleanup_error_from_command_error(target, display_command, error))?;
+
+        cleanup_result_from_output(target, output)
+    }
 }
 
 impl DeveloperCleaner for PackageManagerCleaner {
@@ -330,46 +369,14 @@ impl DeveloperCleaner for PackageManagerCleaner {
                 }
                 CleanupMethod::Command(cmd) => {
                     if !dry_run {
-                        Command::new("sh")
-                            .args(["-c", cmd])
-                            .output()
-                            .map_err(|e| CleanupError {
-                                target: target.name.clone(),
-                                message: e.to_string(),
-                            })
-                            .and_then(|o| {
-                                if o.status.success() {
-                                    Ok(())
-                                } else {
-                                    Err(CleanupError {
-                                        target: target.name.clone(),
-                                        message: String::from_utf8_lossy(&o.stderr).to_string(),
-                                    })
-                                }
-                            })
+                        self.execute_cleanup_command(target, cmd)
                     } else {
                         Ok(())
                     }
                 }
                 CleanupMethod::CommandWithArgs(cmd, args) => {
                     if !dry_run {
-                        Command::new(cmd)
-                            .args(args)
-                            .output()
-                            .map_err(|e| CleanupError {
-                                target: target.name.clone(),
-                                message: e.to_string(),
-                            })
-                            .and_then(|o| {
-                                if o.status.success() {
-                                    Ok(())
-                                } else {
-                                    Err(CleanupError {
-                                        target: target.name.clone(),
-                                        message: String::from_utf8_lossy(&o.stderr).to_string(),
-                                    })
-                                }
-                            })
+                        self.execute_cleanup_with_args(target, cmd, args)
                     } else {
                         Ok(())
                     }
@@ -413,6 +420,38 @@ struct PackageManager {
     detect_command: Option<String>,
 }
 
+fn cleanup_result_from_output(
+    target: &CleanupTarget,
+    output: DeveloperCommandOutput,
+) -> Result<(), CleanupError> {
+    if output.status_success {
+        Ok(())
+    } else {
+        Err(CleanupError {
+            target: target.name.clone(),
+            message: String::from_utf8_lossy(&output.stderr).to_string(),
+        })
+    }
+}
+
+fn cleanup_error_from_command_error(
+    target: &CleanupTarget,
+    command: String,
+    error: DeveloperCommandError,
+) -> CleanupError {
+    let message = match error {
+        DeveloperCommandError::Io(error) => error.to_string(),
+        DeveloperCommandError::TimedOut { timeout, .. } => {
+            format!("`{}` timed out after {:?}", command, timeout)
+        }
+    };
+
+    CleanupError {
+        target: target.name.clone(),
+        message,
+    }
+}
+
 /// Simple glob matching (only handles * wildcards)
 fn glob_match(pattern: &str, name: &str) -> bool {
     if pattern == "*" {
@@ -449,6 +488,70 @@ fn glob_match(pattern: &str, name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
+    use std::io;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    type MockCommandResult = Result<DeveloperCommandOutput, DeveloperCommandError>;
+
+    #[derive(Default)]
+    struct MockCommandRunner {
+        responses: Mutex<VecDeque<MockCommandResult>>,
+        calls: Mutex<Vec<(String, Vec<String>, Duration)>>,
+    }
+
+    impl MockCommandRunner {
+        fn new(responses: Vec<MockCommandResult>) -> Arc<Self> {
+            Arc::new(Self {
+                responses: Mutex::new(responses.into()),
+                calls: Mutex::new(Vec::new()),
+            })
+        }
+
+        fn timeout(command: &str, timeout: Duration) -> MockCommandResult {
+            Err(DeveloperCommandError::TimedOut {
+                command: command.to_string(),
+                timeout,
+            })
+        }
+
+        fn calls(&self) -> Vec<(String, Vec<String>, Duration)> {
+            self.calls
+                .lock()
+                .expect("mock calls lock should not be poisoned")
+                .clone()
+        }
+    }
+
+    impl CommandRunner for MockCommandRunner {
+        fn run(
+            &self,
+            program: &str,
+            args: &[&str],
+            timeout: Duration,
+        ) -> Result<DeveloperCommandOutput, DeveloperCommandError> {
+            self.calls
+                .lock()
+                .expect("mock calls lock should not be poisoned")
+                .push((
+                    program.to_string(),
+                    args.iter().map(|arg| arg.to_string()).collect(),
+                    timeout,
+                ));
+
+            self.responses
+                .lock()
+                .expect("mock responses lock should not be poisoned")
+                .pop_front()
+                .unwrap_or_else(|| {
+                    Err(DeveloperCommandError::Io(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "no mock response configured",
+                    )))
+                })
+        }
+    }
 
     #[test]
     fn test_package_manager_cleaner_creation() {
@@ -539,6 +642,60 @@ mod tests {
         assert_eq!(result.items_cleaned, 0);
         assert!(result.dry_run);
         assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_clean_dry_run_does_not_execute_command() {
+        let runner = MockCommandRunner::new(Vec::new());
+        let cleaner = PackageManagerCleaner::with_command_runner(runner.clone());
+        let target = CleanupTarget {
+            path: Some(PathBuf::from("/tmp/osx-cleaner-test-npm-cache")),
+            name: "npm Cache".to_string(),
+            size: 2048,
+            safety_level: SafetyLevel::Safe,
+            cleanup_method: CleanupMethod::Command("npm cache clean --force".to_string()),
+            description: None,
+        };
+
+        let result = cleaner.clean(&[target], true);
+
+        assert!(result.dry_run);
+        assert_eq!(result.freed_bytes, 2048);
+        assert_eq!(result.items_cleaned, 1);
+        assert!(result.errors.is_empty());
+        assert!(runner.calls().is_empty());
+    }
+
+    #[test]
+    fn test_clean_command_timeout_records_structured_error() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "npm cache clean --force",
+            COMMAND_CLEANUP_TIMEOUT,
+        )]);
+        let cleaner = PackageManagerCleaner::with_command_runner(runner.clone());
+        let target = CleanupTarget {
+            path: Some(PathBuf::from("/tmp/osx-cleaner-test-npm-cache")),
+            name: "npm Cache".to_string(),
+            size: 2048,
+            safety_level: SafetyLevel::Safe,
+            cleanup_method: CleanupMethod::Command("npm cache clean --force".to_string()),
+            description: None,
+        };
+
+        let result = cleaner.clean(&[target], false);
+
+        assert!(!result.dry_run);
+        assert_eq!(result.freed_bytes, 0);
+        assert_eq!(result.items_cleaned, 0);
+        assert_eq!(result.errors.len(), 1);
+        assert_eq!(result.errors[0].target, "npm Cache");
+        assert!(result.errors[0].message.contains("timed out"));
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "sh");
+        assert_eq!(calls[0].1, vec!["-c", "npm cache clean --force"]);
+        assert_eq!(calls[0].2, COMMAND_CLEANUP_TIMEOUT);
     }
 
     #[test]

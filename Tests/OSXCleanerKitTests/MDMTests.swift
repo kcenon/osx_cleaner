@@ -534,7 +534,11 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
 
     func testMDMServiceUsesInjectedCleanerService() async throws {
         // Given
+        let cleanupDirectory = try makeTemporaryCleanupDirectory()
+        defer { try? FileManager.default.removeItem(at: cleanupDirectory) }
+
         let mockCleaner = MockCleanerService()
+        mockCleaner.requireDestructiveTargets(inside: cleanupDirectory)
         mockCleaner.cleanResult = CleanResult(
             freedBytes: 5000,
             filesRemoved: 10,
@@ -542,7 +546,10 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
             errors: []
         )
 
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = MDMService(
+            cleanerService: mockCleaner,
+            cleanupConfiguration: dryRunCleanupConfiguration(inside: cleanupDirectory)
+        )
 
         let command = MDMCommand(
             id: "cleanup-cmd",
@@ -556,6 +563,8 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
         // Then
         XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
         XCTAssertNotNil(mockCleaner.lastCleanConfiguration, "Configuration should be captured")
+        XCTAssertEqual(mockCleaner.lastCleanConfiguration?.specificPaths, [cleanupDirectory.path])
+        XCTAssertEqual(mockCleaner.lastCleanConfiguration?.dryRun, true)
         XCTAssertTrue(result.success, "Command should succeed")
         XCTAssertNotNil(result.message, "Message should be present")
         XCTAssertEqual(result.details["bytes_freed"], "5000", "Details should contain freed bytes")
@@ -563,13 +572,20 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
 
     func testMDMServiceHandlesCleanerServiceError() async throws {
         // Given
+        let cleanupDirectory = try makeTemporaryCleanupDirectory()
+        defer { try? FileManager.default.removeItem(at: cleanupDirectory) }
+
         let mockCleaner = MockCleanerService()
+        mockCleaner.requireDestructiveTargets(inside: cleanupDirectory)
         mockCleaner.cleanError = CleanError(
             path: "/test/path",
             reason: "Permission denied"
         )
 
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = MDMService(
+            cleanerService: mockCleaner,
+            cleanupConfiguration: dryRunCleanupConfiguration(inside: cleanupDirectory)
+        )
 
         let command = MDMCommand(
             id: "cleanup-cmd",
@@ -586,9 +602,18 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
         XCTAssertNotNil(result.message, "Error message should be present")
     }
 
-    func testMDMServiceDefaultCleanerService() async throws {
-        // Given - MDMService with default CleanerService
-        let mdmService = MDMService()
+    func testMDMServiceCleanupCommandUsesInjectedDryRunConfiguration() async throws {
+        // Given
+        let cleanupDirectory = try makeTemporaryCleanupDirectory()
+        defer { try? FileManager.default.removeItem(at: cleanupDirectory) }
+
+        let mockCleaner = MockCleanerService()
+        mockCleaner.requireDestructiveTargets(inside: cleanupDirectory)
+
+        let mdmService = MDMService(
+            cleanerService: mockCleaner,
+            cleanupConfiguration: dryRunCleanupConfiguration(inside: cleanupDirectory)
+        )
 
         let command = MDMCommand(
             id: "cleanup-cmd",
@@ -596,17 +621,25 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
             priority: .normal
         )
 
-        // When - Execute command (may succeed or fail based on actual system state)
+        // When
         let result = try await mdmService.executeCommand(command)
 
-        // Then - Verify result structure (not actual cleanup)
-        XCTAssertNotNil(result.commandId, "Result should have command ID")
+        // Then
         XCTAssertEqual(result.commandId, "cleanup-cmd", "Command ID should match")
+        XCTAssertTrue(result.success, "Injected mock cleanup should succeed")
+        XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
+        XCTAssertEqual(mockCleaner.lastCleanConfiguration?.dryRun, true)
+        XCTAssertEqual(mockCleaner.lastCleanConfiguration?.includeSystemCaches, false)
+        XCTAssertEqual(mockCleaner.lastCleanConfiguration?.specificPaths, [cleanupDirectory.path])
     }
 
     func testMDMServiceMultipleCleanupCommands() async throws {
         // Given
+        let cleanupDirectory = try makeTemporaryCleanupDirectory()
+        defer { try? FileManager.default.removeItem(at: cleanupDirectory) }
+
         let mockCleaner = MockCleanerService()
+        mockCleaner.requireDestructiveTargets(inside: cleanupDirectory)
         mockCleaner.cleanResult = CleanResult(
             freedBytes: 1000,
             filesRemoved: 5,
@@ -614,7 +647,10 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
             errors: []
         )
 
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = MDMService(
+            cleanerService: mockCleaner,
+            cleanupConfiguration: dryRunCleanupConfiguration(inside: cleanupDirectory)
+        )
 
         // When - Execute multiple cleanup commands
         for i in 1...3 {
@@ -628,23 +664,63 @@ final class MDMServiceDependencyInjectionTests: XCTestCase {
 
         // Then
         XCTAssertEqual(mockCleaner.cleanCallCount, 3, "CleanerService should be called 3 times")
+        XCTAssertEqual(mockCleaner.lastCleanConfiguration?.dryRun, true)
     }
 
-    func testMDMServiceSharedInstanceUsesDefaultCleaner() async throws {
-        // Given - Shared instance should use default CleanerService
-        let sharedService = MDMService.shared
+    func testMDMServiceCleanupGuardRejectsDestructiveTargetsOutsideTempDirectory() async throws {
+        // Given
+        let cleanupDirectory = try makeTemporaryCleanupDirectory()
+        defer { try? FileManager.default.removeItem(at: cleanupDirectory) }
+
+        let mockCleaner = MockCleanerService()
+        mockCleaner.requireDestructiveTargets(inside: cleanupDirectory)
+
+        let mdmService = MDMService(
+            cleanerService: mockCleaner,
+            cleanupConfiguration: CleanerConfiguration(
+                cleanupLevel: .normal,
+                dryRun: false,
+                includeSystemCaches: true,
+                specificPaths: ["/Library/Caches"]
+            )
+        )
 
         let command = MDMCommand(
-            id: "test-cmd",
+            id: "unsafe-cleanup-cmd",
             type: .cleanup,
             priority: .low
         )
 
         // When
-        let result = try await sharedService.executeCommand(command)
+        let result = try await mdmService.executeCommand(command)
 
-        // Then - Verify it completes (actual behavior depends on system)
-        XCTAssertEqual(result.commandId, "test-cmd", "Command ID should match")
+        // Then
+        XCTAssertEqual(mockCleaner.cleanCallCount, 1, "CleanerService should be called once")
+        XCTAssertEqual(result.commandId, "unsafe-cleanup-cmd", "Command ID should match")
+        XCTAssertFalse(result.success, "Guard should reject destructive cleanup outside test temp")
+        XCTAssertTrue(result.message?.contains("Refusing unsafe cleanup in test") ?? false)
+        XCTAssertTrue(result.message?.contains("outside test temp directory") ?? false)
+    }
+}
+
+private extension MDMServiceDependencyInjectionTests {
+    func makeTemporaryCleanupDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("osxcleaner-mdm-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.standardizedFileURL.resolvingSymlinksInPath()
+    }
+
+    func dryRunCleanupConfiguration(inside cleanupDirectory: URL) -> CleanerConfiguration {
+        CleanerConfiguration(
+            cleanupLevel: .normal,
+            dryRun: true,
+            includeSystemCaches: false,
+            includeDeveloperCaches: false,
+            includeBrowserCaches: false,
+            includeLogsCaches: false,
+            specificPaths: [cleanupDirectory.path]
+        )
     }
 }
 
