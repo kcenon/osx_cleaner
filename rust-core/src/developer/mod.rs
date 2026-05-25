@@ -34,6 +34,7 @@ pub use simulator::SimulatorCleaner;
 pub use xcode::XcodeCleaner;
 
 pub(crate) const COMMAND_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+pub(crate) const COMMAND_CLEANUP_TIMEOUT: Duration = Duration::from_secs(600);
 
 #[derive(Debug)]
 pub(crate) struct DeveloperCommandOutput {
@@ -152,7 +153,7 @@ fn terminate_child_process_tree(child: &mut Child) {
     let _ = child.kill();
 }
 
-fn format_command(program: &str, args: &[&str]) -> String {
+pub(crate) fn format_command(program: &str, args: &[&str]) -> String {
     if args.is_empty() {
         program.to_string()
     } else {

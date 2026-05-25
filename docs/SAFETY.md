@@ -277,6 +277,11 @@ These paths are Warning level and require confirmation before deletion:
 | Docker images need to be pulled again | Depends on images |
 | npm/pip packages need reinstall | project-dependent |
 
+Developer cleanup commands, such as Docker prune or package manager cache
+cleanup, have a default 10 minute execution timeout. Dry-runs do not execute
+these external cleanup commands. If a cleanup command times out, the target is
+reported as a cleanup error and is not counted as cleaned or freed space.
+
 ### After System Cleanup
 
 | Change | Duration |

@@ -444,7 +444,7 @@ coverage:
 4. **Test Edge Cases**: Empty inputs, max values, null pointers
 5. **Test Error Paths**: Ensure error handling is covered
 6. **Isolate Tests**: No shared state, use setup/teardown
-7. **Mock External Dependencies**: FFI, file system, network
+7. **Mock External Dependencies**: FFI, file system, network, cleanup commands
 
 ### Don'ts ❌
 
