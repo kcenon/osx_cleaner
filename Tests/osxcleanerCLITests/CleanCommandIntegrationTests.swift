@@ -87,7 +87,7 @@ final class CleanCommandIntegrationTests: XCTestCase {
             [
                 "clean",
                 "--level",
-                "light",
+                "deep",
                 "--non-interactive",
                 "--force",
                 "--ignore-team",
@@ -98,7 +98,7 @@ final class CleanCommandIntegrationTests: XCTestCase {
         )
 
         XCTAssertEqual(result.exitCode, 0, result.combinedOutput)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: target.path), result.combinedOutput)
     }
 
     func testInvalidPathIsRejectedBeforeCleanup() throws {
