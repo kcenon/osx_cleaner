@@ -2,6 +2,10 @@ import XCTest
 @testable import OSXCleanerKit
 
 final class PathValidatorTests: XCTestCase {
+    private func canonicalPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardized.path
+    }
+
     // MARK: - Empty Path Tests
 
     func testValidate_EmptyPath_ThrowsError() {
@@ -94,7 +98,27 @@ final class PathValidatorTests: XCTestCase {
 
         // Should be canonicalized (no .. components)
         XCTAssertFalse(validatedURL.path.contains(".."))
-        XCTAssertEqual(validatedURL.path, testDir.path)
+        XCTAssertEqual(validatedURL.path, canonicalPath(testDir))
+    }
+
+    func testValidate_SymbolicLink_ResolvesToCanonicalTarget() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_pathvalidator_symlink_\(UUID().uuidString)")
+        let targetDir = tempDir.appendingPathComponent("target")
+        let linkURL = tempDir.appendingPathComponent("link")
+
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            atPath: linkURL.path,
+            withDestinationPath: targetDir.path
+        )
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        let validatedURL = try PathValidator.validate(linkURL.path)
+
+        XCTAssertEqual(validatedURL.path, targetDir.path)
     }
 
     // MARK: - System Path Protection Tests
@@ -146,7 +170,7 @@ final class PathValidatorTests: XCTestCase {
         }
 
         let validatedURL = try PathValidator.validate(testDir.path)
-        XCTAssertEqual(validatedURL.path, testDir.path)
+        XCTAssertEqual(validatedURL.path, canonicalPath(testDir))
     }
 
     // MARK: - Tilde Expansion Tests
@@ -205,7 +229,7 @@ final class PathValidatorTests: XCTestCase {
         let tempDir = FileManager.default.temporaryDirectory
         let url = try PathValidator.validate(tempDir.path)
 
-        XCTAssertEqual(url.path, tempDir.path)
+        XCTAssertEqual(url.path, canonicalPath(tempDir))
     }
 
     // MARK: - Readability Check Tests
@@ -238,8 +262,8 @@ final class PathValidatorTests: XCTestCase {
         let validatedURLs = try PathValidator.validateAll(paths)
 
         XCTAssertEqual(validatedURLs.count, 2)
-        XCTAssertEqual(validatedURLs[0].path, testDir1.path)
-        XCTAssertEqual(validatedURLs[1].path, testDir2.path)
+        XCTAssertEqual(validatedURLs[0].path, canonicalPath(testDir1))
+        XCTAssertEqual(validatedURLs[1].path, canonicalPath(testDir2))
     }
 
     func testValidateAll_OneInvalidPath_ThrowsError() {
@@ -380,7 +404,37 @@ final class PathValidatorTests: XCTestCase {
         let tempDir = FileManager.default.temporaryDirectory
         let pathString = try PathValidator.validatePath(tempDir.path)
 
-        XCTAssertEqual(pathString, tempDir.path)
+        XCTAssertEqual(pathString, canonicalPath(tempDir))
         XCTAssertTrue(pathString is String)
+    }
+
+    // MARK: - Safety Classification Tests
+
+    func testSafetyLevel_SystemRoot_IsDanger() throws {
+        let safetyLevel = try PathValidator.safetyLevel(for: "/System")
+
+        XCTAssertEqual(safetyLevel, .danger)
+    }
+
+    func testSafetyLevel_SystemCache_IsWarning() throws {
+        let safetyLevel = try PathValidator.safetyLevel(for: "/Library/Caches")
+
+        XCTAssertEqual(safetyLevel, .warning)
+    }
+
+    func testSafetyLevel_TemporaryDirectory_IsSafe() throws {
+        let tempPath = FileManager.default.temporaryDirectory.path
+        let safetyLevel = try PathValidator.safetyLevel(for: tempPath)
+
+        XCTAssertEqual(safetyLevel, .safe)
+    }
+
+    func testSafetyLevel_UserDocuments_IsDanger() throws {
+        let documentsPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents")
+            .path
+        let safetyLevel = try PathValidator.safetyLevel(for: documentsPath)
+
+        XCTAssertEqual(safetyLevel, .danger)
     }
 }
