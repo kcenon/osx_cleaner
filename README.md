@@ -229,6 +229,7 @@ osxcleaner schedule enable daily
 | `--format` | clean, analyze, schedule | Output format (text, json) |
 | `--dry-run` | clean | Preview without actual deletion |
 | `--non-interactive` | clean | Skip confirmation prompts (for CI/CD) |
+| `--force` | clean | Explicitly approve warning/system cleanup in non-interactive mode |
 | `--verbose` | clean, analyze | Show detailed output |
 | `--quiet` | clean, analyze | Minimal output |
 | `--ignore-team` | clean | Ignore team configuration policies |
@@ -455,7 +456,7 @@ See [Fastlane Plugin README](integrations/fastlane/README.md) for installation a
 osxcleaner clean --level normal --non-interactive --format json
 
 # Cleanup only if available space is below 20GB
-osxcleaner clean --level deep --non-interactive --min-space 20 --format json
+osxcleaner clean --level deep --non-interactive --force --min-space 20 --format json
 
 # Preview cleanup in CI logs
 osxcleaner clean --level deep --dry-run --format json

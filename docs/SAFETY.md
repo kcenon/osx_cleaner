@@ -22,24 +22,19 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 
 1. **Never delete what you can't recover** - System files and user documents are always protected
 2. **Classify before delete** - Every path is classified before any action is taken
-3. **Review risky operations** - Warning-level items should be reviewed before cleanup
+3. **Confirm risky operations** - Warning-level items require explicit approval
 4. **Preview before cleanup** - Use `--dry-run` to inspect planned changes before deletion
-
-> **Implementation note:** Confirmation and dry-run behavior is being aligned
-> with the F19 safety fixes. This page documents the intended safety model and
-> the current operator guidance, but does not claim an enforced confirmation gate
-> beyond what the CLI exposes in this branch.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Safety Decision Flow                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                   │
-│  Path Input → Classify → Check Level → Review → Delete           │
+│  Path Input → Classify → Check Level → Confirm → Delete          │
 │      ↓            ↓           ↓           ↓         ↓            │
-│   Validate    4-Level     Match with   Operator   Execute        │
-│   Existence   System      Cleanup      Review     Safely         │
-│                           Level                                  │
+│   Validate    4-Level     Match with   Require    Execute        │
+│   Existence   System      Cleanup      Approval   Safely         │
+│                           Level        if Warning                │
 │                                                                   │
 │  At any step: DANGER paths → IMMEDIATE BLOCK (never delete)      │
 │                                                                   │
@@ -167,6 +162,10 @@ osxcleaner clean --level deep
 
 **Best for:** Pre-release cleanup, disk space emergency
 
+Deep cleanup can include Warning-level targets. Interactive runs ask for `yes`
+before deletion. Non-interactive runs fail closed for Warning-level cleanup
+unless `--force` is also provided.
+
 ### Level 4: System
 
 ```bash
@@ -182,7 +181,9 @@ sudo osxcleaner clean --level system
 
 **Best for:** Expert users only, system maintenance
 
-> **Note:** Even at System level, Danger paths are NEVER deleted.
+> **Note:** System-level cleanup also requires confirmation, or
+> `--non-interactive --force` in automation. Even at System level, Danger paths
+> are NEVER deleted.
 
 ---
 
@@ -233,9 +234,9 @@ These paths are classified as **Danger** and will never be deleted:
 | `~/Music` | Music library |
 | `~/Downloads` | Downloaded files |
 
-### Warning Paths (Review Before Cleanup)
+### Warning Paths (Require Confirmation)
 
-These paths are Warning level and should be reviewed before deletion:
+These paths are Warning level and require confirmation before deletion:
 
 | Path | Reason |
 |------|--------|
@@ -294,6 +295,9 @@ These paths are Warning level and should be reviewed before deletion:
    ```bash
    osxcleaner clean --level deep --dry-run
    ```
+
+   Dry-run output reports the planned target count, highest safety level, and
+   estimated reclaimable space without deleting files.
 
 2. **Create a Time Machine backup**
    ```bash
@@ -355,7 +359,7 @@ docker pull your-image-name
 
 **A:**
 1. OSX Cleaner won't delete Danger paths
-2. Review Warning paths before deletion, especially before Deep or System cleanup
+2. Confirm Warning paths before deletion, especially before Deep or System cleanup
 3. Use Time Machine for recovery
 4. Most cleaned items regenerate automatically
 
