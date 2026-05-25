@@ -92,6 +92,26 @@ final class FFIRoundTripTests: XCTestCase {
         }
     }
 
+    func testAnalyze_RepeatedSuccessAndRustError_CleansFFIResults() throws {
+        let tempDir = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        for _ in 0..<50 {
+            let result = try bridge.analyzePath(tempDir.path)
+            XCTAssertEqual(result.path, tempDir.path)
+        }
+
+        for index in 0..<50 {
+            let missingPath = tempDir.appendingPathComponent("missing-\(index)").path
+            XCTAssertThrowsError(try bridge.analyzePath(missingPath)) { error in
+                guard case RustBridgeError.rustError = error else {
+                    XCTFail("Expected RustBridgeError.rustError, got \(error)")
+                    return
+                }
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeTempDirectory() throws -> URL {

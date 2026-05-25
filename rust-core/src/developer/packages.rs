@@ -21,8 +21,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use super::{
-    calculate_dir_size, expand_home, CleanupError, CleanupMethod, CleanupResult, CleanupTarget,
-    DeveloperCleaner, DeveloperTool, ScanResult,
+    calculate_dir_size, expand_home, run_command_with_timeout, CleanupError, CleanupMethod,
+    CleanupResult, CleanupTarget, DeveloperCleaner, DeveloperTool, ScanResult,
+    COMMAND_PROBE_TIMEOUT,
 };
 use crate::safety::SafetyLevel;
 
@@ -136,21 +137,17 @@ impl PackageManagerCleaner {
 
     /// Get Homebrew cache path
     fn get_homebrew_cache_path() -> Option<PathBuf> {
-        Command::new("brew")
-            .arg("--cache")
-            .output()
+        run_command_with_timeout("brew", &["--cache"], COMMAND_PROBE_TIMEOUT)
             .ok()
-            .filter(|o| o.status.success())
+            .filter(|o| o.status_success)
             .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
     }
 
     /// Get pnpm store path
     fn get_pnpm_store_path() -> Option<PathBuf> {
-        Command::new("pnpm")
-            .args(["store", "path"])
-            .output()
+        run_command_with_timeout("pnpm", &["store", "path"], COMMAND_PROBE_TIMEOUT)
             .ok()
-            .filter(|o| o.status.success())
+            .filter(|o| o.status_success)
             .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
     }
 

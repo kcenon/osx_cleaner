@@ -19,8 +19,11 @@ pub mod xcode;
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::io;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Child, Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::safety::SafetyLevel;
 
@@ -29,6 +32,133 @@ pub use docker::DockerCleaner;
 pub use packages::PackageManagerCleaner;
 pub use simulator::SimulatorCleaner;
 pub use xcode::XcodeCleaner;
+
+pub(crate) const COMMAND_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+
+#[derive(Debug)]
+pub(crate) struct DeveloperCommandOutput {
+    pub(crate) status_success: bool,
+    pub(crate) stdout: Vec<u8>,
+    pub(crate) stderr: Vec<u8>,
+}
+
+impl From<Output> for DeveloperCommandOutput {
+    fn from(output: Output) -> Self {
+        Self {
+            status_success: output.status.success(),
+            stdout: output.stdout,
+            stderr: output.stderr,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum DeveloperCommandError {
+    Io(io::Error),
+    TimedOut { command: String, timeout: Duration },
+}
+
+impl std::fmt::Display for DeveloperCommandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(error) => write!(f, "{}", error),
+            Self::TimedOut { command, timeout } => {
+                write!(f, "`{}` timed out after {:?}", command, timeout)
+            }
+        }
+    }
+}
+
+pub(crate) trait CommandRunner: Send + Sync {
+    fn run(
+        &self,
+        program: &str,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Result<DeveloperCommandOutput, DeveloperCommandError>;
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct SystemCommandRunner;
+
+impl CommandRunner for SystemCommandRunner {
+    fn run(
+        &self,
+        program: &str,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Result<DeveloperCommandOutput, DeveloperCommandError> {
+        run_command_with_timeout(program, args, timeout)
+    }
+}
+
+pub(crate) fn run_command_with_timeout(
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<DeveloperCommandOutput, DeveloperCommandError> {
+    let mut command = Command::new(program);
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    configure_timeout_command(&mut command);
+
+    let mut child = command.spawn().map_err(DeveloperCommandError::Io)?;
+
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                let output = child
+                    .wait_with_output()
+                    .map_err(DeveloperCommandError::Io)?;
+                return Ok(output.into());
+            }
+            Ok(None) if Instant::now() >= deadline => {
+                terminate_child_process_tree(&mut child);
+                let _ = child.wait();
+                return Err(DeveloperCommandError::TimedOut {
+                    command: format_command(program, args),
+                    timeout,
+                });
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(10)),
+            Err(error) => return Err(DeveloperCommandError::Io(error)),
+        }
+    }
+}
+
+#[cfg(unix)]
+fn configure_timeout_command(command: &mut Command) {
+    use std::os::unix::process::CommandExt;
+
+    command.process_group(0);
+}
+
+#[cfg(not(unix))]
+fn configure_timeout_command(_command: &mut Command) {}
+
+fn terminate_child_process_tree(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let process_group = format!("-{}", child.id());
+        let _ = Command::new("/bin/kill")
+            .args(["-KILL", process_group.as_str()])
+            .status();
+    }
+
+    let _ = child.kill();
+}
+
+fn format_command(program: &str, args: &[&str]) -> String {
+    if args.is_empty() {
+        program.to_string()
+    } else {
+        format!("{} {}", program, args.join(" "))
+    }
+}
 
 /// Supported developer tools
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -315,10 +445,8 @@ impl DeveloperCleanerManager {
 
 /// Check if a command is available in PATH
 fn is_command_available(command: &str) -> bool {
-    Command::new("which")
-        .arg(command)
-        .output()
-        .map(|o| o.status.success())
+    run_command_with_timeout("which", &[command], COMMAND_PROBE_TIMEOUT)
+        .map(|o| o.status_success)
         .unwrap_or(false)
 }
 
@@ -339,10 +467,8 @@ fn gradle_wrapper_exists() -> bool {
 
 /// Check if Docker is available and running
 fn is_docker_available() -> bool {
-    Command::new("docker")
-        .arg("info")
-        .output()
-        .map(|o| o.status.success())
+    run_command_with_timeout("docker", &["info"], COMMAND_PROBE_TIMEOUT)
+        .map(|o| o.status_success)
         .unwrap_or(false)
 }
 
@@ -441,5 +567,30 @@ mod tests {
         assert!(!result.installed);
         assert_eq!(result.total_size, 0);
         assert!(result.targets.is_empty());
+    }
+
+    #[test]
+    fn test_run_command_with_timeout_success() {
+        let output =
+            run_command_with_timeout("sh", &["-c", "printf osx-cleaner"], Duration::from_secs(1))
+                .expect("short command should complete");
+
+        assert!(output.status_success);
+        assert_eq!(String::from_utf8_lossy(&output.stdout), "osx-cleaner");
+    }
+
+    #[test]
+    fn test_run_command_with_timeout_times_out() {
+        let started = Instant::now();
+        let result = run_command_with_timeout("sh", &["-c", "sleep 2"], Duration::from_millis(50));
+
+        assert!(matches!(
+            result,
+            Err(DeveloperCommandError::TimedOut { .. })
+        ));
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "timeout runner should not wait for the full child sleep"
+        );
     }
 }

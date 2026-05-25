@@ -12,9 +12,13 @@
 use osxcore::*;
 use std::ffi::{CStr, CString};
 
+unsafe fn free_result(result: &mut FFIResult) {
+    osx_free_result(result);
+}
+
 #[test]
 fn test_ffi_result_allocation_ok() {
-    let result = FFIResult::ok(Some("test data".to_string()));
+    let mut result = FFIResult::ok(Some("test data".to_string()));
 
     assert!(result.success);
     assert!(result.error_message.is_null());
@@ -23,13 +27,16 @@ fn test_ffi_result_allocation_ok() {
     unsafe {
         let data = CStr::from_ptr(result.data);
         assert_eq!(data.to_str().unwrap(), "test data");
-        osx_free_string(result.data);
+        free_result(&mut result);
     }
+
+    assert!(result.data.is_null());
+    assert!(result.error_message.is_null());
 }
 
 #[test]
 fn test_ffi_result_allocation_error() {
-    let result = FFIResult::err("error message".to_string());
+    let mut result = FFIResult::err("error message".to_string());
 
     assert!(!result.success);
     assert!(!result.error_message.is_null());
@@ -38,8 +45,11 @@ fn test_ffi_result_allocation_error() {
     unsafe {
         let error = CStr::from_ptr(result.error_message);
         assert_eq!(error.to_str().unwrap(), "error message");
-        osx_free_string(result.error_message);
+        free_result(&mut result);
     }
+
+    assert!(result.data.is_null());
+    assert!(result.error_message.is_null());
 }
 
 #[test]
@@ -47,9 +57,9 @@ fn test_massive_allocation_deallocation() {
     // Test for memory leaks with many allocations
     for i in 0..100000 {
         let data = format!("iteration {}", i);
-        let result = FFIResult::ok(Some(data));
+        let mut result = FFIResult::ok(Some(data));
         unsafe {
-            osx_free_string(result.data);
+            free_result(&mut result);
         }
     }
 
@@ -61,9 +71,38 @@ fn test_massive_error_allocation() {
     // Test error path for memory leaks
     for i in 0..100000 {
         let error = format!("error {}", i);
-        let result = FFIResult::err(error);
+        let mut result = FFIResult::err(error);
         unsafe {
-            osx_free_string(result.error_message);
+            free_result(&mut result);
+        }
+    }
+}
+
+#[test]
+fn test_value_returned_result_cleanup_nulls_fields() {
+    let mut success = FFIResult::ok(Some("success".to_string()));
+    let mut error = FFIResult::err("error".to_string());
+
+    unsafe {
+        free_result(&mut success);
+        free_result(&mut error);
+    }
+
+    assert!(success.data.is_null());
+    assert!(success.error_message.is_null());
+    assert!(error.data.is_null());
+    assert!(error.error_message.is_null());
+}
+
+#[test]
+fn test_repeated_success_and_error_cleanup_paths() {
+    for i in 0..10_000 {
+        let mut success = FFIResult::ok(Some(format!("success {}", i)));
+        let mut error = FFIResult::err(format!("error {}", i));
+
+        unsafe {
+            free_result(&mut success);
+            free_result(&mut error);
         }
     }
 }

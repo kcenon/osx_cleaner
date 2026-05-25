@@ -23,7 +23,7 @@ import Foundation
 /// # Memory Ownership
 ///
 /// - **Input Strings**: Swift owns strings passed to Rust (borrowed by Rust)
-/// - **Output Results**: Rust allocates FFIResult, Swift frees with `osx_free_result()`
+/// - **Output Results**: Rust returns FFIResult by value; Swift frees Rust-owned string fields with `osx_free_result(&result)`
 /// - **Automatic Cleanup**: All methods use `defer` to prevent memory leaks
 ///
 /// # Thread Safety
@@ -333,40 +333,42 @@ public final class RustBridge {
     ///
     /// This method demonstrates proper FFI memory management:
     ///
-    /// 1. **Check Success**: Validates `result.success` before accessing data
-    /// 2. **Copy Data**: Converts C strings to Swift strings (copies memory)
-    /// 3. **Free Memory**: Uses `defer` to ensure Rust-allocated memory is freed
-    /// 4. **Error Propagation**: Converts Rust errors to Swift exceptions
+    /// 1. **Schedule Cleanup**: Uses `defer` to free Rust-owned strings
+    /// 2. **Check Success**: Validates `result.success` before accessing data
+    /// 3. **Copy Data**: Converts C strings to Swift strings (copies memory)
+    /// 4. **Free Memory**: Calls `osx_free_result(&result)` after copied strings are no longer needed
+    /// 5. **Error Propagation**: Converts Rust errors to Swift exceptions
     ///
     /// # Memory Safety
     ///
-    /// - **Input**: `result` is stack-allocated by Rust (no ownership transfer)
+    /// - **Input**: `result` is returned by value (container owned by Swift)
     /// - **Strings**: `error_message` and `data` are heap-allocated by Rust
-    /// - **Ownership**: Swift takes ownership and MUST free strings
-    /// - **Cleanup**: `defer` ensures strings are freed even if function throws
+    /// - **Ownership**: Swift takes ownership of string fields and MUST free them
+    /// - **Cleanup**: `defer` ensures string fields are freed even if function throws
     ///
     /// # Example Memory Flow
     ///
     /// ```
-    /// 1. Rust allocates FFIResult { data: heap_string }
-    /// 2. Swift receives result (borrowed, not owned)
+    /// 1. Rust returns FFIResult { data: heap_string } by value
+    /// 2. Swift stores the result container locally
     /// 3. Swift copies data: String(cString: dataPtr)
-    /// 4. defer block executes: osx_free_string(dataPtr)
-    /// 5. Rust deallocates heap_string
+    /// 4. defer block executes: osx_free_result(&result)
+    /// 5. Rust deallocates heap_string fields and leaves the container alone
     /// ```
     ///
-    /// - Parameter result: FFI result from Rust (strings will be freed automatically)
+    /// - Parameter ffiResult: FFI result from Rust (strings will be freed automatically)
     /// - Returns: Decoded Swift object
     /// - Throws: `RustBridgeError` if parsing fails or result indicates error
-    private func processFFIResult<T: Decodable>(_ result: osx_FFIResult) throws -> T {
+    private func processFFIResult<T: Decodable>(_ ffiResult: osx_FFIResult) throws -> T {
+        var result = ffiResult
+        defer { osx_free_result(&result) }
+
         // Check success before accessing data (safety contract)
         if !result.success {
             let errorMessage: String
             if let errorPtr = result.error_message {
                 // Copy error message to Swift string
                 errorMessage = String(cString: errorPtr)
-                // Free Rust-allocated memory immediately after copy
-                osx_free_string(errorPtr)
             } else {
                 errorMessage = "Unknown error"
             }
@@ -376,8 +378,6 @@ public final class RustBridge {
         guard let dataPtr = result.data else {
             throw RustBridgeError.nullPointer
         }
-        // Free data string at end of scope (even if exception thrown)
-        defer { osx_free_string(dataPtr) }
 
         // Copy C string to Swift string (memory-safe)
         let jsonString = String(cString: dataPtr)

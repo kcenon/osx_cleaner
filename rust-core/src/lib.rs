@@ -129,8 +129,8 @@ pub extern "C" fn osx_core_version() -> *mut c_char {
 /// ## Postconditions
 ///
 /// After this function returns:
-/// - The returned `FFIResult` is owned by the caller
-/// - The caller MUST call `osx_free_result()` to free the returned result
+/// - The returned `FFIResult` container is owned by the caller
+/// - The caller MUST pass its address to `osx_free_result()` to free owned string fields
 /// - The `path` pointer is no longer referenced and can be freed by the caller
 ///
 /// ## Thread Safety
@@ -146,15 +146,15 @@ pub extern "C" fn osx_core_version() -> *mut c_char {
 /// - Passing a pointer to non-null-terminated data
 /// - Passing a pointer to invalid memory
 /// - Using the returned pointers after calling `osx_free_result()`
-/// - Calling `osx_free_result()` more than once on the same result
+/// - Freeing returned string fields separately before calling `osx_free_result()`
 ///
 /// # Example (Swift)
 ///
 /// ```swift
 /// func analyzeDirectory(_ path: String) throws -> AnalysisResult {
 ///     let cPath = path.cString(using: .utf8)!
-///     let result = osx_analyze_path(cPath)
-///     defer { osx_free_result(result) }
+///     var result = osx_analyze_path(cPath)
+///     defer { osx_free_result(&result) }
 ///
 ///     guard result.success else {
 ///         let error = String(cString: result.error_message)
@@ -175,7 +175,7 @@ pub extern "C" fn osx_core_version() -> *mut c_char {
 /// } else {
 ///     fprintf(stderr, "Error: %s\n", result.error_message);
 /// }
-/// osx_free_result(result);
+/// osx_free_result(&result);
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn osx_analyze_path(path: *const c_char) -> FFIResult {
@@ -436,8 +436,8 @@ pub unsafe extern "C" fn osx_validate_cleanup(
 /// ## Postconditions
 ///
 /// After this function returns:
-/// - The returned `FFIResult` is owned by the caller
-/// - The caller MUST call `osx_free_result()` to free the returned result
+/// - The returned `FFIResult` container is owned by the caller
+/// - The caller MUST pass its address to `osx_free_result()` to free owned string fields
 /// - If `dry_run == false` and `success == true`, files may have been deleted
 /// - Deletion operations are logged (if logging is initialized)
 ///
@@ -468,8 +468,8 @@ pub unsafe extern "C" fn osx_validate_cleanup(
 /// ```swift
 /// func cleanDirectory(_ path: String, level: CleanupLevel, dryRun: Bool) throws -> CleanStats {
 ///     let cPath = path.cString(using: .utf8)!
-///     let result = osx_clean_path(cPath, Int32(level.rawValue), dryRun)
-///     defer { osx_free_result(result) }
+///     var result = osx_clean_path(cPath, Int32(level.rawValue), dryRun)
+///     defer { osx_free_result(&result) }
 ///
 ///     guard result.success else {
 ///         let error = String(cString: result.error_message)
@@ -488,14 +488,14 @@ pub unsafe extern "C" fn osx_validate_cleanup(
 /// FFIResult preview = osx_clean_path("/Users/example/Library/Caches", 2, true);
 /// if (preview.success) {
 ///     printf("Would delete: %s\n", preview.data);
-///     osx_free_result(preview);
+///     osx_free_result(&preview);
 ///
 ///     // Confirm and execute
 ///     FFIResult actual = osx_clean_path("/Users/example/Library/Caches", 2, false);
 ///     if (actual.success) {
 ///         printf("Deleted: %s\n", actual.data);
 ///     }
-///     osx_free_result(actual);
+///     osx_free_result(&actual);
 /// }
 /// ```
 #[no_mangle]
@@ -572,34 +572,36 @@ pub unsafe extern "C" fn osx_free_string(s: *mut c_char) {
     }
 }
 
-/// Frees an FFIResult structure and its contents.
+/// Frees the owned string fields inside an FFIResult.
 ///
-/// This function deallocates all memory associated with an `FFIResult`,
-/// including both the `error_message` and `data` fields.
+/// FFI functions return `FFIResult` by value. The result container itself is
+/// owned by the caller, while the `error_message` and `data` fields are
+/// Rust-allocated strings. Pass a mutable pointer to the value-returned result
+/// to release those string fields.
 ///
 /// # Arguments
 ///
-/// * `result` - A pointer to an `FFIResult` structure.
+/// * `result` - A mutable pointer to an `FFIResult` value.
 ///
 /// # Safety
 ///
 /// This function is unsafe because:
-/// - It assumes `result` points to a valid `FFIResult` allocated by Rust
-/// - It deallocates the result and all its associated memory
+/// - It assumes `result` points to a valid, live `FFIResult` value
+/// - It assumes `error_message` and `data`, when non-null, were allocated by Rust
 ///
 /// ## Preconditions
 ///
 /// The caller MUST ensure:
 /// - `result` is either null OR a valid pointer to an `FFIResult`
-/// - `result` has not been freed previously
 /// - The `FFIResult` was created by a Rust FFI function
+/// - `error_message` and `data` have not been freed separately
 ///
 /// ## Postconditions
 ///
 /// After this function returns:
-/// - All memory associated with `result` is deallocated
-/// - `result` becomes a dangling pointer and MUST NOT be used
 /// - Both `error_message` and `data` pointers are freed
+/// - Both fields are set to null on the provided `FFIResult`
+/// - The `FFIResult` container remains owned by the caller
 ///
 /// ## Thread Safety
 ///
@@ -609,21 +611,22 @@ pub unsafe extern "C" fn osx_free_string(s: *mut c_char) {
 /// ## Undefined Behavior
 ///
 /// The following will cause undefined behavior:
-/// - Calling this function twice on the same result (double-free)
-/// - Using `result` or its fields after this function returns
-/// - Passing a pointer to stack-allocated or improperly initialized `FFIResult`
+/// - Passing a pointer to invalid memory
+/// - Using the string fields after this function returns
+/// - Passing an improperly initialized `FFIResult`
+/// - Freeing `error_message` or `data` separately before calling this function
 ///
 /// ## Notes
 ///
 /// - Passing a null pointer is safe and will be ignored
 /// - The function frees both `error_message` and `data` if they are non-null
-/// - Always use `defer { osx_free_result(result) }` in Swift to ensure cleanup
+/// - Always pass a mutable pointer, e.g. `osx_free_result(&result)`
 ///
 /// # Example (Swift)
 ///
 /// ```swift
-/// let result = osx_analyze_path(path)
-/// defer { osx_free_result(result) }  // Automatic cleanup
+/// var result = osx_analyze_path(path)
+/// defer { osx_free_result(&result) }  // Automatic cleanup
 /// // Use result...
 /// ```
 ///
@@ -632,14 +635,16 @@ pub unsafe extern "C" fn osx_free_string(s: *mut c_char) {
 /// ```c
 /// FFIResult result = osx_analyze_path("/path");
 /// // Use result...
-/// osx_free_result(result);  // Manual cleanup
+/// osx_free_result(&result);  // Manual cleanup
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn osx_free_result(result: *mut FFIResult) {
-    if !result.is_null() {
-        let r = Box::from_raw(result);
-        osx_free_string(r.error_message);
-        osx_free_string(r.data);
+    if let Some(result) = result.as_mut() {
+        let error_message = std::mem::replace(&mut result.error_message, ptr::null_mut());
+        let data = std::mem::replace(&mut result.data, ptr::null_mut());
+
+        osx_free_string(error_message);
+        osx_free_string(data);
     }
 }
 
@@ -1827,6 +1832,60 @@ mod tests {
 
             // Note: After free, the pointer should not be used
             // This test verifies we can call free without crashes
+        }
+    }
+
+    #[test]
+    fn test_free_result_releases_value_returned_success_fields() {
+        let mut result = FFIResult::ok(Some("owned data".to_string()));
+
+        assert!(result.success);
+        assert!(!result.data.is_null());
+
+        unsafe {
+            osx_free_result(&mut result);
+        }
+
+        assert!(result.error_message.is_null());
+        assert!(result.data.is_null());
+
+        // The container remains caller-owned and the nulled fields make a
+        // repeated cleanup on the same live value a no-op.
+        unsafe {
+            osx_free_result(&mut result);
+        }
+    }
+
+    #[test]
+    fn test_free_result_releases_value_returned_error_fields() {
+        let mut result = FFIResult::err("owned error".to_string());
+
+        assert!(!result.success);
+        assert!(!result.error_message.is_null());
+
+        unsafe {
+            osx_free_result(&mut result);
+        }
+
+        assert!(result.error_message.is_null());
+        assert!(result.data.is_null());
+    }
+
+    #[test]
+    fn test_free_result_repeated_success_and_error_cleanup_paths() {
+        for i in 0..1000 {
+            let mut success = FFIResult::ok(Some(format!("success {}", i)));
+            let mut error = FFIResult::err(format!("error {}", i));
+
+            unsafe {
+                osx_free_result(&mut success);
+                osx_free_result(&mut error);
+            }
+
+            assert!(success.data.is_null());
+            assert!(success.error_message.is_null());
+            assert!(error.data.is_null());
+            assert!(error.error_message.is_null());
         }
     }
 }
