@@ -9,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
 
 jobs:
   # Rust jobs
@@ -112,8 +113,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-full-
 
-      - name: Build all
-        run: make all
+      - name: Build from clean checkout
+        run: make build
 
       - name: Run all tests
         run: make test

@@ -30,6 +30,12 @@ OSX Cleaner uses a hybrid testing approach combining:
 3. **Isolation**: Tests should not depend on external state
 4. **Clarity**: Test names describe what they verify
 
+### Safety Contract
+
+Tests must not clean real user data. Cleanup tests that perform deletion must
+use temporary directories or injected test fixtures, and CLI smoke checks should
+prefer `--dry-run` unless the test owns every path it removes.
+
 ---
 
 ## Test Structure
@@ -58,18 +64,28 @@ osx_cleaner/
 ### Quick Commands
 
 ```bash
+# Fresh clone first build; generates Frameworks/COSXCore.xcframework
+make build
+
 # Run all tests (Rust + Swift)
 make test
 
 # Run only Rust tests
 cd rust-core && cargo test
 
-# Run only Swift tests
-swift test
+# Run only Swift tests; generates the XCFramework first
+make test-swift
 
-# Run with coverage
-make test-coverage
+# Run Swift coverage after the XCFramework bootstrap
+make xcframework
+swift test --enable-code-coverage
 ```
+
+The Swift package has a local binary target at
+`Frameworks/COSXCore.xcframework`. It is generated, not committed, so direct
+`swift build` or `swift test` commands require a prior `make xcframework`.
+Use `./scripts/build-xcframework.sh --check` when diagnosing missing local
+build prerequisites.
 
 ### Detailed Commands
 
@@ -99,7 +115,11 @@ cargo llvm-cov --all-features
 #### Swift Tests
 
 ```bash
-# Run all tests
+# Run all tests from a clean checkout
+make test-swift
+
+# Or bootstrap once, then run SwiftPM directly
+make xcframework
 swift test
 
 # Run specific test class
@@ -119,7 +139,7 @@ swift test --no-parallel
 
 ```bash
 # Build and test full integration
-make all
+make build
 make test
 
 # Test CLI directly
@@ -300,6 +320,7 @@ final class SafetyTests: XCTestCase {
 **Swift:**
 ```bash
 # Run tests with coverage
+make xcframework
 swift test --enable-code-coverage
 
 # Generate lcov report
@@ -365,10 +386,12 @@ The `.github/workflows/ci.yml` runs:
    - Unit tests (`cargo test`)
 
 2. **Swift Check**
+   - XCFramework bootstrap (`make xcframework`)
    - Build (`swift build`)
    - Unit tests (`swift test`)
 
 3. **Coverage**
+   - XCFramework bootstrap (`make xcframework`)
    - Swift coverage with llvm-cov
    - Rust coverage with cargo-llvm-cov
    - Upload to Codecov

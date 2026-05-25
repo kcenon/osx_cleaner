@@ -22,19 +22,24 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 
 1. **Never delete what you can't recover** - System files and user documents are always protected
 2. **Classify before delete** - Every path is classified before any action is taken
-3. **User confirmation for risky operations** - Warning-level items require explicit approval
-4. **Dry-run by default** - Encourage previewing before actual cleanup
+3. **Review risky operations** - Warning-level items should be reviewed before cleanup
+4. **Preview before cleanup** - Use `--dry-run` to inspect planned changes before deletion
+
+> **Implementation note:** Confirmation and dry-run behavior is being aligned
+> with the F19 safety fixes. This page documents the intended safety model and
+> the current operator guidance, but does not claim an enforced confirmation gate
+> beyond what the CLI exposes in this branch.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Safety Decision Flow                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                   │
-│  Path Input → Classify → Check Level → Confirm → Delete          │
+│  Path Input → Classify → Check Level → Review → Delete           │
 │      ↓            ↓           ↓           ↓         ↓            │
-│   Validate    4-Level     Match with   Require    Execute        │
-│   Existence   System      Cleanup      Approval   Safely         │
-│                           Level        if Warning                 │
+│   Validate    4-Level     Match with   Operator   Execute        │
+│   Existence   System      Cleanup      Review     Safely         │
+│                           Level                                  │
 │                                                                   │
 │  At any step: DANGER paths → IMMEDIATE BLOCK (never delete)      │
 │                                                                   │
@@ -228,9 +233,9 @@ These paths are classified as **Danger** and will never be deleted:
 | `~/Music` | Music library |
 | `~/Downloads` | Downloaded files |
 
-### Warning Paths (Require Confirmation)
+### Warning Paths (Review Before Cleanup)
 
-These paths are Warning level and require confirmation before deletion:
+These paths are Warning level and should be reviewed before deletion:
 
 | Path | Reason |
 |------|--------|
@@ -350,7 +355,7 @@ docker pull your-image-name
 
 **A:**
 1. OSX Cleaner won't delete Danger paths
-2. Warning paths require confirmation
+2. Review Warning paths before deletion, especially before Deep or System cleanup
 3. Use Time Machine for recovery
 4. Most cleaned items regenerate automatically
 

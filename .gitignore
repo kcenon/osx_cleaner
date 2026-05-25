@@ -32,7 +32,7 @@ DerivedData/
 # =============================================================================
 .build/
 .swiftpm/
-Package.resolved
+# Package.resolved is tracked for application/CLI reproducibility.
 Packages/
 *.playground/timeline.xctimeline
 *.playground/playground.xcworkspace
@@ -41,7 +41,7 @@ Packages/
 # Rust
 # =============================================================================
 target/
-Cargo.lock
+# Cargo.lock is tracked for application/CLI reproducibility.
 **/*.rs.bk
 
 # =============================================================================

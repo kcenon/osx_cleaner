@@ -1,10 +1,10 @@
 # OSX Cleaner - Unified Build System
 # This Makefile provides targets for building the Swift + Rust hybrid project
 
-.PHONY: all swift rust xcframework clean test format lint help install uninstall
+.PHONY: all build bootstrap swift rust xcframework clean test test-rust test-swift format format-rust format-swift lint lint-rust lint-swift help install uninstall debug headers check docs ci clean-rust clean-swift clean-xcframework
 
 # Default target
-all: rust swift
+all: build
 
 # Rust build configuration
 RUST_DIR := rust-core
@@ -30,9 +30,12 @@ NC := \033[0m # No Color
 # Main Targets
 # =============================================================================
 
-## Build everything
-all: xcframework swift
+## Build everything from a clean checkout
+build: xcframework swift
 	@echo "$(GREEN)Build complete!$(NC)"
+
+## Generate local SwiftPM binary target artifact
+bootstrap: xcframework
 
 ## Build only Rust core (host architecture, used for tests and dev)
 rust:
@@ -47,7 +50,7 @@ xcframework:
 	./scripts/build-xcframework.sh
 	@echo "$(GREEN)XCFramework build complete$(NC)"
 
-## Build only Swift (requires the XCFramework to exist)
+## Build only Swift (builds the XCFramework first)
 swift: xcframework
 	@echo "$(YELLOW)Building Swift...$(NC)"
 	swift build -c $(SWIFT_CONFIG)
@@ -149,7 +152,7 @@ clean-swift:
 # =============================================================================
 
 ## Install osxcleaner to /usr/local/bin
-install: all
+install: build
 	@echo "$(YELLOW)Installing osxcleaner...$(NC)"
 	@mkdir -p /usr/local/bin
 	cp $(SWIFT_BUILD_DIR)/$(SWIFT_CONFIG)/osxcleaner /usr/local/bin/
@@ -209,12 +212,14 @@ help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@grep -E '^## ' $(MAKEFILE_LIST) | \
-		sed -e 's/^## //' | \
-		awk 'BEGIN {FS = ":"} /^[a-zA-Z_-]+:/ { printf "  $(GREEN)%-15s$(NC) %s\n", $$1, prev } { prev = $$0 }'
+	@awk 'BEGIN { desc = "" } \
+		/^## / { desc = substr($$0, 4); next } \
+		/^[a-zA-Z0-9_-]+:/ && desc != "" { split($$0, parts, ":"); printf "  $(GREEN)%-20s$(NC) %s\n", parts[1], desc; desc = ""; next } \
+		{ desc = "" }' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "Examples:"
-	@echo "  make              Build everything (Rust + Swift)"
+	@echo "  make build        Build everything from a clean checkout"
+	@echo "  make xcframework  Generate the SwiftPM binary target artifact"
 	@echo "  make test         Run all tests"
 	@echo "  make clean        Clean all build artifacts"
 	@echo "  make install      Install to /usr/local/bin"
