@@ -983,12 +983,9 @@ mod tests {
     fn test_clean_dry_run_does_not_execute_command() {
         let runner = MockCommandRunner::new(Vec::new());
         let cleaner = cleaner_with_runner(runner.clone());
-        let target = CleanupTarget::new_command(
-            "Custom Xcode Cleanup",
-            "echo cleanup",
-            SafetyLevel::Safe,
-        )
-        .with_size(1024);
+        let target =
+            CleanupTarget::new_command("Custom Xcode Cleanup", "echo cleanup", SafetyLevel::Safe)
+                .with_size(1024);
 
         let result = cleaner.clean(&[target], true);
 
@@ -1010,7 +1007,11 @@ mod tests {
             safety_level: SafetyLevel::Safe,
             cleanup_method: CleanupMethod::CommandWithArgs(
                 "xcrun".to_string(),
-                vec!["simctl".to_string(), "delete".to_string(), "abc".to_string()],
+                vec![
+                    "simctl".to_string(),
+                    "delete".to_string(),
+                    "abc".to_string(),
+                ],
             ),
             description: None,
         };
@@ -1074,7 +1075,11 @@ mod tests {
             safety_level: SafetyLevel::Safe,
             cleanup_method: CleanupMethod::CommandWithArgs(
                 "xcrun".to_string(),
-                vec!["simctl".to_string(), "delete".to_string(), "abc".to_string()],
+                vec![
+                    "simctl".to_string(),
+                    "delete".to_string(),
+                    "abc".to_string(),
+                ],
             ),
             description: None,
         };

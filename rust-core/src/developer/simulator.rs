@@ -964,9 +964,7 @@ mod tests {
 
     #[test]
     fn test_list_devices_uses_scan_timeout() {
-        let runner = MockCommandRunner::new(vec![MockCommandRunner::success(
-            r#"{"devices": {}}"#,
-        )]);
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::success(r#"{"devices": {}}"#)]);
         let cleaner = cleaner_with_runner(runner.clone());
 
         let list = cleaner
@@ -998,9 +996,8 @@ mod tests {
 
     #[test]
     fn test_list_runtimes_uses_scan_timeout() {
-        let runner = MockCommandRunner::new(vec![MockCommandRunner::success(
-            r#"{"runtimes": []}"#,
-        )]);
+        let runner =
+            MockCommandRunner::new(vec![MockCommandRunner::success(r#"{"runtimes": []}"#)]);
         let cleaner = cleaner_with_runner(runner.clone());
 
         let runtimes = cleaner
@@ -1052,9 +1049,7 @@ mod tests {
     #[test]
     fn test_delete_unavailable_dry_run_does_not_execute_command() {
         // Dry run should only invoke the list (probe) command, never the delete.
-        let runner = MockCommandRunner::new(vec![MockCommandRunner::success(
-            r#"{"devices": {}}"#,
-        )]);
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::success(r#"{"devices": {}}"#)]);
         let cleaner = cleaner_with_runner(runner.clone());
 
         let count = cleaner
@@ -1129,7 +1124,9 @@ mod tests {
         )]);
         let cleaner = cleaner_with_runner(runner);
 
-        let error = cleaner.erase_all(false).expect_err("timeout should surface");
+        let error = cleaner
+            .erase_all(false)
+            .expect_err("timeout should surface");
         assert!(matches!(error, SimulatorError::CommandTimedOut(_)));
     }
 
@@ -1196,7 +1193,11 @@ mod tests {
             safety_level: SafetyLevel::Safe,
             cleanup_method: CleanupMethod::CommandWithArgs(
                 "xcrun".to_string(),
-                vec!["simctl".to_string(), "delete".to_string(), "abc".to_string()],
+                vec![
+                    "simctl".to_string(),
+                    "delete".to_string(),
+                    "abc".to_string(),
+                ],
             ),
             description: None,
         };
@@ -1221,8 +1222,14 @@ mod tests {
         // here we just verify that even if list_devices times out the scan does
         // not panic and surfaces a structured error in `errors`.
         let runner = MockCommandRunner::new(vec![
-            MockCommandRunner::timeout("xcrun simctl list devices -j", SIMULATOR_SCAN_COMMAND_TIMEOUT),
-            MockCommandRunner::timeout("xcrun simctl runtime list -j", SIMULATOR_SCAN_COMMAND_TIMEOUT),
+            MockCommandRunner::timeout(
+                "xcrun simctl list devices -j",
+                SIMULATOR_SCAN_COMMAND_TIMEOUT,
+            ),
+            MockCommandRunner::timeout(
+                "xcrun simctl runtime list -j",
+                SIMULATOR_SCAN_COMMAND_TIMEOUT,
+            ),
         ]);
         let cleaner = cleaner_with_runner(runner);
 
