@@ -9,6 +9,7 @@
 - [Safety Philosophy](#safety-philosophy)
 - [4-Level Safety Classification](#4-level-safety-classification)
 - [Cleanup Levels Explained](#cleanup-levels-explained)
+- [Confirmation and Dry-Run Semantics](#confirmation-and-dry-run-semantics)
 - [Protected Paths](#protected-paths)
 - [What to Expect](#what-to-expect)
 - [Recovery Options](#recovery-options)
@@ -22,8 +23,8 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 
 1. **Never delete what you can't recover** - System files and user documents are always protected
 2. **Classify before delete** - Every path is classified before any action is taken
-3. **Confirm risky operations** - Warning-level items require explicit approval
-4. **Preview before cleanup** - Use `--dry-run` to inspect planned changes before deletion
+3. **Confirm risky operations** - Warning- and system-level items require explicit approval. In `--non-interactive` mode the command fails closed and exits non-zero unless `--force` is also passed.
+4. **Preview before cleanup** - Use `--dry-run` to inspect planned changes before deletion. See [Confirmation and Dry-Run Semantics](#confirmation-and-dry-run-semantics) for the full decision matrix.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -184,6 +185,64 @@ sudo osxcleaner clean --level system
 > **Note:** System-level cleanup also requires confirmation, or
 > `--non-interactive --force` in automation. Even at System level, Danger paths
 > are NEVER deleted.
+
+---
+
+## Confirmation and Dry-Run Semantics
+
+The `clean` command always classifies every target before any destructive
+action runs, then routes the plan through one of three policies depending
+on the flags you pass.
+
+### Decision Matrix
+
+| Mode                                                  | Warning/system targets present? | Behavior                                                                                                          |
+|-------------------------------------------------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `--dry-run`                                           | Any                             | Print a per-target preview, never delete, exit `0`. Output includes the policy hint for the equivalent real run.   |
+| Interactive (no `--non-interactive`), no `--force`    | No                              | Cleanup runs without prompting.                                                                                    |
+| Interactive (no `--non-interactive`), no `--force`    | Yes                             | Prompt lists the risky paths and waits for `yes` on stdin. Any other answer aborts with `operation cancelled`.     |
+| `--force` (interactive or not)                        | Any                             | Prompt is skipped entirely; cleanup proceeds.                                                                      |
+| `--non-interactive` only                              | No                              | Cleanup runs without prompting.                                                                                    |
+| `--non-interactive` only                              | Yes                             | **Fail-closed.** The command exits non-zero with `--non-interactive requires --force ...` and nothing is deleted.  |
+| `--non-interactive --force`                           | Any                             | Cleanup runs without prompting and without further safety questions.                                               |
+
+Danger-level paths are blocked under every combination above and cannot be
+unlocked by `--force`.
+
+### Dry-Run Output Contract
+
+`--dry-run` always:
+
+1. Enumerates the targets that would be considered, with safety level,
+   label, and canonical path.
+2. Reports the highest safety level encountered and the estimated
+   reclaimable space.
+3. Lists the risky targets in a dedicated section when `cleanupLevel`
+   would otherwise delete them.
+4. Prints the hint: a real run requires interactive `yes` approval or
+   `--non-interactive --force` for those targets.
+5. Returns exit code `0` and performs no deletion, including for JSON
+   output (`--format json` reports `"dry_run": true` and zero freed
+   bytes).
+
+### Approval Flag Contract (`--force`)
+
+`--force` is the single explicit opt-in that bypasses both the interactive
+prompt and the non-interactive fail-closed gate. It does **not** unlock
+danger-level paths; those are still blocked.
+
+- Interactive: `--force` suppresses the `Type 'yes' to continue:` prompt
+  for the current invocation.
+- Non-interactive: `--non-interactive` without `--force` exits non-zero
+  when any warning- or system-level target is in the plan. `--force`
+  acknowledges the risk and lets cleanup proceed.
+
+### Rejection Behavior
+
+If the user answers anything other than `yes` (case-insensitive) at the
+interactive prompt, the command throws `operationCancelled` and exits
+non-zero. No deletion has happened at that point. Re-running the
+command will replay the same classification and prompt.
 
 ---
 
@@ -429,4 +488,4 @@ All operations are logged to `~/Library/Logs/osxcleaner/`:
 
 ---
 
-*Last updated: 2025-12-26*
+*Last updated: 2026-05-27*
