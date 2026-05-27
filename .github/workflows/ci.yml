@@ -11,6 +11,13 @@ env:
   RUST_BACKTRACE: 1
   MACOSX_DEPLOYMENT_TARGET: "14.0"
 
+# Cache key policy (F19.4.2 / issue #272):
+# - rust-core/Cargo.lock and Package.resolved are tracked in git for
+#   reproducibility (see .gitignore comments). Cache keys hash these lockfiles
+#   so the cache stays warm across CI runs with the same dependency graph.
+# - Frameworks/COSXCore.xcframework is NOT tracked. Every Swift-bearing job
+#   must run `make xcframework` before any `swift build` / `swift test`.
+
 jobs:
   # Rust jobs
   rust-check:
@@ -114,8 +121,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-full-
 
-      - name: Build from clean checkout
-        run: make build
+      - name: Build XCFramework (universal arm64 + x86_64)
+        run: make xcframework
+
+      - name: Build Swift package (after XCFramework prerequisite)
+        run: make swift
 
       - name: Run all tests
         run: make test
