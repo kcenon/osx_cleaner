@@ -728,10 +728,37 @@ private extension MDMServiceDependencyInjectionTests {
 
 final class MDMServiceComplianceConfigTests: XCTestCase {
 
+    /// Build an MDMService whose CleanerService is mocked AND whose cleanup
+    /// configuration is locked to a dry-run inside the supplied temp directory.
+    /// This guarantees that even if a future edit accidentally adds a cleanup
+    /// command path to these tests, no real files outside the temp directory
+    /// can be deleted.
+    private func makeMDMService(
+        cleanerService: any CleanerServiceProtocol,
+        cleanupDirectory: URL? = nil
+    ) -> MDMService {
+        let temp = cleanupDirectory ?? FileManager.default.temporaryDirectory
+            .appendingPathComponent("osxcleaner-mdm-compliance-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+
+        return MDMService(
+            cleanerService: cleanerService,
+            cleanupConfiguration: CleanerConfiguration(
+                cleanupLevel: .normal,
+                dryRun: true,
+                includeSystemCaches: false,
+                includeDeveloperCaches: false,
+                includeBrowserCaches: false,
+                includeLogsCaches: false,
+                specificPaths: [temp.standardizedFileURL.resolvingSymlinksInPath().path]
+            )
+        )
+    }
+
     func testExecuteCommandReportCompliance() async throws {
         // Given
         let mockCleaner = MockCleanerService()
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = makeMDMService(cleanerService: mockCleaner)
 
         // Connect to MDM first
         try await mdmService.connect(
@@ -766,7 +793,7 @@ final class MDMServiceComplianceConfigTests: XCTestCase {
     func testExecuteCommandUpdateConfig() async throws {
         // Given
         let mockCleaner = MockCleanerService()
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = makeMDMService(cleanerService: mockCleaner)
 
         // Create valid configuration JSON
         let config = MDMConfiguration(
@@ -812,7 +839,7 @@ final class MDMServiceComplianceConfigTests: XCTestCase {
     func testExecuteCommandUpdateConfigMissingParameter() async throws {
         // Given
         let mockCleaner = MockCleanerService()
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = makeMDMService(cleanerService: mockCleaner)
 
         // Connect first
         try await mdmService.connect(
@@ -841,7 +868,7 @@ final class MDMServiceComplianceConfigTests: XCTestCase {
     func testExecuteCommandUpdateConfigInvalidJSON() async throws {
         // Given
         let mockCleaner = MockCleanerService()
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = makeMDMService(cleanerService: mockCleaner)
 
         // Connect first
         try await mdmService.connect(
@@ -869,7 +896,7 @@ final class MDMServiceComplianceConfigTests: XCTestCase {
     func testExecuteCommandReportComplianceNotConnected() async throws {
         // Given - Not connected to MDM
         let mockCleaner = MockCleanerService()
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = makeMDMService(cleanerService: mockCleaner)
 
         let command = MDMCommand(
             id: "compliance-cmd",
@@ -889,7 +916,7 @@ final class MDMServiceComplianceConfigTests: XCTestCase {
     func testComplianceReportStructure() async throws {
         // Given
         let mockCleaner = MockCleanerService()
-        let mdmService = MDMService(cleanerService: mockCleaner)
+        let mdmService = makeMDMService(cleanerService: mockCleaner)
 
         // Connect to MDM
         try await mdmService.connect(
