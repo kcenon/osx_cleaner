@@ -33,6 +33,8 @@ DerivedData/
 .build/
 .swiftpm/
 # Package.resolved is tracked for application/CLI reproducibility.
+# See F19.4.2 (issue #272): CI cache keys hash Package.resolved, so the file
+# must be committed. Do NOT add Package.resolved to this ignore list.
 Packages/
 *.playground/timeline.xctimeline
 *.playground/playground.xcworkspace
@@ -42,6 +44,8 @@ Packages/
 # =============================================================================
 target/
 # Cargo.lock is tracked for application/CLI reproducibility.
+# See F19.4.2 (issue #272): CI cache keys hash rust-core/Cargo.lock, so the
+# file must be committed for deterministic builds. Do NOT ignore Cargo.lock.
 **/*.rs.bk
 
 # =============================================================================

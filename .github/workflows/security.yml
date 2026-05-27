@@ -15,6 +15,13 @@ env:
   RUST_BACKTRACE: 1
   MACOSX_DEPLOYMENT_TARGET: "14.0"
 
+# Cache key policy (F19.4.2 / issue #272):
+# - rust-core/Cargo.lock is tracked in git (see .gitignore comments) so the
+#   cache key resolves to a real file. cargo-audit/deny only need lockfile
+#   metadata, so neither job builds the XCFramework.
+# - SwiftLint operates on source files alone (no SwiftPM resolution required),
+#   so swiftlint-security also skips `make xcframework`.
+
 jobs:
   # Rust dependency vulnerability scanning
   cargo-audit:
