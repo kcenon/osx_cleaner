@@ -112,6 +112,126 @@ final class CleanCommandIntegrationTests: XCTestCase {
         XCTAssertNotEqual(result.exitCode, 0, result.combinedOutput)
     }
 
+    // MARK: - Preview transparency
+
+    func testDryRunPreviewListsTargetAndSafetyLevel() throws {
+        let home = try makeTemporaryDirectory(named: "home")
+        let target = try makeFile(in: home, relativePath: "Library/Caches/com.example/cache.db")
+
+        let result = try runCLI(
+            ["clean", "--level", "light", "--dry-run", "--ignore-team", target.path],
+            home: home
+        )
+
+        XCTAssertEqual(result.exitCode, 0, result.combinedOutput)
+        XCTAssertTrue(
+            result.combinedOutput.contains("Planned targets:"),
+            "preview should enumerate planned targets — got: \(result.combinedOutput)"
+        )
+        XCTAssertTrue(
+            result.combinedOutput.contains(target.path),
+            "preview should print the canonical target path — got: \(result.combinedOutput)"
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: target.path),
+            "dry-run must not delete the target"
+        )
+    }
+
+    func testDryRunOnWarningTargetEmitsPolicyHintAndRiskyList() throws {
+        let (home, target) = try makeWarningFixture()
+
+        let result = try runCLI(
+            ["clean", "--level", "deep", "--dry-run", "--ignore-team", target.path],
+            home: home
+        )
+
+        XCTAssertEqual(result.exitCode, 0, result.combinedOutput)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: target.path),
+            "dry-run must not delete warning-level targets"
+        )
+        XCTAssertTrue(
+            result.combinedOutput.contains("Risky targets requiring approval:"),
+            "dry-run should call out risky targets — got: \(result.combinedOutput)"
+        )
+        XCTAssertTrue(
+            result.combinedOutput.contains("--non-interactive --force"),
+            "dry-run should hint at the non-interactive policy — got: \(result.combinedOutput)"
+        )
+    }
+
+    func testInteractivePromptIncludesRiskyTargetPath() throws {
+        let (home, target) = try makeWarningFixture()
+
+        let result = try runCLI(
+            ["clean", "--level", "deep", "--ignore-team", target.path],
+            home: home,
+            stdin: "no\n"
+        )
+
+        XCTAssertNotEqual(result.exitCode, 0, result.combinedOutput)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target.path))
+        XCTAssertTrue(
+            result.combinedOutput.contains("will delete the following risky targets"),
+            "prompt should describe the risky targets — got: \(result.combinedOutput)"
+        )
+        XCTAssertTrue(
+            result.combinedOutput.contains(target.path),
+            "prompt should reveal the exact path the user is approving — got: \(result.combinedOutput)"
+        )
+    }
+
+    func testForceSuppressesInteractivePrompt() throws {
+        let (home, target) = try makeWarningFixture()
+
+        // Even when stdin says 'no', --force skips the prompt entirely and
+        // cleanup proceeds. This pins the documented contract: --force is the
+        // explicit opt-in that bypasses both the prompt (interactive) and the
+        // fail-closed gate (non-interactive).
+        let result = try runCLI(
+            ["clean", "--level", "deep", "--force", "--ignore-team", target.path],
+            home: home,
+            stdin: "no\n"
+        )
+
+        XCTAssertEqual(result.exitCode, 0, result.combinedOutput)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
+        XCTAssertFalse(
+            result.combinedOutput.contains("Type 'yes' to continue"),
+            "--force must skip the prompt — got: \(result.combinedOutput)"
+        )
+    }
+
+    func testDryRunJSONOutputReportsDryRunTrueAndZeroFreedBytes() throws {
+        let home = try makeTemporaryDirectory(named: "home")
+        let target = try makeFile(in: home, relativePath: "Library/Caches/com.example/cache.db")
+
+        let result = try runCLI(
+            [
+                "clean",
+                "--level",
+                "light",
+                "--dry-run",
+                "--format",
+                "json",
+                "--ignore-team",
+                target.path
+            ],
+            home: home
+        )
+
+        XCTAssertEqual(result.exitCode, 0, result.combinedOutput)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: target.path),
+            "JSON dry-run must not delete the target"
+        )
+        XCTAssertTrue(
+            result.stdout.contains("\"dry_run\":true"),
+            "JSON output should report dry_run=true — got: \(result.stdout)"
+        )
+    }
+
     private func makeWarningFixture() throws -> (home: URL, target: URL) {
         let home = try makeTemporaryDirectory(named: "home")
         let target = try makeFile(
