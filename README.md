@@ -336,34 +336,52 @@ For detailed documentation, see [Monitoring Guide](docs/monitoring/MONITORING.md
 
 ### Manual Build
 
+The canonical first-build sequence on a fresh clone matches what CI runs in the
+`Full Build` job (`.github/workflows/ci.yml`):
+
 ```bash
-# Fresh clone first build (universal XCFramework + Swift release binaries)
-make build
+# 1. Verify required toolchains (rustc, cargo, swift, lipo, xcodebuild,
+#    and both aarch64-apple-darwin / x86_64-apple-darwin Rust targets).
+make check-prereqs
 
-# Backward-compatible alias for the same full build
-make all
+# 2. Build the universal XCFramework (Frameworks/COSXCore.xcframework)
+#    that wraps the Rust core for SwiftPM's binaryTarget.
+make xcframework
 
-# Run tests (Rust + Swift; Swift step automatically builds the XCFramework first)
+# 3. Build the Swift package against the XCFramework just produced.
+make swift
+```
+
+After this sequence, direct `swift build` and `swift test` commands work
+because the local binary target (`Frameworks/COSXCore.xcframework`) is in
+place. Common follow-up targets:
+
+```bash
+# Run all tests (Rust + Swift)
 make test
 
 # Build for development (Swift debug; still requires the XCFramework)
 make debug
 
-# Rebuild only the universal XCFramework (Frameworks/COSXCore.xcframework)
-make xcframework
+# One-shot convenience alias for steps 2 + 3 above
+make build
 ```
 
 The Swift package consumes the Rust core through
 `Frameworks/COSXCore.xcframework`, a universal (`arm64` + `x86_64`) static
 library wrapped via SwiftPM's `binaryTarget`. It is **not** committed to the
-repository, so the supported clean-checkout path is `make build` (or `make`
-with no target). Direct `swift build`/`swift test` commands are supported only
-after `make xcframework` has generated the local binary target.
+repository, so direct `swift build`/`swift test` commands require a prior
+`make xcframework`.
 
-Dependency lockfiles are committed for reproducibility:
-`Package.resolved` pins SwiftPM dependencies and `rust-core/Cargo.lock` pins
-Rust dependencies. When changing dependencies, update and commit the matching
-lockfile with the manifest change.
+If `make check-prereqs` reports missing tooling, it forwards to
+`./scripts/build-xcframework.sh --check`, which prints actionable diagnostics
+(for example, the exact `rustup target add` invocation needed, or alternatives
+when `rustup` is not installed).
+
+Dependency lockfiles `Package.resolved` and `rust-core/Cargo.lock` are tracked
+for reproducibility; CI cache keys hash them so the cache stays warm across
+runs with the same dependency graph. When changing dependencies, update and
+commit the matching lockfile with the manifest change.
 
 ---
 

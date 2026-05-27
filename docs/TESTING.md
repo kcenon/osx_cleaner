@@ -61,25 +61,47 @@ osx_cleaner/
 
 ## Running Tests
 
+### Prerequisites
+
+Before running any Swift test target, complete the canonical first-build
+sequence (matches `Full Build` in `.github/workflows/ci.yml`):
+
+```bash
+# 1. Verify required toolchains (rustc, cargo, swift, lipo, xcodebuild,
+#    and both aarch64-apple-darwin / x86_64-apple-darwin Rust targets).
+make check-prereqs
+
+# 2. Build the universal XCFramework that Swift tests link against.
+make xcframework
+
+# 3. Build the Swift package (also runs the prerequisite XCFramework step).
+make swift
+```
+
+Rust-only tests (`cd rust-core && cargo test`) do not require step 2, but the
+Swift test targets do. If `make check-prereqs` reports missing tooling, it
+forwards to `./scripts/build-xcframework.sh --check`, which prints actionable
+diagnostics for resolving the gap.
+
+Dependency lockfiles `Package.resolved` and `rust-core/Cargo.lock` are tracked
+for reproducibility.
+
 ### Quick Commands
 
 ```bash
-# Fresh clone first build; generates Frameworks/COSXCore.xcframework
-make build
-
-# Run all tests (Rust + Swift)
+# Run all tests (Rust + Swift; the Swift step rebuilds the XCFramework if needed)
 make test
 
 # Run only Rust tests
 cd rust-core && cargo test
 
-# Run only Swift tests; generates the XCFramework first
+# Run only Swift tests (depends on the XCFramework; rebuilt automatically)
 make test-swift
 
 # Run only CLI integration tests
 make test-cli
 
-# Run Swift coverage after the XCFramework bootstrap
+# Run Swift coverage on top of the canonical first-build sequence
 make xcframework
 swift test --enable-code-coverage
 ```
@@ -87,8 +109,6 @@ swift test --enable-code-coverage
 The Swift package has a local binary target at
 `Frameworks/COSXCore.xcframework`. It is generated, not committed, so direct
 `swift build` or `swift test` commands require a prior `make xcframework`.
-Use `./scripts/build-xcframework.sh --check` when diagnosing missing local
-build prerequisites.
 
 ### Detailed Commands
 
@@ -118,10 +138,12 @@ cargo llvm-cov --all-features
 #### Swift Tests
 
 ```bash
-# Run all tests from a clean checkout
+# Run all Swift tests from a clean checkout (rebuilds the XCFramework if needed)
 make test-swift
 
-# Or bootstrap once, then run SwiftPM directly
+# Or bootstrap once, then run SwiftPM directly. This sequence matches the
+# CI Full Build job in .github/workflows/ci.yml.
+make check-prereqs
 make xcframework
 swift build --product osxcleaner
 OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
@@ -142,8 +164,10 @@ swift test --no-parallel
 ### Integration Tests
 
 ```bash
-# Build and test full integration
-make build
+# Canonical first-build sequence, then run all tests
+make check-prereqs
+make xcframework
+make swift
 make test
 
 # Test CLI directly
@@ -397,7 +421,13 @@ The `.github/workflows/ci.yml` runs:
    - Build (`swift build`)
    - Unit tests (`swift test`)
 
-3. **Coverage**
+3. **Full Build**
+   - XCFramework bootstrap (`make xcframework`)
+   - Swift package build (`make swift`)
+   - All tests (`make test`)
+   - CLI smoke check (`.build/release/osxcleaner --version`)
+
+4. **Coverage**
    - XCFramework bootstrap (`make xcframework`)
    - Swift coverage with llvm-cov
    - Rust coverage with cargo-llvm-cov
