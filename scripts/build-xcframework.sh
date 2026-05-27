@@ -39,7 +39,7 @@ Options:
   -h, --help                Show this help text.
 
 Prerequisites:
-  - cargo and rustc 1.75+
+  - cargo and rustc 1.75+ (via rustup OR Homebrew Rust)
   - lipo and xcodebuild from Xcode 15+ or Xcode Command Line Tools
   - aarch64-apple-darwin and x86_64-apple-darwin Rust standard libraries
 
@@ -47,8 +47,16 @@ rustup is optional when the active Rust toolchain already includes both Apple
 targets. When rustup is available, missing targets are installed during a normal
 build. In --check mode, missing targets are reported without installing them.
 
+If rustup is unavailable and a target is missing, the script prints actionable
+options:
+  1) Install rustup: https://rustup.rs then 'rustup target add <target>'.
+  2) Install a Rust toolchain that already bundles both Apple targets.
+
 Environment:
-  MACOSX_DEPLOYMENT_TARGET  Defaults to 14.0 to match Package.swift.
+  MACOSX_DEPLOYMENT_TARGET  Defaults to 14.0 to match Package.swift (.macOS(.v14)).
+                            Forwarded to Rust via RUSTFLAGS so both static libs
+                            and the Swift target agree on the minimum macOS
+                            version, eliminating linker warnings.
 EOF
 }
 
@@ -95,26 +103,42 @@ ensure_rust_target() {
         log "  Installing target: ${target}"
         rustup target add "${target}"
     else
-        fail "Rust target is not available: ${target}. Install Rust with rustup and run 'rustup target add ${target}', or use a toolchain that already includes the Apple target standard library."
+        fail "Rust target is not available: ${target}.
+  Detected: cargo and rustc are present, but rustup is not.
+  This usually means Rust was installed via Homebrew or a system package
+  that does not bundle Apple cross-targets.
+  Pick one of these actionable options:
+    1) Install rustup (recommended):
+         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+       then re-run: rustup target add ${target}
+    2) If you prefer the current toolchain, install a Rust distribution
+       that already includes ${target} (for example, 'brew install rustup'
+       followed by 'rustup-init')."
     fi
 
     target_std_available "${target}" || fail "Rust target is still unavailable after installation attempt: ${target}"
 }
 
 check_prerequisites() {
-    require_command cargo "Install Rust 1.75+."
-    require_command rustc "Install Rust 1.75+."
-    require_command lipo "Install Xcode 15+ or Xcode Command Line Tools."
-    require_command xcodebuild "Install Xcode 15+ or Xcode Command Line Tools."
+    require_command cargo "Install Rust 1.75+ (rustup recommended: https://rustup.rs)."
+    require_command rustc "Install Rust 1.75+ (rustup recommended: https://rustup.rs)."
+    require_command lipo "Install Xcode 15+ or run 'xcode-select --install' for the Command Line Tools."
+    require_command xcodebuild "Install Xcode 15+ or run 'xcode-select --install' for the Command Line Tools."
+
+    local cargo_path
+    cargo_path="$(command -v cargo 2>/dev/null || true)"
+    log "Using cargo at: ${cargo_path:-unknown}"
 
     if command_exists rustup; then
         log "rustup found; missing Rust targets can be installed automatically."
     else
         log "rustup not found; using the active Rust toolchain as-is."
-        log "Homebrew Rust can work only if both Apple target standard libraries are already installed."
+        log "Non-rustup toolchains (e.g. Homebrew Rust) work only when both Apple"
+        log "target standard libraries are already present for the current rustc."
     fi
 
     log "Using MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}"
+    log "Forwarding to Rust via RUSTFLAGS=\"${RUSTFLAGS}\""
 
     log "Checking Rust targets..."
     for target in "${ARM64_TARGET}" "${X86_64_TARGET}"; do
@@ -142,6 +166,17 @@ done
 
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-${DEFAULT_MACOSX_DEPLOYMENT_TARGET}}"
 
+# Forward the deployment target to Rust via RUSTFLAGS so the static libraries
+# embed -mmacosx-version-min=<target>, matching the Swift target's platform
+# spec (.macOS(.v14) in Package.swift). Without this, linkers warn about
+# mismatched deployment targets between the Rust artefacts and the Swift binary.
+RUST_DEPLOYMENT_LINK_ARG="-C link-arg=-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}"
+if [[ -n "${RUSTFLAGS:-}" ]]; then
+    export RUSTFLAGS="${RUSTFLAGS} ${RUST_DEPLOYMENT_LINK_ARG}"
+else
+    export RUSTFLAGS="${RUST_DEPLOYMENT_LINK_ARG}"
+fi
+
 check_prerequisites
 
 if [[ "${CHECK_ONLY}" == "1" ]]; then
@@ -149,10 +184,10 @@ if [[ "${CHECK_ONLY}" == "1" ]]; then
     exit 0
 fi
 
-log "Building Rust core for ${ARM64_TARGET}..."
+log "Building Rust core for ${ARM64_TARGET} (macOS ${MACOSX_DEPLOYMENT_TARGET})..."
 (cd "${RUST_DIR}" && cargo build --release --target "${ARM64_TARGET}")
 
-log "Building Rust core for ${X86_64_TARGET}..."
+log "Building Rust core for ${X86_64_TARGET} (macOS ${MACOSX_DEPLOYMENT_TARGET})..."
 (cd "${RUST_DIR}" && cargo build --release --target "${X86_64_TARGET}")
 
 ARM64_LIB="${RUST_DIR}/target/${ARM64_TARGET}/release/${LIB_NAME}"
@@ -164,7 +199,11 @@ log "Combining into universal static library..."
 mkdir -p "${BUILD_DIR}"
 UNIVERSAL_LIB="${BUILD_DIR}/${LIB_NAME}"
 lipo -create "${ARM64_LIB}" "${X86_64_LIB}" -output "${UNIVERSAL_LIB}"
-lipo -info "${UNIVERSAL_LIB}"
+LIPO_INFO="$(lipo -info "${UNIVERSAL_LIB}")"
+printf '%s\n' "${LIPO_INFO}"
+if [[ "${LIPO_INFO}" != *"arm64"* || "${LIPO_INFO}" != *"x86_64"* ]]; then
+    fail "Universal library is missing one of the expected architectures: ${LIPO_INFO}"
+fi
 
 log "Staging headers and modulemap..."
 rm -rf "${HEADERS_STAGING}"
