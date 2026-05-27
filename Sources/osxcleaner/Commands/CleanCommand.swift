@@ -409,9 +409,31 @@ struct CleanCommand: AsyncParsableCommand {
     ) throws {
         guard plan.requiresConfirmation, !force else { return }
 
+        let risky = plan.targets.filter { target in
+            target.safetyLevel.requiresConfirmation &&
+                plan.cleanupLevel.canDelete(target.safetyLevel)
+        }
+
+        let header: String
+        if risky.isEmpty {
+            // System-level cleanup always requires confirmation even without
+            // explicit warning targets (e.g., level=system over only safe paths).
+            header = "This cleanup runs at the system level and requires confirmation."
+        } else {
+            let bulletList = risky
+                .map { target in
+                    "  - [\(shortSafetyName(target.safetyLevel))] \(target.label): \(target.path)"
+                }
+                .joined(separator: "\n")
+            header = """
+                This cleanup will delete the following risky targets:
+                \(bulletList)
+                """
+        }
+
         output.displayPrompt(
             """
-            This cleanup includes warning or system-level targets.
+            \(header)
             Estimated reclaimable space: \(previewResult.formattedFreedSpace)
             Type 'yes' to continue:
             """
@@ -443,8 +465,59 @@ struct CleanCommand: AsyncParsableCommand {
         output.display(message: "Estimated reclaimable space: \(result.formattedFreedSpace)", level: .normal)
         output.display(message: "Items matched: \(matchedItems)", level: .normal)
 
+        displayPlanTargets(plan: plan, output: output)
+        displayRiskyTargets(plan: plan, output: output)
+
+        if dryRunOnly {
+            displayDryRunPolicyHint(plan: plan, output: output)
+        }
+
         if !result.errors.isEmpty {
             output.displayWarning("Skipped \(result.errors.count) target(s) due to safety or access policy")
+        }
+    }
+
+    private func displayPlanTargets(plan: CleanupPlan, output: OutputHandler) {
+        guard !plan.targets.isEmpty else { return }
+
+        output.display(message: "Planned targets:", level: .normal)
+        for target in plan.targets {
+            let line = "  - [\(shortSafetyName(target.safetyLevel))] \(target.label): \(target.path)"
+            output.display(message: line, level: .normal)
+        }
+    }
+
+    private func displayRiskyTargets(plan: CleanupPlan, output: OutputHandler) {
+        let risky = plan.targets.filter { target in
+            target.safetyLevel.requiresConfirmation &&
+                plan.cleanupLevel.canDelete(target.safetyLevel)
+        }
+        guard !risky.isEmpty else { return }
+
+        output.display(message: "Risky targets requiring approval:", level: .normal)
+        for target in risky {
+            let line = "  ! [\(shortSafetyName(target.safetyLevel))] \(target.label): \(target.path)"
+            output.display(message: line, level: .normal)
+        }
+    }
+
+    private func displayDryRunPolicyHint(plan: CleanupPlan, output: OutputHandler) {
+        guard plan.requiresConfirmation else { return }
+        let message = "Note: a real run requires interactive 'yes' approval " +
+            "or --non-interactive --force for the targets above."
+        output.display(message: message, level: .normal)
+    }
+
+    private func shortSafetyName(_ level: SafetyLevel) -> String {
+        switch level {
+        case .safe:
+            return "safe"
+        case .caution:
+            return "caution"
+        case .warning:
+            return "warning"
+        case .danger:
+            return "danger"
         }
     }
 
