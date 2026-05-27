@@ -1,7 +1,7 @@
 # OSX Cleaner - Unified Build System
 # This Makefile provides targets for building the Swift + Rust hybrid project
 
-.PHONY: all build bootstrap swift rust xcframework clean test test-rust test-swift test-cli format format-rust format-swift lint lint-rust lint-swift help install uninstall debug headers check docs ci clean-rust clean-swift clean-xcframework
+.PHONY: all build bootstrap swift rust xcframework check-prereqs clean test test-rust test-swift test-cli format format-rust format-swift lint lint-rust lint-swift help install uninstall debug headers check docs ci clean-rust clean-swift clean-xcframework
 
 # Default target
 all: build
@@ -19,6 +19,13 @@ SWIFT_CONFIG := release
 # XCFramework build artifacts
 XCFRAMEWORK_DIR := Frameworks/COSXCore.xcframework
 XCFRAMEWORK_BUILD_DIR := build/xcframework
+
+# Minimum macOS version forwarded to both Rust (via RUSTFLAGS in
+# scripts/build-xcframework.sh) and Swift builds, keeping it aligned with
+# Package.swift's .macOS(.v14) platform spec. Override via the environment
+# (e.g. `MACOSX_DEPLOYMENT_TARGET=15.0 make xcframework`) to bump the floor
+# without editing the Makefile.
+export MACOSX_DEPLOYMENT_TARGET ?= 14.0
 
 # Colors for output
 GREEN := \033[0;32m
@@ -43,6 +50,12 @@ rust:
 	@mkdir -p $(INCLUDE_DIR)
 	cd $(RUST_DIR) && cargo build --release
 	@echo "$(GREEN)Rust build complete$(NC)"
+
+## Validate XCFramework build prerequisites without building anything
+check-prereqs:
+	@echo "$(YELLOW)Checking XCFramework build prerequisites...$(NC)"
+	./scripts/build-xcframework.sh --check
+	@echo "$(GREEN)Prerequisites OK$(NC)"
 
 ## Build the universal XCFramework consumed by SwiftPM and Xcode
 xcframework:

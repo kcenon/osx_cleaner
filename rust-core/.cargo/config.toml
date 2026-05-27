@@ -1,0 +1,17 @@
+# Default rustflags for Apple targets when building the Rust core directly
+# (e.g. `cargo build --target aarch64-apple-darwin` during local development).
+#
+# These flags align the minimum macOS version embedded in the static libraries
+# with Package.swift's `.macOS(.v14)` platform spec, eliminating linker
+# warnings about mismatched deployment targets.
+#
+# When `scripts/build-xcframework.sh` runs, it exports `RUSTFLAGS` with the
+# resolved `MACOSX_DEPLOYMENT_TARGET`, which takes precedence over the values
+# below per Cargo's rustflags precedence rules. The defaults here exist as a
+# safety net for direct `cargo` invocations.
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-mmacosx-version-min=14.0"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-mmacosx-version-min=14.0"]
