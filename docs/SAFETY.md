@@ -9,8 +9,10 @@
 - [Safety Philosophy](#safety-philosophy)
 - [4-Level Safety Classification](#4-level-safety-classification)
 - [Cleanup Levels Explained](#cleanup-levels-explained)
+- [Cleanup Engine Safety Parity](#cleanup-engine-safety-parity)
 - [Confirmation and Dry-Run Semantics](#confirmation-and-dry-run-semantics)
 - [Protected Paths](#protected-paths)
+- [Credential Storage](#credential-storage)
 - [What to Expect](#what-to-expect)
 - [Recovery Options](#recovery-options)
 - [FAQ](#faq)
@@ -188,6 +190,36 @@ sudo osxcleaner clean --level system
 
 ---
 
+## Cleanup Engine Safety Parity
+
+OSX Cleaner performs deletions through the Rust core whenever it is available,
+and transparently falls back to a Swift implementation when the Rust core
+cannot be initialized. **Both engines enforce the same safety policy** — the
+fallback path is a compatibility mechanism, not a relaxation of safety.
+
+Before deleting any target, both the Rust core and the Swift fallback:
+
+1. **Canonicalize the path** through `PathValidator` (tilde expansion, relative
+   path normalization, and `..` component removal), so the path that is checked
+   is exactly the path that is deleted.
+2. **Classify the target** into one of the four safety levels (Safe, Caution,
+   Warning, Danger).
+3. **Refuse Danger-level targets** outright — they are never deleted, regardless
+   of cleanup level or flags.
+4. **Gate on the cleanup level**: a target is only removed if the selected
+   cleanup level is permitted to delete its safety level (Light → Safe,
+   Normal → Caution, Deep → Warning). A target that exceeds the selected level
+   is skipped, not deleted.
+5. **Honor `--dry-run`**: no external state is modified; targets are previewed
+   only.
+
+When the Swift fallback skips a target for a safety reason, it reports a
+structured error for that single target and continues with the remaining safe
+targets, rather than aborting the whole run. As a result, a Rust initialization
+failure can never widen the set of files that are eligible for deletion.
+
+---
+
 ## Confirmation and Dry-Run Semantics
 
 The `clean` command always classifies every target before any destructive
@@ -306,6 +338,35 @@ These paths are Warning level and require confirmation before deletion:
 | `~/Library/Group Containers` | Shared app container data |
 | `~/.docker` | Docker configuration |
 | `/Library/Caches` | System-wide caches |
+
+---
+
+## Credential Storage
+
+When OSX Cleaner runs in server/agent mode, it must hold a server
+authentication token. **Auth tokens are stored in the macOS Keychain, never in
+the plaintext JSON configuration file.**
+
+| Property | Value |
+|----------|-------|
+| Storage backend | macOS Keychain |
+| Keychain service | `com.osxcleaner.server.auth` |
+| Account identity | Derived from the server URL and agent ID |
+| Config file (`config.json`) | Stores only non-secret metadata (server URL, agent ID, token expiry); the `authToken` field is never written back to disk |
+
+**Migration of legacy configs.** If an older configuration file still contains
+an `authToken` value in plaintext, it is automatically migrated on first load:
+the token is moved into the Keychain and the configuration file is rewritten
+without the token. No action is required.
+
+**Resetting credentials.** To rotate or remove stored credentials:
+
+- Re-register the agent (`osxcleaner server register …`) to overwrite the
+  stored token, or
+- Open **Keychain Access**, search for `com.osxcleaner.server.auth`, and delete
+  the matching entry.
+
+Token values are never written to logs or printed to standard output.
 
 ---
 
@@ -478,6 +539,9 @@ All operations are logged to `~/Library/Logs/osxcleaner/`:
 - `analyze.log` - Scan results
 - `error.log` - Any errors
 
+Server authentication tokens are **never** logged. See
+[Credential Storage](#credential-storage) for how secrets are handled.
+
 ---
 
 ## See Also
@@ -488,4 +552,4 @@ All operations are logged to `~/Library/Logs/osxcleaner/`:
 
 ---
 
-*Last updated: 2026-05-27*
+*Last updated: 2026-05-31*
