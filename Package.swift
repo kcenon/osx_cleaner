@@ -55,7 +55,14 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Yams", package: "Yams")
             ],
-            path: "Sources/OSXCleanerKit"
+            path: "Sources/OSXCleanerKit",
+            linkerSettings: [
+                // sysinfo (>= 0.39) resolves macOS users via OpenDirectory.
+                // The static library is repackaged into COSXCore.xcframework,
+                // which drops the crate's `#[link]` directive, so the framework
+                // must be linked explicitly here for every downstream consumer.
+                .linkedFramework("OpenDirectory")
+            ]
         ),
         // Tests
         .testTarget(
