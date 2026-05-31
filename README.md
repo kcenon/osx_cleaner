@@ -229,6 +229,7 @@ osxcleaner schedule enable daily
 | `--format` | clean, analyze, schedule | Output format (text, json) |
 | `--dry-run` | clean | Preview without actual deletion |
 | `--non-interactive` | clean | Skip confirmation prompts (for CI/CD) |
+| `--force` | clean | Explicitly approve warning/system cleanup in non-interactive mode |
 | `--verbose` | clean, analyze | Show detailed output |
 | `--quiet` | clean, analyze | Minimal output |
 | `--ignore-team` | clean | Ignore team configuration policies |
@@ -335,16 +336,52 @@ For detailed documentation, see [Monitoring Guide](docs/monitoring/MONITORING.md
 
 ### Manual Build
 
-```bash
-# Build everything
-make all
+The canonical first-build sequence on a fresh clone matches what CI runs in the
+`Full Build` job (`.github/workflows/ci.yml`):
 
-# Run tests
+```bash
+# 1. Verify required toolchains (rustc, cargo, swift, lipo, xcodebuild,
+#    and both aarch64-apple-darwin / x86_64-apple-darwin Rust targets).
+make check-prereqs
+
+# 2. Build the universal XCFramework (Frameworks/COSXCore.xcframework)
+#    that wraps the Rust core for SwiftPM's binaryTarget.
+make xcframework
+
+# 3. Build the Swift package against the XCFramework just produced.
+make swift
+```
+
+After this sequence, direct `swift build` and `swift test` commands work
+because the local binary target (`Frameworks/COSXCore.xcframework`) is in
+place. Common follow-up targets:
+
+```bash
+# Run all tests (Rust + Swift)
 make test
 
-# Build for development
+# Build for development (Swift debug; still requires the XCFramework)
 make debug
+
+# One-shot convenience alias for steps 2 + 3 above
+make build
 ```
+
+The Swift package consumes the Rust core through
+`Frameworks/COSXCore.xcframework`, a universal (`arm64` + `x86_64`) static
+library wrapped via SwiftPM's `binaryTarget`. It is **not** committed to the
+repository, so direct `swift build`/`swift test` commands require a prior
+`make xcframework`.
+
+If `make check-prereqs` reports missing tooling, it forwards to
+`./scripts/build-xcframework.sh --check`, which prints actionable diagnostics
+(for example, the exact `rustup target add` invocation needed, or alternatives
+when `rustup` is not installed).
+
+Dependency lockfiles `Package.resolved` and `rust-core/Cargo.lock` are tracked
+for reproducibility; CI cache keys hash them so the cache stays warm across
+runs with the same dependency graph. When changing dependencies, update and
+commit the matching lockfile with the manifest change.
 
 ---
 
@@ -437,7 +474,7 @@ See [Fastlane Plugin README](integrations/fastlane/README.md) for installation a
 osxcleaner clean --level normal --non-interactive --format json
 
 # Cleanup only if available space is below 20GB
-osxcleaner clean --level deep --non-interactive --min-space 20 --format json
+osxcleaner clean --level deep --non-interactive --force --min-space 20 --format json
 
 # Preview cleanup in CI logs
 osxcleaner clean --level deep --dry-run --format json
@@ -493,7 +530,14 @@ The `--format json` flag outputs machine-readable results for CI/CD integration:
 ### Build Requirements
 - **Swift**: 5.9+
 - **Rust**: 1.75+
-- **Xcode**: 15+
+- **Rust targets**: `aarch64-apple-darwin` and `x86_64-apple-darwin`
+- **Xcode**: 15+ or Xcode Command Line Tools (`lipo`, `xcodebuild`)
+
+Source builds target macOS 14.0 and later. `rustup` is recommended because
+`scripts/build-xcframework.sh` can install missing Rust targets automatically;
+Homebrew Rust can work when both Apple target standard libraries are already
+available. Use `./scripts/build-xcframework.sh --check` to diagnose local
+prerequisites without building.
 
 ---
 
@@ -515,8 +559,8 @@ osxcleaner/
 │   │   ├── Services/           # Business logic
 │   │   ├── Config/             # Configuration
 │   │   └── Logger/             # Logging
-│   └── COSXCore/               # C module for Rust FFI
-│       └── module.modulemap    # Module definition
+├── Frameworks/                 # Built XCFramework wrapping the Rust core (gitignored)
+│   └── COSXCore.xcframework/   # Universal arm64 + x86_64 static lib + headers
 ├── rust-core/                  # Rust sources
 │   ├── Cargo.toml
 │   ├── cbindgen.toml           # FFI header generation
@@ -548,6 +592,7 @@ osxcleaner/
 ├── scripts/                    # Shell scripts
 │   ├── install.sh
 │   ├── uninstall.sh
+│   ├── build-xcframework.sh    # Builds Frameworks/COSXCore.xcframework
 │   └── launchd/                # launchd agent
 ├── Tests/                      # Test files
 └── docs/                       # Documentation

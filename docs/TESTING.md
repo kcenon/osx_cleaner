@@ -30,6 +30,12 @@ OSX Cleaner uses a hybrid testing approach combining:
 3. **Isolation**: Tests should not depend on external state
 4. **Clarity**: Test names describe what they verify
 
+### Safety Contract
+
+Tests must not clean real user data. Cleanup tests that perform deletion must
+use temporary directories or injected test fixtures, and CLI smoke checks should
+prefer `--dry-run` unless the test owns every path it removes.
+
 ---
 
 ## Test Structure
@@ -47,7 +53,7 @@ osx_cleaner/
 │   │   ├── Services/
 │   │   ├── Core/
 │   │   └── Utilities/
-│   └── osxcleanerTests/       # CLI tests
+│   └── osxcleanerCLITests/    # CLI integration tests
 └── benchmarks/                # Performance benchmarks
 ```
 
@@ -55,21 +61,54 @@ osx_cleaner/
 
 ## Running Tests
 
+### Prerequisites
+
+Before running any Swift test target, complete the canonical first-build
+sequence (matches `Full Build` in `.github/workflows/ci.yml`):
+
+```bash
+# 1. Verify required toolchains (rustc, cargo, swift, lipo, xcodebuild,
+#    and both aarch64-apple-darwin / x86_64-apple-darwin Rust targets).
+make check-prereqs
+
+# 2. Build the universal XCFramework that Swift tests link against.
+make xcframework
+
+# 3. Build the Swift package (also runs the prerequisite XCFramework step).
+make swift
+```
+
+Rust-only tests (`cd rust-core && cargo test`) do not require step 2, but the
+Swift test targets do. If `make check-prereqs` reports missing tooling, it
+forwards to `./scripts/build-xcframework.sh --check`, which prints actionable
+diagnostics for resolving the gap.
+
+Dependency lockfiles `Package.resolved` and `rust-core/Cargo.lock` are tracked
+for reproducibility.
+
 ### Quick Commands
 
 ```bash
-# Run all tests (Rust + Swift)
+# Run all tests (Rust + Swift; the Swift step rebuilds the XCFramework if needed)
 make test
 
 # Run only Rust tests
 cd rust-core && cargo test
 
-# Run only Swift tests
-swift test
+# Run only Swift tests (depends on the XCFramework; rebuilt automatically)
+make test-swift
 
-# Run with coverage
-make test-coverage
+# Run only CLI integration tests
+make test-cli
+
+# Run Swift coverage on top of the canonical first-build sequence
+make xcframework
+swift test --enable-code-coverage
 ```
+
+The Swift package has a local binary target at
+`Frameworks/COSXCore.xcframework`. It is generated, not committed, so direct
+`swift build` or `swift test` commands require a prior `make xcframework`.
 
 ### Detailed Commands
 
@@ -99,8 +138,15 @@ cargo llvm-cov --all-features
 #### Swift Tests
 
 ```bash
-# Run all tests
-swift test
+# Run all Swift tests from a clean checkout (rebuilds the XCFramework if needed)
+make test-swift
+
+# Or bootstrap once, then run SwiftPM directly. This sequence matches the
+# CI Full Build job in .github/workflows/ci.yml.
+make check-prereqs
+make xcframework
+swift build --product osxcleaner
+OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
 
 # Run specific test class
 swift test --filter SafetyTests
@@ -118,12 +164,17 @@ swift test --no-parallel
 ### Integration Tests
 
 ```bash
-# Build and test full integration
-make all
+# Canonical first-build sequence, then run all tests
+make check-prereqs
+make xcframework
+make swift
 make test
 
 # Test CLI directly
 .build/release/osxcleaner --dry-run --level light
+
+# Run subprocess-based CLI regression tests
+make test-cli
 ```
 
 ---
@@ -300,6 +351,7 @@ final class SafetyTests: XCTestCase {
 **Swift:**
 ```bash
 # Run tests with coverage
+make xcframework
 swift test --enable-code-coverage
 
 # Generate lcov report
@@ -365,10 +417,18 @@ The `.github/workflows/ci.yml` runs:
    - Unit tests (`cargo test`)
 
 2. **Swift Check**
+   - XCFramework bootstrap (`make xcframework`)
    - Build (`swift build`)
    - Unit tests (`swift test`)
 
-3. **Coverage**
+3. **Full Build**
+   - XCFramework bootstrap (`make xcframework`)
+   - Swift package build (`make swift`)
+   - All tests (`make test`)
+   - CLI smoke check (`.build/release/osxcleaner --version`)
+
+4. **Coverage**
+   - XCFramework bootstrap (`make xcframework`)
    - Swift coverage with llvm-cov
    - Rust coverage with cargo-llvm-cov
    - Upload to Codecov
@@ -414,7 +474,7 @@ coverage:
 4. **Test Edge Cases**: Empty inputs, max values, null pointers
 5. **Test Error Paths**: Ensure error handling is covered
 6. **Isolate Tests**: No shared state, use setup/teardown
-7. **Mock External Dependencies**: FFI, file system, network
+7. **Mock External Dependencies**: FFI, file system, network, cleanup commands
 
 ### Don'ts ❌
 

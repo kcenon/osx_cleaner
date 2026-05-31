@@ -27,10 +27,7 @@
 |--------------|-----------|--------------|----------------|
 | 15.x | Sequoia | Apple Silicon, Intel | Full Support |
 | 14.x | Sonoma | Apple Silicon, Intel | Full Support |
-| 13.x | Ventura | Apple Silicon, Intel | Full Support |
-| 12.x | Monterey | Apple Silicon, Intel | Full Support |
-| 11.x | Big Sur | Apple Silicon, Intel | Full Support |
-| 10.15 | Catalina | Intel | Full Support |
+| 13.x and earlier | Ventura or older | Apple Silicon, Intel | Not supported by the current SwiftPM manifest |
 
 ### Hardware Requirements
 
@@ -42,12 +39,23 @@
 
 ### Build Requirements (for source builds)
 
+Source builds in this repository target macOS 14.0 and later.
+
 | Tool | Minimum Version | Check Command |
 |------|-----------------|---------------|
 | **Xcode** | 15.0 | `xcode-select --version` |
 | **Swift** | 5.9 | `swift --version` |
 | **Rust** | 1.75 | `rustc --version` |
 | **Cargo** | 1.75 | `cargo --version` |
+| **lipo** | Xcode tools | `xcrun -find lipo` |
+| **xcodebuild** | Xcode tools | `xcodebuild -version` |
+
+The Swift package consumes a generated local binary target,
+`Frameworks/COSXCore.xcframework`. The source build therefore also needs Rust
+standard libraries for `aarch64-apple-darwin` and `x86_64-apple-darwin`.
+`rustup` is recommended because the build script can install missing targets;
+Homebrew Rust can work only when those target standard libraries are already
+available.
 
 ---
 
@@ -69,7 +77,7 @@ cd osx_cleaner
 The install script will:
 1. Check system requirements
 2. Install Rust toolchain if needed
-3. Build the Rust core library
+3. Build the generated Rust XCFramework
 4. Build the Swift CLI application
 5. Install the binary to `/usr/local/bin`
 6. Set up shell completions (optional)
@@ -106,12 +114,12 @@ source ~/.cargo/env
 git clone https://github.com/kcenon/osx_cleaner.git
 cd osx_cleaner
 
-# Build everything (Rust + Swift)
-make all
+# Build everything from a clean checkout
+make build
 
 # Or build step by step
-make rust      # Build Rust core library
-make swift     # Build Swift CLI
+make xcframework  # Generate Frameworks/COSXCore.xcframework
+make swift        # Build Swift CLI
 ```
 
 #### Step 3: Install
@@ -128,7 +136,9 @@ make install PREFIX=~/.local
 
 | Command | Description |
 |---------|-------------|
-| `make all` | Build everything (release mode) |
+| `make build` | Build everything from a clean checkout |
+| `make all` | Alias for `make build` |
+| `make xcframework` | Generate `Frameworks/COSXCore.xcframework` |
 | `make debug` | Build in debug mode |
 | `make test` | Run all tests |
 | `make clean` | Clean build artifacts |
@@ -212,7 +222,7 @@ Total Cleanable: 32.7 GB
 cd osx_cleaner
 git pull origin main
 make clean
-make all
+make build
 make install
 ```
 
@@ -286,8 +296,14 @@ export PATH="$PATH:~/.local/bin"
 #### Rust build fails
 
 ```bash
+# Check XCFramework prerequisites without building
+./scripts/build-xcframework.sh --check
+
 # Update Rust
 rustup update stable
+
+# Install required Apple targets when using rustup
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
 # Clean and rebuild
 cd rust-core
@@ -295,9 +311,16 @@ cargo clean
 cargo build --release
 ```
 
+If `rustup` is not installed, `make xcframework` uses the active Rust toolchain
+as-is. Install Rust with `rustup`, or use a toolchain that already includes both
+Apple target standard libraries.
+
 #### Swift build fails
 
 ```bash
+# Generate the local binary target required by Package.swift
+make xcframework
+
 # Clean Swift build
 swift package clean
 
@@ -308,16 +331,22 @@ swift package resolve
 swift build -c release
 ```
 
-#### "Library not loaded" error
+If Swift reports that `Frameworks/COSXCore.xcframework` is missing or does not
+contain a binary artifact, run `make xcframework` first. A clean checkout cannot
+run direct `swift build` or `swift test` until that local artifact exists.
 
-The Rust dynamic library is not found.
+#### Rust bridge or linker errors
+
+The Rust core is linked through the generated
+`Frameworks/COSXCore.xcframework`.
 
 ```bash
-# Check library location
-ls -la .build/release/libosxcore.dylib
+# Check the generated binary target
+ls -la Frameworks/COSXCore.xcframework
 
-# Set library path
-export DYLD_LIBRARY_PATH="$(pwd)/.build/release:$DYLD_LIBRARY_PATH"
+# Rebuild it if missing or stale
+make xcframework
+swift build -c release
 ```
 
 #### Full Disk Access issues

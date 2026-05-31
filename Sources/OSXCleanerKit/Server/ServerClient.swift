@@ -44,6 +44,18 @@ public actor ServerClient: ManagementServerProtocol {
         self.urlSession = URLSession(configuration: sessionConfig)
     }
 
+    /// Configure previously issued credentials loaded from secure storage.
+    public func configureAuthentication(
+        agentId: UUID,
+        authToken: String,
+        tokenExpiresAt: Date? = nil
+    ) {
+        self.agentId = agentId
+        self.authToken = authToken
+        self.tokenExpiresAt = tokenExpiresAt
+        self._connectionState = .active
+    }
+
     // MARK: - Registration
 
     public func register(identity: AgentIdentity) async throws -> RegistrationResult {

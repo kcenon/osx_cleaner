@@ -14,15 +14,24 @@ use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
+use std::sync::Arc;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use super::{
-    calculate_dir_size, expand_home, CleanupError, CleanupMethod, CleanupResult, CleanupTarget,
-    DeveloperCleaner, DeveloperTool, ScanResult,
+    calculate_dir_size, expand_home, format_command, CleanupError, CleanupMethod, CleanupResult,
+    CleanupTarget, CommandRunner, DeveloperCleaner, DeveloperCommandError, DeveloperCommandOutput,
+    DeveloperTool, ScanResult, SystemCommandRunner, COMMAND_CLEANUP_TIMEOUT, COMMAND_PROBE_TIMEOUT,
 };
 use crate::safety::SafetyLevel;
+
+/// Timeout for Xcode-related scan commands (e.g. `xcrun devicectl list`).
+///
+/// Scan commands may need to enumerate connected devices, so they are given
+/// more headroom than a fast probe but are still kept short to avoid blocking
+/// the UI on a stuck tool.
+const XCODE_SCAN_COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Xcode cache cleaner
 pub struct XcodeCleaner {
@@ -34,6 +43,8 @@ pub struct XcodeCleaner {
     ios_device_support_path: PathBuf,
     /// Path to watchOS Device Support
     watchos_device_support_path: PathBuf,
+    /// Command runner used for all external command invocations.
+    command_runner: Arc<dyn CommandRunner>,
 }
 
 impl Default for XcodeCleaner {
@@ -52,16 +63,42 @@ impl XcodeCleaner {
             watchos_device_support_path: expand_home(
                 "~/Library/Developer/Xcode/watchOS DeviceSupport",
             ),
+            command_runner: Arc::new(SystemCommandRunner),
+        }
+    }
+
+    #[cfg(test)]
+    fn with_command_runner(command_runner: Arc<dyn CommandRunner>) -> Self {
+        Self {
+            command_runner,
+            ..Self::new()
+        }
+    }
+
+    #[cfg(test)]
+    fn with_paths_and_runner(
+        derived_data_path: PathBuf,
+        archives_path: PathBuf,
+        ios_device_support_path: PathBuf,
+        watchos_device_support_path: PathBuf,
+        command_runner: Arc<dyn CommandRunner>,
+    ) -> Self {
+        Self {
+            derived_data_path,
+            archives_path,
+            ios_device_support_path,
+            watchos_device_support_path,
+            command_runner,
         }
     }
 
     /// Check if Xcode is currently building
     pub fn is_build_running(&self) -> bool {
-        // Check for running xcodebuild processes
-        Command::new("pgrep")
-            .args(["-x", "xcodebuild"])
-            .output()
-            .map(|o| o.status.success())
+        // Check for running xcodebuild processes through the bounded runner so
+        // a stuck `pgrep` cannot hang a scan.
+        self.command_runner
+            .run("pgrep", &["-x", "xcodebuild"], COMMAND_PROBE_TIMEOUT)
+            .map(|o| o.status_success)
             .unwrap_or(false)
     }
 
@@ -184,19 +221,22 @@ impl XcodeCleaner {
     fn get_connected_versions(&self, target_platform: &str) -> HashSet<String> {
         let mut versions = HashSet::new();
 
-        // Try xcrun devicectl (Xcode 15+)
-        let output = Command::new("xcrun")
-            .args([
+        // Try xcrun devicectl (Xcode 15+) via the bounded runner. A hung or
+        // missing devicectl must not stall a scan.
+        let output = self.command_runner.run(
+            "xcrun",
+            &[
                 "devicectl",
                 "list",
                 "devices",
                 "--json-output",
                 "/dev/stdout",
-            ])
-            .output();
+            ],
+            XCODE_SCAN_COMMAND_TIMEOUT,
+        );
 
         if let Ok(output) = output {
-            if output.status.success() {
+            if output.status_success {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Ok(parsed) = serde_json::from_str::<DeviceCtlOutput>(&stdout) {
                     for device in parsed.result.devices {
@@ -396,42 +436,32 @@ impl XcodeCleaner {
                 }
             }
             CleanupMethod::Command(cmd) => {
-                if !dry_run {
-                    let output = Command::new("sh").args(["-c", cmd]).output().map_err(|e| {
-                        CleanupError {
-                            target: target.name.clone(),
-                            message: e.to_string(),
-                        }
-                    })?;
-
-                    if !output.status.success() {
-                        return Err(CleanupError {
-                            target: target.name.clone(),
-                            message: String::from_utf8_lossy(&output.stderr).to_string(),
-                        });
-                    }
+                if dry_run {
+                    return Ok(target.size);
                 }
-                Ok(target.size)
+
+                let output = self
+                    .command_runner
+                    .run("sh", &["-c", cmd], COMMAND_CLEANUP_TIMEOUT)
+                    .map_err(|error| {
+                        cleanup_error_from_command_error(target, cmd.clone(), error)
+                    })?;
+                cleanup_result_from_output(target, output).map(|()| target.size)
             }
             CleanupMethod::CommandWithArgs(cmd, args) => {
-                if !dry_run {
-                    let output =
-                        Command::new(cmd)
-                            .args(args)
-                            .output()
-                            .map_err(|e| CleanupError {
-                                target: target.name.clone(),
-                                message: e.to_string(),
-                            })?;
-
-                    if !output.status.success() {
-                        return Err(CleanupError {
-                            target: target.name.clone(),
-                            message: String::from_utf8_lossy(&output.stderr).to_string(),
-                        });
-                    }
+                if dry_run {
+                    return Ok(target.size);
                 }
-                Ok(target.size)
+
+                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                let display_command = format_command(cmd, &arg_refs);
+                let output = self
+                    .command_runner
+                    .run(cmd, &arg_refs, COMMAND_CLEANUP_TIMEOUT)
+                    .map_err(|error| {
+                        cleanup_error_from_command_error(target, display_command, error)
+                    })?;
+                cleanup_result_from_output(target, output).map(|()| target.size)
             }
         }
     }
@@ -528,6 +558,38 @@ pub struct DeviceSupportInfo {
     pub full_name: String,
 }
 
+fn cleanup_result_from_output(
+    target: &CleanupTarget,
+    output: DeveloperCommandOutput,
+) -> Result<(), CleanupError> {
+    if output.status_success {
+        Ok(())
+    } else {
+        Err(CleanupError {
+            target: target.name.clone(),
+            message: String::from_utf8_lossy(&output.stderr).to_string(),
+        })
+    }
+}
+
+fn cleanup_error_from_command_error(
+    target: &CleanupTarget,
+    command: String,
+    error: DeveloperCommandError,
+) -> CleanupError {
+    let message = match error {
+        DeveloperCommandError::Io(error) => error.to_string(),
+        DeveloperCommandError::TimedOut { timeout, .. } => {
+            format!("`{}` timed out after {:?}", command, timeout)
+        }
+    };
+
+    CleanupError {
+        target: target.name.clone(),
+        message,
+    }
+}
+
 // JSON parsing structures for xcrun devicectl output
 #[derive(Debug, Deserialize)]
 struct DeviceCtlOutput {
@@ -555,7 +617,96 @@ struct DeviceCtlDeviceProperties {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
+    use std::io;
+    use std::sync::Mutex;
     use tempfile::tempdir;
+
+    type MockCommandResult = Result<DeveloperCommandOutput, DeveloperCommandError>;
+
+    #[derive(Default)]
+    struct MockCommandRunner {
+        responses: Mutex<VecDeque<MockCommandResult>>,
+        calls: Mutex<Vec<(String, Vec<String>, Duration)>>,
+    }
+
+    impl MockCommandRunner {
+        fn new(responses: Vec<MockCommandResult>) -> Arc<Self> {
+            Arc::new(Self {
+                responses: Mutex::new(responses.into()),
+                calls: Mutex::new(Vec::new()),
+            })
+        }
+
+        fn success(stdout: impl Into<Vec<u8>>) -> MockCommandResult {
+            Ok(DeveloperCommandOutput {
+                status_success: true,
+                stdout: stdout.into(),
+                stderr: Vec::new(),
+            })
+        }
+
+        fn failure(stderr: impl Into<Vec<u8>>) -> MockCommandResult {
+            Ok(DeveloperCommandOutput {
+                status_success: false,
+                stdout: Vec::new(),
+                stderr: stderr.into(),
+            })
+        }
+
+        fn timeout(command: &str, timeout: Duration) -> MockCommandResult {
+            Err(DeveloperCommandError::TimedOut {
+                command: command.to_string(),
+                timeout,
+            })
+        }
+
+        fn calls(&self) -> Vec<(String, Vec<String>, Duration)> {
+            self.calls
+                .lock()
+                .expect("mock calls lock should not be poisoned")
+                .clone()
+        }
+    }
+
+    impl CommandRunner for MockCommandRunner {
+        fn run(
+            &self,
+            program: &str,
+            args: &[&str],
+            timeout: Duration,
+        ) -> Result<DeveloperCommandOutput, DeveloperCommandError> {
+            self.calls
+                .lock()
+                .expect("mock calls lock should not be poisoned")
+                .push((
+                    program.to_string(),
+                    args.iter().map(|arg| arg.to_string()).collect(),
+                    timeout,
+                ));
+
+            self.responses
+                .lock()
+                .expect("mock responses lock should not be poisoned")
+                .pop_front()
+                .unwrap_or_else(|| {
+                    Err(DeveloperCommandError::Io(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "no mock response configured",
+                    )))
+                })
+        }
+    }
+
+    fn cleaner_with_runner(runner: Arc<dyn CommandRunner>) -> XcodeCleaner {
+        XcodeCleaner::with_paths_and_runner(
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            runner,
+        )
+    }
 
     #[test]
     fn test_xcode_cleaner_creation() {
@@ -565,12 +716,7 @@ mod tests {
 
     #[test]
     fn test_scan_derived_data_empty() {
-        let cleaner = XcodeCleaner {
-            derived_data_path: PathBuf::from("/nonexistent/path"),
-            archives_path: PathBuf::from("/nonexistent/path"),
-            ios_device_support_path: PathBuf::from("/nonexistent/path"),
-            watchos_device_support_path: PathBuf::from("/nonexistent/path"),
-        };
+        let cleaner = cleaner_with_runner(MockCommandRunner::new(Vec::new()));
 
         let targets = cleaner.scan_derived_data();
         assert!(targets.is_empty());
@@ -587,12 +733,13 @@ mod tests {
         fs::create_dir(&project_dir).expect("Failed to create project directory");
         fs::write(project_dir.join("test.txt"), "test content").expect("Failed to write test file");
 
-        let cleaner = XcodeCleaner {
-            derived_data_path: derived_data,
-            archives_path: PathBuf::from("/nonexistent"),
-            ios_device_support_path: PathBuf::from("/nonexistent"),
-            watchos_device_support_path: PathBuf::from("/nonexistent"),
-        };
+        let cleaner = XcodeCleaner::with_paths_and_runner(
+            derived_data,
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            MockCommandRunner::new(Vec::new()),
+        );
 
         let targets = cleaner.scan_derived_data();
         assert!(!targets.is_empty());
@@ -615,18 +762,103 @@ mod tests {
 
     #[test]
     fn test_get_connected_ios_versions_returns_empty_when_no_devices() {
-        // This test verifies the function handles missing devicectl gracefully
-        let cleaner = XcodeCleaner {
-            derived_data_path: PathBuf::from("/nonexistent"),
-            archives_path: PathBuf::from("/nonexistent"),
-            ios_device_support_path: PathBuf::from("/nonexistent"),
-            watchos_device_support_path: PathBuf::from("/nonexistent"),
-        };
+        // Returns empty when devicectl returns a non-success status (e.g. missing tool).
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::failure(
+            "xcrun: error: unable to find utility \"devicectl\"",
+        )]);
+        let cleaner = cleaner_with_runner(runner.clone());
 
-        // Should return empty set without panicking even if devicectl fails
         let versions = cleaner.get_connected_ios_versions();
-        // Just verify it doesn't panic - actual result depends on system state
-        assert!(versions.len() <= 100); // Reasonable upper bound
+        assert!(versions.is_empty());
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "xcrun");
+        assert_eq!(
+            calls[0].1,
+            vec![
+                "devicectl",
+                "list",
+                "devices",
+                "--json-output",
+                "/dev/stdout",
+            ]
+        );
+        assert_eq!(calls[0].2, XCODE_SCAN_COMMAND_TIMEOUT);
+    }
+
+    #[test]
+    fn test_get_connected_ios_versions_parses_runner_output() {
+        let json = r#"{
+            "result": {
+                "devices": [
+                    {
+                        "deviceProperties": {
+                            "osVersionNumber": "18.4.1",
+                            "platform": "iOS"
+                        }
+                    },
+                    {
+                        "deviceProperties": {
+                            "osVersionNumber": "11.6",
+                            "platform": "watchOS"
+                        }
+                    }
+                ]
+            }
+        }"#;
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::success(json)]);
+        let cleaner = cleaner_with_runner(runner);
+
+        let versions = cleaner.get_connected_ios_versions();
+        assert!(versions.contains("18"));
+        assert!(!versions.contains("11"));
+    }
+
+    #[test]
+    fn test_get_connected_versions_timeout_returns_empty_set() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "xcrun devicectl list devices",
+            XCODE_SCAN_COMMAND_TIMEOUT,
+        )]);
+        let cleaner = cleaner_with_runner(runner.clone());
+
+        let versions = cleaner.get_connected_ios_versions();
+        assert!(versions.is_empty());
+        assert_eq!(runner.calls().len(), 1);
+    }
+
+    #[test]
+    fn test_is_build_running_uses_probe_timeout() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::success("")]);
+        let cleaner = cleaner_with_runner(runner.clone());
+
+        assert!(cleaner.is_build_running());
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "pgrep");
+        assert_eq!(calls[0].1, vec!["-x", "xcodebuild"]);
+        assert_eq!(calls[0].2, COMMAND_PROBE_TIMEOUT);
+    }
+
+    #[test]
+    fn test_is_build_running_failure_returns_false() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::failure("")]);
+        let cleaner = cleaner_with_runner(runner);
+
+        assert!(!cleaner.is_build_running());
+    }
+
+    #[test]
+    fn test_is_build_running_timeout_returns_false() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "pgrep -x xcodebuild",
+            COMMAND_PROBE_TIMEOUT,
+        )]);
+        let cleaner = cleaner_with_runner(runner);
+
+        assert!(!cleaner.is_build_running());
     }
 
     #[test]
@@ -645,12 +877,13 @@ mod tests {
                 .expect("Failed to write fake symbols");
         }
 
-        let cleaner = XcodeCleaner {
-            derived_data_path: PathBuf::from("/nonexistent"),
-            archives_path: PathBuf::from("/nonexistent"),
-            ios_device_support_path: ios_support,
-            watchos_device_support_path: PathBuf::from("/nonexistent"),
-        };
+        let cleaner = XcodeCleaner::with_paths_and_runner(
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            ios_support,
+            PathBuf::from("/nonexistent"),
+            MockCommandRunner::new(Vec::new()),
+        );
 
         // With keep_latest=2, only the oldest version (16.0) should be targeted
         let targets = cleaner.get_device_support_cleanup_targets(2);
@@ -678,19 +911,24 @@ mod tests {
                 .expect("Failed to write fake symbols");
         }
 
-        let cleaner = XcodeCleaner {
-            derived_data_path: PathBuf::from("/nonexistent"),
-            archives_path: PathBuf::from("/nonexistent"),
-            ios_device_support_path: ios_support,
-            watchos_device_support_path: PathBuf::from("/nonexistent"),
-        };
+        // Both methods invoke devicectl through the runner; mock two responses
+        // (one for each smart pass: iOS + watchOS).
+        let runner = MockCommandRunner::new(vec![
+            MockCommandRunner::failure(""),
+            MockCommandRunner::failure(""),
+        ]);
+        let cleaner = XcodeCleaner::with_paths_and_runner(
+            PathBuf::from("/nonexistent"),
+            PathBuf::from("/nonexistent"),
+            ios_support,
+            PathBuf::from("/nonexistent"),
+            runner,
+        );
 
-        // Both methods should work without panicking
         let regular_targets = cleaner.get_device_support_cleanup_targets(1);
         let smart_targets = cleaner.get_device_support_cleanup_targets_smart(1);
 
         // Smart targets should be <= regular targets
-        // (smart may preserve more due to connected devices)
         assert!(smart_targets.len() <= regular_targets.len() || regular_targets.is_empty());
     }
 
@@ -739,5 +977,123 @@ mod tests {
             let major = version.split('.').next().unwrap_or(version);
             assert_eq!(major, *expected);
         }
+    }
+
+    #[test]
+    fn test_clean_dry_run_does_not_execute_command() {
+        let runner = MockCommandRunner::new(Vec::new());
+        let cleaner = cleaner_with_runner(runner.clone());
+        let target =
+            CleanupTarget::new_command("Custom Xcode Cleanup", "echo cleanup", SafetyLevel::Safe)
+                .with_size(1024);
+
+        let result = cleaner.clean(&[target], true);
+
+        assert!(result.dry_run);
+        assert_eq!(result.freed_bytes, 1024);
+        assert_eq!(result.items_cleaned, 1);
+        assert!(result.errors.is_empty());
+        assert!(runner.calls().is_empty());
+    }
+
+    #[test]
+    fn test_clean_dry_run_does_not_execute_command_with_args() {
+        let runner = MockCommandRunner::new(Vec::new());
+        let cleaner = cleaner_with_runner(runner.clone());
+        let target = CleanupTarget {
+            path: None,
+            name: "Custom Xcode Cleanup".to_string(),
+            size: 4096,
+            safety_level: SafetyLevel::Safe,
+            cleanup_method: CleanupMethod::CommandWithArgs(
+                "xcrun".to_string(),
+                vec![
+                    "simctl".to_string(),
+                    "delete".to_string(),
+                    "abc".to_string(),
+                ],
+            ),
+            description: None,
+        };
+
+        let result = cleaner.clean(&[target], true);
+
+        assert!(result.dry_run);
+        assert_eq!(result.freed_bytes, 4096);
+        assert_eq!(result.items_cleaned, 1);
+        assert!(result.errors.is_empty());
+        assert!(runner.calls().is_empty());
+    }
+
+    #[test]
+    fn test_clean_command_timeout_records_structured_error() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "rm -rf /Users/test/Library/Developer/Xcode/DerivedData",
+            COMMAND_CLEANUP_TIMEOUT,
+        )]);
+        let cleaner = cleaner_with_runner(runner.clone());
+        let target = CleanupTarget::new_command(
+            "DerivedData purge",
+            "rm -rf /Users/test/Library/Developer/Xcode/DerivedData",
+            SafetyLevel::Safe,
+        )
+        .with_size(2048);
+
+        let result = cleaner.clean(&[target], false);
+
+        assert!(!result.dry_run);
+        assert_eq!(result.freed_bytes, 0);
+        assert_eq!(result.items_cleaned, 0);
+        assert_eq!(result.errors.len(), 1);
+        assert_eq!(result.errors[0].target, "DerivedData purge");
+        assert!(result.errors[0].message.contains("timed out"));
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "sh");
+        assert_eq!(
+            calls[0].1,
+            vec![
+                "-c",
+                "rm -rf /Users/test/Library/Developer/Xcode/DerivedData",
+            ]
+        );
+        assert_eq!(calls[0].2, COMMAND_CLEANUP_TIMEOUT);
+    }
+
+    #[test]
+    fn test_clean_command_with_args_timeout_records_structured_error() {
+        let runner = MockCommandRunner::new(vec![MockCommandRunner::timeout(
+            "xcrun simctl delete abc",
+            COMMAND_CLEANUP_TIMEOUT,
+        )]);
+        let cleaner = cleaner_with_runner(runner.clone());
+        let target = CleanupTarget {
+            path: None,
+            name: "xcrun delete".to_string(),
+            size: 1024,
+            safety_level: SafetyLevel::Safe,
+            cleanup_method: CleanupMethod::CommandWithArgs(
+                "xcrun".to_string(),
+                vec![
+                    "simctl".to_string(),
+                    "delete".to_string(),
+                    "abc".to_string(),
+                ],
+            ),
+            description: None,
+        };
+
+        let result = cleaner.clean(&[target], false);
+
+        assert!(!result.dry_run);
+        assert_eq!(result.errors.len(), 1);
+        assert!(result.errors[0].message.contains("timed out"));
+
+        let calls = runner.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "xcrun");
+        assert_eq!(calls[0].1, vec!["simctl", "delete", "abc"]);
+        assert_eq!(calls[0].2, COMMAND_CLEANUP_TIMEOUT);
     }
 }

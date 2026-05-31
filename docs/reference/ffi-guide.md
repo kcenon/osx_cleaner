@@ -42,7 +42,7 @@ OSX Cleaner provides a C-compatible Foreign Function Interface (FFI) for integra
 | Function | Purpose |
 |----------|---------|
 | `osx_free_string()` | Free Rust-allocated string |
-| `osx_free_result()` | Free FFIResult structure |
+| `osx_free_result()` | Free Rust-owned string fields inside an `FFIResult` |
 
 ### Process Detection
 
@@ -71,13 +71,13 @@ OSX Cleaner provides a C-compatible Foreign Function Interface (FFI) for integra
 
 ### Rule 1: Always Free Results
 
-**Every FFI function that returns `FFIResult` allocates memory that must be freed.**
+**Every FFI function that returns `FFIResult` returns the container by value and may include Rust-owned strings that must be freed.**
 
 #### Swift
 
 ```swift
-let result = osx_analyze_path(path)
-defer { osx_free_result(result) }  // ALWAYS use defer
+var result = osx_analyze_path(path)
+defer { osx_free_result(&result) }  // ALWAYS use defer
 ```
 
 **Why `defer`?**
@@ -92,7 +92,7 @@ FFIResult result = osx_analyze_path(path);
 if (result.success) {
     printf("Data: %s\n", result.data);
 }
-osx_free_result(result);  // Manual cleanup
+osx_free_result(&result);  // Manual cleanup
 ```
 
 ### Rule 2: Copy Data Before Freeing
@@ -102,30 +102,30 @@ osx_free_result(result);  // Manual cleanup
 #### ✅ Correct
 
 ```swift
-let result = osx_analyze_path(path)
+var result = osx_analyze_path(path)
 let jsonCopy = String(cString: result.data)  // Copy BEFORE free
-osx_free_result(result)
+osx_free_result(&result)
 // Use jsonCopy...
 ```
 
 #### ❌ Wrong
 
 ```swift
-let result = osx_analyze_path(path)
-osx_free_result(result)
+var result = osx_analyze_path(path)
+osx_free_result(&result)
 let json = String(cString: result.data)  // Use-after-free!
 ```
 
-### Rule 3: Never Free Twice
+### Rule 3: Do Not Free Result Fields Separately
 
-**Each result must be freed exactly once.**
+**Use `osx_free_result(&result)` for `FFIResult` values. Do not call `osx_free_string()` on `data` or `error_message` separately unless you are deliberately bypassing result cleanup.**
 
-#### ❌ Wrong - Double Free
+#### ❌ Wrong - Mixed Cleanup
 
 ```swift
-let result = osx_analyze_path(path)
-osx_free_result(result)  // First free
-osx_free_result(result)  // CRASH: double-free!
+var result = osx_analyze_path(path)
+osx_free_string(result.data)
+osx_free_result(&result)  // Double-free risk
 ```
 
 ### Memory Ownership Model
@@ -135,27 +135,27 @@ osx_free_result(result)  // CRASH: double-free!
 ```swift
 let path = "/Users/example/Library/Caches"
 let cPath = path.cString(using: .utf8)!
-let result = osx_analyze_path(cPath)
+var result = osx_analyze_path(cPath)
 // Rust does NOT take ownership of cPath
 // Caller still owns cPath
-osx_free_result(result)
+osx_free_result(&result)
 ```
 
 #### Output Strings: Owned by Caller After Return
 
 ```swift
-let result = osx_analyze_path(cPath)
-// Rust allocates memory for result.data
-// Caller now owns result.data
-// Caller MUST call osx_free_result() to free
-defer { osx_free_result(result) }
+var result = osx_analyze_path(cPath)
+// Rust returned the FFIResult container by value
+// Caller owns the Rust-allocated data/error_message fields
+// Caller MUST pass the result address to osx_free_result() to free those fields
+defer { osx_free_result(&result) }
 ```
 
 ### FFIResult Memory Layout
 
 ```text
 FFIResult {
-    success: bool,              // Stack allocated, no cleanup needed
+    success: bool,              // Value field, no cleanup needed
     error_message: *mut c_char, // Heap allocated if non-null
     data: *mut c_char,          // Heap allocated if non-null
 }
@@ -170,8 +170,8 @@ FFIResult {
 #### Swift
 
 ```swift
-let result = osx_analyze_path(path)
-defer { osx_free_result(result) }
+var result = osx_analyze_path(path)
+defer { osx_free_result(&result) }
 
 if result.success {
     // Safe to use result.data
@@ -195,7 +195,7 @@ if (result.success) {
     fprintf(stderr, "Error: %s\n", result.error_message);
 }
 
-osx_free_result(result);
+osx_free_result(&result);
 ```
 
 ### Error Codes for Non-FFIResult Functions
@@ -224,13 +224,13 @@ let isRunning = osx_is_app_running(appName)
 ```swift
 // Safe: Different paths, can run concurrently
 DispatchQueue.global().async {
-    let result1 = osx_analyze_path(path1)
-    defer { osx_free_result(result1) }
+    var result1 = osx_analyze_path(path1)
+    defer { osx_free_result(&result1) }
 }
 
 DispatchQueue.global().async {
-    let result2 = osx_analyze_path(path2)
-    defer { osx_free_result(result2) }
+    var result2 = osx_analyze_path(path2)
+    defer { osx_free_result(&result2) }
 }
 ```
 
@@ -243,13 +243,13 @@ DispatchQueue.global().async {
 ```swift
 // DO NOT DO THIS
 DispatchQueue.global().async {
-    let result1 = osx_clean_path(path, 2, false)
-    osx_free_result(result1)
+    var result1 = osx_clean_path(path, 2, false)
+    osx_free_result(&result1)
 }
 
 DispatchQueue.global().async {
-    let result2 = osx_clean_path(path, 2, false)  // RACE CONDITION
-    osx_free_result(result2)
+    var result2 = osx_clean_path(path, 2, false)  // RACE CONDITION
+    osx_free_result(&result2)
 }
 ```
 
@@ -264,11 +264,11 @@ DispatchQueue.global().async {
 var result = osx_analyze_path(path)
 
 DispatchQueue.global().async {
-    osx_free_result(result)  // Thread 1
+    osx_free_result(&result)  // Thread 1
 }
 
 DispatchQueue.global().async {
-    osx_free_result(result)  // Thread 2 - CRASH!
+    osx_free_result(&result)  // Thread 2 - CRASH!
 }
 ```
 
@@ -291,16 +291,16 @@ The caller MUST ensure:
 
 The caller MUST:
 
-1. **Free Result**: Call `osx_free_result()` on the returned result
+1. **Free Result Fields**: Pass the returned value's address to `osx_free_result(&result)`
 2. **Copy Data**: Copy strings before freeing if needed later
-3. **No Double-Free**: Free result exactly once
+3. **No Mixed Cleanup**: Do not free string fields separately before calling `osx_free_result`
 4. **Check Success**: Check `success` before accessing `data`
 
 ### Postconditions (Rust Guarantees)
 
 After a function returns:
 
-1. **Ownership Transfer**: Caller owns returned `FFIResult`
+1. **Ownership Transfer**: Caller owns the returned `FFIResult` container and its Rust-owned string fields
 2. **No Aliasing**: Rust no longer references input pointers
 3. **Valid Result**: Returned pointers are valid until `osx_free_result()`
 4. **Thread-Safe**: Function can be called again from any thread
@@ -313,7 +313,7 @@ The following cause undefined behavior:
 2. **Invalid UTF-8**: Passing non-UTF-8 strings
 3. **Non-Null-Terminated**: Passing strings without null terminator
 4. **Use After Free**: Using pointers after `osx_free_result()`
-5. **Double Free**: Calling `osx_free_result()` twice on same result
+5. **Double Free**: Freeing string fields separately and then calling `osx_free_result()`
 6. **Wrong Allocator**: Freeing strings not allocated by Rust
 
 ---
@@ -323,7 +323,7 @@ The following cause undefined behavior:
 ### ❌ Memory Leak
 
 ```swift
-let result = osx_analyze_path(path)
+var result = osx_analyze_path(path)
 // WRONG: Forgot to call osx_free_result
 return parseResult(result)  // Memory leaked
 ```
@@ -331,8 +331,8 @@ return parseResult(result)  // Memory leaked
 #### ✅ Correct
 
 ```swift
-let result = osx_analyze_path(path)
-defer { osx_free_result(result) }  // Always freed
+var result = osx_analyze_path(path)
+defer { osx_free_result(&result) }  // Always freed
 return parseResult(result)
 ```
 
@@ -341,8 +341,8 @@ return parseResult(result)
 ### ❌ Use After Free
 
 ```swift
-let result = osx_analyze_path(path)
-osx_free_result(result)
+var result = osx_analyze_path(path)
+osx_free_result(&result)
 // WRONG: Using result.data after free
 let json = String(cString: result.data)  // Undefined behavior
 ```
@@ -350,9 +350,9 @@ let json = String(cString: result.data)  // Undefined behavior
 #### ✅ Correct
 
 ```swift
-let result = osx_analyze_path(path)
+var result = osx_analyze_path(path)
 let json = String(cString: result.data)  // Copy BEFORE free
-osx_free_result(result)
+osx_free_result(&result)
 // Use json...
 ```
 
@@ -361,8 +361,8 @@ osx_free_result(result)
 ### ❌ Not Checking Success
 
 ```swift
-let result = osx_analyze_path(path)
-defer { osx_free_result(result) }
+var result = osx_analyze_path(path)
+defer { osx_free_result(&result) }
 
 // WRONG: Not checking success before using data
 let json = String(cString: result.data)  // May crash if failed
@@ -371,8 +371,8 @@ let json = String(cString: result.data)  // May crash if failed
 #### ✅ Correct
 
 ```swift
-let result = osx_analyze_path(path)
-defer { osx_free_result(result) }
+var result = osx_analyze_path(path)
+defer { osx_free_result(&result) }
 
 guard result.success else {
     let error = String(cString: result.error_message)
@@ -403,8 +403,8 @@ class Analyzer {
     var lastData: String?  // Store copied data, not FFIResult
 
     func analyze() {
-        let result = osx_analyze_path(path)
-        defer { osx_free_result(result) }
+        var result = osx_analyze_path(path)
+        defer { osx_free_result(&result) }
 
         if result.success {
             lastData = String(cString: result.data)  // Copy
@@ -418,22 +418,22 @@ class Analyzer {
 ### ❌ Manual String Deallocation
 
 ```swift
-let result = osx_analyze_path(path)
+var result = osx_analyze_path(path)
 
 // WRONG: Freeing individual strings
 osx_free_string(result.data)
 osx_free_string(result.error_message)
 
 // This will double-free!
-osx_free_result(result)
+osx_free_result(&result)
 ```
 
 #### ✅ Correct
 
 ```swift
-let result = osx_analyze_path(path)
+var result = osx_analyze_path(path)
 // Just free the result - it frees strings automatically
-osx_free_result(result)
+osx_free_result(&result)
 ```
 
 ---
@@ -445,8 +445,8 @@ osx_free_result(result)
 ```swift
 func performAnalysis(path: String) throws -> AnalysisResult {
     let cPath = path.cString(using: .utf8)!
-    let result = osx_analyze_path(cPath)
-    defer { osx_free_result(result) }  // Automatic cleanup
+    var result = osx_analyze_path(cPath)
+    defer { osx_free_result(&result) }  // Automatic cleanup
 
     guard result.success else {
         throw AnalysisError.failed(String(cString: result.error_message))
@@ -466,8 +466,8 @@ func analyzeDirectory(_ path: String) throws {
     }
 
     let cPath = path.cString(using: .utf8)!
-    let result = osx_analyze_path(cPath)
-    defer { osx_free_result(result) }
+    var result = osx_analyze_path(cPath)
+    defer { osx_free_result(&result) }
 
     // ... handle result
 }
@@ -485,8 +485,8 @@ enum CleanupLevel: Int32 {
 
 func cleanPath(_ path: String, level: CleanupLevel, dryRun: Bool) throws {
     let cPath = path.cString(using: .utf8)!
-    let result = osx_clean_path(cPath, level.rawValue, dryRun)
-    defer { osx_free_result(result) }
+    var result = osx_clean_path(cPath, level.rawValue, dryRun)
+    defer { osx_free_result(&result) }
 
     // ... handle result
 }
@@ -499,8 +499,9 @@ struct FFIError: Error {
     let message: String
 }
 
-func unwrapFFIResult(_ result: FFIResult) throws -> String {
-    defer { osx_free_result(result) }
+func unwrapFFIResult(_ ffiResult: FFIResult) throws -> String {
+    var result = ffiResult
+    defer { osx_free_result(&result) }
 
     guard result.success else {
         let error = String(cString: result.error_message)
@@ -545,8 +546,8 @@ func analyze(_ path: String) throws {
         throw AnalysisError.invalidUTF8
     }
 
-    let result = osx_analyze_path(cPath)
-    defer { osx_free_result(result) }
+    var result = osx_analyze_path(cPath)
+    defer { osx_free_result(&result) }
     // ...
 }
 ```
@@ -588,8 +589,8 @@ struct OSXCleanerFFI {
             throw FFIError.invalidUTF8
         }
 
-        let result = osx_analyze_path(cPath)
-        defer { osx_free_result(result) }
+        var result = osx_analyze_path(cPath)
+        defer { osx_free_result(&result) }
 
         guard result.success else {
             let error = String(cString: result.error_message)
@@ -605,8 +606,8 @@ struct OSXCleanerFFI {
             throw FFIError.invalidUTF8
         }
 
-        let result = osx_clean_path(cPath, level.rawValue, dryRun)
-        defer { osx_free_result(result) }
+        var result = osx_clean_path(cPath, level.rawValue, dryRun)
+        defer { osx_free_result(&result) }
 
         guard result.success else {
             let error = String(cString: result.error_message)

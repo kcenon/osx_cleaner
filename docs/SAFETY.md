@@ -9,7 +9,10 @@
 - [Safety Philosophy](#safety-philosophy)
 - [4-Level Safety Classification](#4-level-safety-classification)
 - [Cleanup Levels Explained](#cleanup-levels-explained)
+- [Cleanup Engine Safety Parity](#cleanup-engine-safety-parity)
+- [Confirmation and Dry-Run Semantics](#confirmation-and-dry-run-semantics)
 - [Protected Paths](#protected-paths)
+- [Credential Storage](#credential-storage)
 - [What to Expect](#what-to-expect)
 - [Recovery Options](#recovery-options)
 - [FAQ](#faq)
@@ -22,8 +25,8 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 
 1. **Never delete what you can't recover** - System files and user documents are always protected
 2. **Classify before delete** - Every path is classified before any action is taken
-3. **User confirmation for risky operations** - Warning-level items require explicit approval
-4. **Dry-run by default** - Encourage previewing before actual cleanup
+3. **Confirm risky operations** - Warning- and system-level items require explicit approval. In `--non-interactive` mode the command fails closed and exits non-zero unless `--force` is also passed.
+4. **Preview before cleanup** - Use `--dry-run` to inspect planned changes before deletion. See [Confirmation and Dry-Run Semantics](#confirmation-and-dry-run-semantics) for the full decision matrix.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,7 +37,7 @@ OSX Cleaner is built with a **safety-first** approach. The core principles are:
 │      ↓            ↓           ↓           ↓         ↓            │
 │   Validate    4-Level     Match with   Require    Execute        │
 │   Existence   System      Cleanup      Approval   Safely         │
-│                           Level        if Warning                 │
+│                           Level        if Warning                │
 │                                                                   │
 │  At any step: DANGER paths → IMMEDIATE BLOCK (never delete)      │
 │                                                                   │
@@ -162,6 +165,10 @@ osxcleaner clean --level deep
 
 **Best for:** Pre-release cleanup, disk space emergency
 
+Deep cleanup can include Warning-level targets. Interactive runs ask for `yes`
+before deletion. Non-interactive runs fail closed for Warning-level cleanup
+unless `--force` is also provided.
+
 ### Level 4: System
 
 ```bash
@@ -177,7 +184,97 @@ sudo osxcleaner clean --level system
 
 **Best for:** Expert users only, system maintenance
 
-> **Note:** Even at System level, Danger paths are NEVER deleted.
+> **Note:** System-level cleanup also requires confirmation, or
+> `--non-interactive --force` in automation. Even at System level, Danger paths
+> are NEVER deleted.
+
+---
+
+## Cleanup Engine Safety Parity
+
+OSX Cleaner performs deletions through the Rust core whenever it is available,
+and transparently falls back to a Swift implementation when the Rust core
+cannot be initialized. **Both engines enforce the same safety policy** — the
+fallback path is a compatibility mechanism, not a relaxation of safety.
+
+Before deleting any target, both the Rust core and the Swift fallback:
+
+1. **Canonicalize the path** through `PathValidator` (tilde expansion, relative
+   path normalization, and `..` component removal), so the path that is checked
+   is exactly the path that is deleted.
+2. **Classify the target** into one of the four safety levels (Safe, Caution,
+   Warning, Danger).
+3. **Refuse Danger-level targets** outright — they are never deleted, regardless
+   of cleanup level or flags.
+4. **Gate on the cleanup level**: a target is only removed if the selected
+   cleanup level is permitted to delete its safety level (Light → Safe,
+   Normal → Caution, Deep → Warning). A target that exceeds the selected level
+   is skipped, not deleted.
+5. **Honor `--dry-run`**: no external state is modified; targets are previewed
+   only.
+
+When the Swift fallback skips a target for a safety reason, it reports a
+structured error for that single target and continues with the remaining safe
+targets, rather than aborting the whole run. As a result, a Rust initialization
+failure can never widen the set of files that are eligible for deletion.
+
+---
+
+## Confirmation and Dry-Run Semantics
+
+The `clean` command always classifies every target before any destructive
+action runs, then routes the plan through one of three policies depending
+on the flags you pass.
+
+### Decision Matrix
+
+| Mode                                                  | Warning/system targets present? | Behavior                                                                                                          |
+|-------------------------------------------------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `--dry-run`                                           | Any                             | Print a per-target preview, never delete, exit `0`. Output includes the policy hint for the equivalent real run.   |
+| Interactive (no `--non-interactive`), no `--force`    | No                              | Cleanup runs without prompting.                                                                                    |
+| Interactive (no `--non-interactive`), no `--force`    | Yes                             | Prompt lists the risky paths and waits for `yes` on stdin. Any other answer aborts with `operation cancelled`.     |
+| `--force` (interactive or not)                        | Any                             | Prompt is skipped entirely; cleanup proceeds.                                                                      |
+| `--non-interactive` only                              | No                              | Cleanup runs without prompting.                                                                                    |
+| `--non-interactive` only                              | Yes                             | **Fail-closed.** The command exits non-zero with `--non-interactive requires --force ...` and nothing is deleted.  |
+| `--non-interactive --force`                           | Any                             | Cleanup runs without prompting and without further safety questions.                                               |
+
+Danger-level paths are blocked under every combination above and cannot be
+unlocked by `--force`.
+
+### Dry-Run Output Contract
+
+`--dry-run` always:
+
+1. Enumerates the targets that would be considered, with safety level,
+   label, and canonical path.
+2. Reports the highest safety level encountered and the estimated
+   reclaimable space.
+3. Lists the risky targets in a dedicated section when `cleanupLevel`
+   would otherwise delete them.
+4. Prints the hint: a real run requires interactive `yes` approval or
+   `--non-interactive --force` for those targets.
+5. Returns exit code `0` and performs no deletion, including for JSON
+   output (`--format json` reports `"dry_run": true` and zero freed
+   bytes).
+
+### Approval Flag Contract (`--force`)
+
+`--force` is the single explicit opt-in that bypasses both the interactive
+prompt and the non-interactive fail-closed gate. It does **not** unlock
+danger-level paths; those are still blocked.
+
+- Interactive: `--force` suppresses the `Type 'yes' to continue:` prompt
+  for the current invocation.
+- Non-interactive: `--non-interactive` without `--force` exits non-zero
+  when any warning- or system-level target is in the plan. `--force`
+  acknowledges the risk and lets cleanup proceed.
+
+### Rejection Behavior
+
+If the user answers anything other than `yes` (case-insensitive) at the
+interactive prompt, the command throws `operationCancelled` and exits
+non-zero. No deletion has happened at that point. Re-running the
+command will replay the same classification and prompt.
 
 ---
 
@@ -244,6 +341,35 @@ These paths are Warning level and require confirmation before deletion:
 
 ---
 
+## Credential Storage
+
+When OSX Cleaner runs in server/agent mode, it must hold a server
+authentication token. **Auth tokens are stored in the macOS Keychain, never in
+the plaintext JSON configuration file.**
+
+| Property | Value |
+|----------|-------|
+| Storage backend | macOS Keychain |
+| Keychain service | `com.osxcleaner.server.auth` |
+| Account identity | Derived from the server URL and agent ID |
+| Config file (`config.json`) | Stores only non-secret metadata (server URL, agent ID, token expiry); the `authToken` field is never written back to disk |
+
+**Migration of legacy configs.** If an older configuration file still contains
+an `authToken` value in plaintext, it is automatically migrated on first load:
+the token is moved into the Keychain and the configuration file is rewritten
+without the token. No action is required.
+
+**Resetting credentials.** To rotate or remove stored credentials:
+
+- Re-register the agent (`osxcleaner server register …`) to overwrite the
+  stored token, or
+- Open **Keychain Access**, search for `com.osxcleaner.server.auth`, and delete
+  the matching entry.
+
+Token values are never written to logs or printed to standard output.
+
+---
+
 ## What to Expect
 
 ### After Light Cleanup
@@ -271,6 +397,11 @@ These paths are Warning level and require confirmation before deletion:
 | Docker images need to be pulled again | Depends on images |
 | npm/pip packages need reinstall | project-dependent |
 
+Developer cleanup commands, such as Docker prune or package manager cache
+cleanup, have a default 10 minute execution timeout. Dry-runs do not execute
+these external cleanup commands. If a cleanup command times out, the target is
+reported as a cleanup error and is not counted as cleaned or freed space.
+
 ### After System Cleanup
 
 | Change | Duration |
@@ -289,6 +420,9 @@ These paths are Warning level and require confirmation before deletion:
    ```bash
    osxcleaner clean --level deep --dry-run
    ```
+
+   Dry-run output reports the planned target count, highest safety level, and
+   estimated reclaimable space without deleting files.
 
 2. **Create a Time Machine backup**
    ```bash
@@ -350,7 +484,7 @@ docker pull your-image-name
 
 **A:**
 1. OSX Cleaner won't delete Danger paths
-2. Warning paths require confirmation
+2. Confirm Warning paths before deletion, especially before Deep or System cleanup
 3. Use Time Machine for recovery
 4. Most cleaned items regenerate automatically
 
@@ -405,6 +539,9 @@ All operations are logged to `~/Library/Logs/osxcleaner/`:
 - `analyze.log` - Scan results
 - `error.log` - Any errors
 
+Server authentication tokens are **never** logged. See
+[Credential Storage](#credential-storage) for how secrets are handled.
+
 ---
 
 ## See Also
@@ -415,4 +552,4 @@ All operations are logged to `~/Library/Logs/osxcleaner/`:
 
 ---
 
-*Last updated: 2025-12-26*
+*Last updated: 2026-05-31*

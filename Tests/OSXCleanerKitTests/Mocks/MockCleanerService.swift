@@ -20,12 +20,18 @@ final class MockCleanerService: CleanerServiceProtocol, @unchecked Sendable {
     var cleanResult: CleanResult?
     var cleanError: Error?
 
+    // MARK: - Safety Guard
+
+    private var destructiveGuard: DestructiveCleanupGuard?
+
     // MARK: - CleanerServiceProtocol Implementation
 
     func clean(with config: CleanerConfiguration) async throws -> CleanResult {
         cleanCallCount += 1
         lastCleanConfiguration = config
         lastTriggerType = nil
+
+        try validateSafeDestructiveTargets(in: config)
 
         if let error = cleanError {
             throw error
@@ -46,6 +52,8 @@ final class MockCleanerService: CleanerServiceProtocol, @unchecked Sendable {
         cleanCallCount += 1
         lastCleanConfiguration = config
         lastTriggerType = triggerType
+
+        try validateSafeDestructiveTargets(in: config)
 
         if let error = cleanError {
             throw error
@@ -68,5 +76,15 @@ final class MockCleanerService: CleanerServiceProtocol, @unchecked Sendable {
         lastTriggerType = nil
         cleanResult = nil
         cleanError = nil
+        destructiveGuard = nil
+    }
+
+    /// Require destructive cleanup requests to target only paths inside a test temp directory.
+    func requireDestructiveTargets(inside temporaryDirectory: URL) {
+        destructiveGuard = DestructiveCleanupGuard(allowedRoot: temporaryDirectory)
+    }
+
+    private func validateSafeDestructiveTargets(in config: CleanerConfiguration) throws {
+        try destructiveGuard?.assertSafe(config)
     }
 }

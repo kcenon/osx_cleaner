@@ -46,11 +46,12 @@ extension ServerCommand {
             let progressView = ProgressView()
             let configService = ConfigurationService()
             let config = try configService.load()
+            let hasAuthToken = try configService.loadServerAuthToken(for: config) != nil
 
             let status = ServerConnectionStatus(
                 serverURL: config.serverURL,
                 agentId: config.agentId,
-                isRegistered: config.agentId != nil,
+                isRegistered: config.agentId != nil && hasAuthToken,
                 lastHeartbeat: config.lastHeartbeat,
                 tokenExpiresAt: config.tokenExpiresAt
             )
@@ -84,7 +85,7 @@ extension ServerCommand {
 
             if let agentId = status.agentId {
                 progressView.display(message: "  Agent ID:        \(agentId)")
-                progressView.display(message: "  Registered:      ✓ Yes")
+                progressView.display(message: "  Registered:      \(status.isRegistered ? "✓ Yes" : "○ No")")
             } else {
                 progressView.display(message: "  Agent ID:        -")
                 progressView.display(message: "  Registered:      ○ No")
@@ -181,6 +182,7 @@ extension ServerCommand {
             let progressView = ProgressView()
             let configService = ConfigurationService()
             var config = try configService.load()
+            let originalConfig = config
 
             guard config.serverURL != nil else {
                 progressView.display(message: "Not connected to any server")
@@ -196,9 +198,15 @@ extension ServerCommand {
             // If registered, try to unregister first
             if let serverURL = config.serverURL,
                let url = URL(string: serverURL),
-               config.authToken != nil {
+               let agentId = config.agentId,
+               let authToken = try configService.loadServerAuthToken(for: config) {
                 let clientConfig = ServerClientConfig(serverURL: url)
                 let client = ServerClient(config: clientConfig)
+                await client.configureAuthentication(
+                    agentId: agentId,
+                    authToken: authToken,
+                    tokenExpiresAt: config.tokenExpiresAt
+                )
 
                 do {
                     try await client.unregister()
@@ -214,6 +222,7 @@ extension ServerCommand {
             config.authToken = nil
             config.tokenExpiresAt = nil
             config.lastHeartbeat = nil
+            try configService.deleteServerAuthToken(for: originalConfig)
             try configService.save(config)
 
             progressView.display(message: "")
@@ -269,17 +278,7 @@ extension ServerCommand {
                 return
             }
 
-            // Create agent identity
-            let hostname = name ?? ProcessInfo.processInfo.hostName
-            let tagList = tags?.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) } ?? []
-
-            let identity = AgentIdentity(
-                id: config.agentId ?? UUID(),
-                hostname: hostname,
-                osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
-                appVersion: "0.1.0",
-                tags: tagList
-            )
+            let identity = makeAgentIdentity(agentId: config.agentId)
 
             progressView.display(message: "Registering with server: \(serverURL.absoluteString)")
             progressView.display(message: "")
@@ -294,36 +293,80 @@ extension ServerCommand {
                 let result = try await client.register(identity: identity)
 
                 if result.success {
-                    // Save registration info
-                    config.agentId = result.agentId
-                    config.authToken = result.authToken
-                    config.tokenExpiresAt = result.tokenExpiresAt
-                    config.lastHeartbeat = Date()
-                    try configService.save(config)
-
-                    if json {
-                        let output = RegistrationOutput(
-                            success: true,
-                            agentId: result.agentId,
-                            message: result.message
-                        )
-                        let encoder = JSONEncoder()
-                        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                        let data = try encoder.encode(output)
-                        print(String(data: data, encoding: .utf8) ?? "{}")
-                    } else {
-                        progressView.displaySuccess("Agent registered successfully!")
-                        progressView.display(message: "")
-                        progressView.display(message: "  Agent ID:  \(result.agentId?.uuidString ?? "unknown")")
-                        if let message = result.message {
-                            progressView.display(message: "  Message:   \(message)")
-                        }
+                    guard let agentId = try persistRegistration(
+                        result: result,
+                        config: &config,
+                        configService: configService
+                    ) else {
+                        progressView.display(message: "✗ Registration error: server did not return credentials")
+                        return
                     }
+
+                    try printRegistrationSuccess(
+                        agentId: agentId,
+                        message: result.message,
+                        progressView: progressView
+                    )
                 } else {
                     progressView.display(message: "✗ Registration failed: \(result.message ?? "Unknown error")")
                 }
             } catch {
                 progressView.display(message: "✗ Registration error: \(error.localizedDescription)")
+            }
+        }
+
+        private func makeAgentIdentity(agentId: UUID?) -> AgentIdentity {
+            let hostname = name ?? ProcessInfo.processInfo.hostName
+            let tagList = tags?.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) } ?? []
+
+            return AgentIdentity(
+                id: agentId ?? UUID(),
+                hostname: hostname,
+                osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+                appVersion: "0.1.0",
+                tags: tagList
+            )
+        }
+
+        private func persistRegistration(
+            result: RegistrationResult,
+            config: inout AppConfiguration,
+            configService: ConfigurationService
+        ) throws -> UUID? {
+            guard let agentId = result.agentId, let authToken = result.authToken else {
+                return nil
+            }
+
+            config.agentId = agentId
+            config.authToken = authToken
+            config.tokenExpiresAt = result.tokenExpiresAt
+            config.lastHeartbeat = Date()
+            try configService.save(config)
+            return agentId
+        }
+
+        private func printRegistrationSuccess(
+            agentId: UUID,
+            message: String?,
+            progressView: ProgressView
+        ) throws {
+            if json {
+                let output = RegistrationOutput(
+                    success: true,
+                    agentId: agentId,
+                    message: message
+                )
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let data = try encoder.encode(output)
+                print(String(data: data, encoding: .utf8) ?? "{}")
+            } else {
+                progressView.displaySuccess("Agent registered successfully!")
+                progressView.display(message: "")
+                progressView.display(message: "  Agent ID:  \(agentId.uuidString)")
+                if let message {
+                    progressView.display(message: "  Message:   \(message)")
+                }
             }
         }
     }
@@ -352,8 +395,12 @@ extension ServerCommand {
                 return
             }
 
-            guard config.authToken != nil, config.agentId != nil else {
+            guard let agentId = config.agentId else {
                 progressView.display(message: "✗ Agent not registered. Use 'osxcleaner server register' first.")
+                return
+            }
+            guard let authToken = try configService.loadServerAuthToken(for: config) else {
+                progressView.display(message: "✗ Auth token missing. Run 'osxcleaner server register' again.")
                 return
             }
 
@@ -362,10 +409,15 @@ extension ServerCommand {
                 requestTimeout: TimeInterval(config.serverTimeout ?? 30)
             )
             let client = ServerClient(config: clientConfig)
+            await client.configureAuthentication(
+                agentId: agentId,
+                authToken: authToken,
+                tokenExpiresAt: config.tokenExpiresAt
+            )
 
             // Create current status
             let status = AgentStatus.current(
-                agentId: config.agentId!,
+                agentId: agentId,
                 connectionState: .active
             )
 

@@ -9,6 +9,14 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+# Cache key policy (F19.4.2 / issue #272):
+# - rust-core/Cargo.lock and Package.resolved are tracked in git for
+#   reproducibility (see .gitignore comments). Cache keys hash these lockfiles
+#   so the cache stays warm across CI runs with the same dependency graph.
+# - Frameworks/COSXCore.xcframework is NOT tracked. Every Swift-bearing job
+#   must run `make xcframework` before any `swift build` / `swift test`.
 
 jobs:
   # Rust jobs
@@ -56,6 +64,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Cargo registry
         uses: actions/cache@v5
@@ -76,14 +86,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swift-
 
-      - name: Build Rust core
-        run: cd rust-core && cargo build --release
+      - name: Build XCFramework (universal arm64 + x86_64)
+        run: make xcframework
 
       - name: Build Swift
         run: swift build
 
       - name: Run Swift tests
-        run: swift test
+        run: |
+          OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" swift test
 
   # Full build and integration test
   build:
@@ -95,6 +106,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache dependencies
         uses: actions/cache@v5
@@ -108,8 +121,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-full-
 
-      - name: Build all
-        run: make all
+      - name: Build XCFramework (universal arm64 + x86_64)
+        run: make xcframework
+
+      - name: Build Swift package (after XCFramework prerequisite)
+        run: make swift
 
       - name: Run all tests
         run: make test
@@ -135,6 +151,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
@@ -147,11 +164,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swift-coverage-
 
-      - name: Build Rust core (required for Swift tests)
-        run: cd rust-core && cargo build --release
+      - name: Build XCFramework (required for Swift tests)
+        run: make xcframework
+
+      - name: Build CLI for integration tests
+        run: swift build --product osxcleaner
 
       - name: Run Swift tests with coverage
-        run: swift test --enable-code-coverage
+        run: |
+          # Coverage instrumentation skews performance SLO tests; benchmarks.yml
+          # validates those separately.
+          OSXCLEANER_CLI_PATH="$(swift build --show-bin-path)/osxcleaner" \
+            swift test --enable-code-coverage --skip Performance
 
       - name: Generate Swift coverage report
         run: |

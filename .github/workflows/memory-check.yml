@@ -67,6 +67,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Rust dependencies
         uses: actions/cache@v5
@@ -81,10 +83,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build Rust core
-        run: |
-          cd rust-core
-          cargo build --release
+      - name: Build XCFramework (required for swift test)
+        run: make xcframework
 
       - name: Run Swift memory tests
         run: |
@@ -105,6 +105,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Rust dependencies
         uses: actions/cache@v5
@@ -119,10 +121,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build Rust core
-        run: |
-          cd rust-core
-          cargo build --release
+      - name: Build XCFramework (required for swift test)
+        run: make xcframework
 
       - name: Run end-to-end memory tests
         run: |

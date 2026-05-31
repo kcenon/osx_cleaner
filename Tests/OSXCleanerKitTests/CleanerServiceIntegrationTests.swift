@@ -8,10 +8,12 @@ final class CleanerServiceIntegrationTests: XCTestCase {
     var tempDir: URL!
     var cleanerService: CleanerService!
     var fileManager: FileManager!
+    var additionalCleanupURLs: [URL] = []
 
     override func setUpWithError() throws {
         try super.setUpWithError()
         fileManager = .default
+        additionalCleanupURLs = []
 
         // Create isolated test directory
         tempDir = fileManager.temporaryDirectory
@@ -27,6 +29,9 @@ final class CleanerServiceIntegrationTests: XCTestCase {
 
     override func tearDownWithError() throws {
         // Clean up test directory
+        for url in additionalCleanupURLs where url.lastPathComponent.hasPrefix("OSXCleanerFallbackSafety-") {
+            try? fileManager.removeItem(at: url)
+        }
         if let tempDir = tempDir {
             try? fileManager.removeItem(at: tempDir)
         }
@@ -71,6 +76,48 @@ final class CleanerServiceIntegrationTests: XCTestCase {
         )
     }
 
+    private func makeFallbackService() -> CleanerService {
+        CleanerService(
+            fileManager: .default,
+            rustBridge: .shared,
+            loggingService: .shared,
+            forceSwiftFallback: true
+        )
+    }
+
+    /// Run a real cleanup only after asserting all destructive targets are
+    /// inside `tempDir`. Use this helper instead of calling `cleanerService.clean`
+    /// directly so a typo in `specificPaths` or accidental broad-target flag can
+    /// never trigger real cleanup against `~/Library`, `/Library`, or system
+    /// caches.
+    ///
+    /// Dry-run configurations are passed straight through because they cannot
+    /// delete anything.
+    func cleanSafely(
+        _ config: CleanerConfiguration,
+        using service: CleanerService? = nil
+    ) async throws -> CleanResult {
+        let guardian = DestructiveCleanupGuard(allowedRoot: tempDir)
+        try guardian.assertSafe(config)
+        return try await (service ?? cleanerService).clean(with: config)
+    }
+
+    private func createWarningFixture() throws -> URL {
+        let fixture = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Developer/Xcode/DerivedData")
+            .appendingPathComponent("OSXCleanerFallbackSafety-\(UUID().uuidString)")
+
+        try fileManager.createDirectory(at: fixture, withIntermediateDirectories: true)
+        try "derived data".write(
+            to: fixture.appendingPathComponent("index.noindex"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        additionalCleanupURLs.append(fixture)
+        return fixture
+    }
+
     // MARK: - Dry Run Tests
 
     func testDryRunDoesNotDeleteFiles() async throws {
@@ -87,7 +134,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [cacheFile.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Verify file still exists
         XCTAssertTrue(
@@ -114,7 +161,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             ]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Verify all files still exist
         XCTAssertTrue(
@@ -145,7 +192,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [cacheFile.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Verify file is deleted
         XCTAssertFalse(
@@ -169,7 +216,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [cacheDir.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Rust core may delete directory contents but not the directory itself
         // or it may delete the entire directory - both are acceptable
@@ -193,7 +240,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [cacheFile.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Light level should only delete safe items
         XCTAssertNotNil(result)
@@ -212,7 +259,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [tempDir.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Normal level should delete up to caution
         XCTAssertNotNil(result)
@@ -232,7 +279,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [tempDir.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Deep level should delete up to warning
         XCTAssertNotNil(result)
@@ -254,12 +301,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
 
     func testSwiftFallbackWithForceParameter() async throws {
         // Create service with Swift fallback forced
-        let fallbackService = CleanerService(
-            fileManager: .default,
-            rustBridge: .shared,
-            loggingService: .shared,
-            forceSwiftFallback: true
-        )
+        let fallbackService = makeFallbackService()
 
         let cacheFile = tempDir.appendingPathComponent("Caches/test.cache")
         let config = CleanerConfiguration(
@@ -273,12 +315,132 @@ final class CleanerServiceIntegrationTests: XCTestCase {
         )
 
         // Should work without crashing
-        let result = try await fallbackService.clean(with: config)
+        let result = try await cleanSafely(config, using: fallbackService)
         XCTAssertNotNil(result, "Should return a result")
         // Note: In dry-run mode with Swift fallback, size calculation may return 0
         // if the file no longer exists at the time of calculation
         // The important thing is that it doesn't crash
         XCTAssertEqual(result.filesRemoved, 1, "Should report one file would be removed")
+    }
+
+    func testSwiftFallbackDeletesSafeTempFixture() async throws {
+        let fallbackService = makeFallbackService()
+        let cacheFile = tempDir.appendingPathComponent("Caches/test.cache")
+
+        let config = CleanerConfiguration(
+            cleanupLevel: .normal,
+            dryRun: false,
+            includeSystemCaches: false,
+            includeDeveloperCaches: false,
+            includeBrowserCaches: false,
+            includeLogsCaches: false,
+            specificPaths: [cacheFile.path]
+        )
+
+        let result = try await cleanSafely(config, using: fallbackService)
+
+        XCTAssertFalse(fileManager.fileExists(atPath: cacheFile.path))
+        XCTAssertEqual(result.errors.count, 0)
+        XCTAssertEqual(result.filesRemoved, 1)
+        XCTAssertGreaterThan(result.freedBytes, 0)
+    }
+
+    func testSwiftFallbackDryRunDoesNotDeleteSafeFixture() async throws {
+        let fallbackService = makeFallbackService()
+        let cacheFile = tempDir.appendingPathComponent("Caches/test.cache")
+
+        let config = CleanerConfiguration(
+            cleanupLevel: .normal,
+            dryRun: true,
+            includeSystemCaches: false,
+            includeDeveloperCaches: false,
+            includeBrowserCaches: false,
+            includeLogsCaches: false,
+            specificPaths: [cacheFile.path]
+        )
+
+        let result = try await cleanSafely(config, using: fallbackService)
+
+        XCTAssertTrue(fileManager.fileExists(atPath: cacheFile.path))
+        XCTAssertEqual(result.errors.count, 0)
+        XCTAssertEqual(result.filesRemoved, 1)
+        XCTAssertGreaterThan(result.freedBytes, 0)
+    }
+
+    func testSwiftFallbackSkipsProtectedPath() async throws {
+        let fallbackService = makeFallbackService()
+        let config = CleanerConfiguration(
+            cleanupLevel: .system,
+            dryRun: false,
+            includeSystemCaches: false,
+            includeDeveloperCaches: false,
+            includeBrowserCaches: false,
+            includeLogsCaches: false,
+            specificPaths: ["/System"]
+        )
+
+        // INTENTIONAL: This test verifies CleanerService's internal danger-level
+        // protection by handing it `/System` and asserting the cleaner refuses
+        // to delete. The DestructiveCleanupGuard is intentionally bypassed.
+        let result = try await fallbackService.clean(with: config)
+
+        XCTAssertEqual(result.filesRemoved, 0)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertTrue(result.errors[0].reason.contains("danger-level"))
+    }
+
+    func testSwiftFallbackSkipsWarningAtNormalAndContinuesWithSafeTarget() async throws {
+        let fallbackService = makeFallbackService()
+        let warningFixture = try createWarningFixture()
+        let safeFile = tempDir.appendingPathComponent("Caches/test.cache")
+
+        let config = CleanerConfiguration(
+            cleanupLevel: .normal,
+            dryRun: false,
+            includeSystemCaches: false,
+            includeDeveloperCaches: false,
+            includeBrowserCaches: false,
+            includeLogsCaches: false,
+            specificPaths: [warningFixture.path, safeFile.path]
+        )
+
+        // INTENTIONAL: This test verifies CleanerService's warning-level
+        // protection refuses to delete a fixture under ~/Library/Developer at
+        // .normal cleanup level. The fixture is registered in
+        // additionalCleanupURLs and removed in tearDown. The
+        // DestructiveCleanupGuard is intentionally bypassed.
+        let result = try await fallbackService.clean(with: config)
+
+        XCTAssertTrue(fileManager.fileExists(atPath: warningFixture.path))
+        XCTAssertFalse(fileManager.fileExists(atPath: safeFile.path))
+        XCTAssertEqual(result.filesRemoved, 1)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertTrue(result.errors[0].reason.contains("requires"))
+    }
+
+    func testSwiftFallbackWarningDryRunAtDeepDoesNotDelete() async throws {
+        let fallbackService = makeFallbackService()
+        let warningFixture = try createWarningFixture()
+
+        let config = CleanerConfiguration(
+            cleanupLevel: .deep,
+            dryRun: true,
+            includeSystemCaches: false,
+            includeDeveloperCaches: false,
+            includeBrowserCaches: false,
+            includeLogsCaches: false,
+            specificPaths: [warningFixture.path]
+        )
+
+        // Dry-run only: targets a fixture under ~/Library/Developer to confirm
+        // the cleaner reports it as removable at .deep level without deleting.
+        // DestructiveCleanupGuard permits dry-runs unconditionally.
+        let result = try await cleanSafely(config, using: fallbackService)
+
+        XCTAssertTrue(fileManager.fileExists(atPath: warningFixture.path))
+        XCTAssertEqual(result.errors.count, 0)
+        XCTAssertEqual(result.filesRemoved, 1)
+        XCTAssertGreaterThan(result.freedBytes, 0)
     }
 
     // MARK: - Error Handling Tests
@@ -296,7 +458,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [nonExistentPath]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Should not throw, but no files should be removed
         XCTAssertEqual(result.filesRemoved, 0)
@@ -323,7 +485,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [readOnlyFile.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Note: Rust core may succeed in deleting read-only files
         // This test verifies that the operation completes without crashing
@@ -358,7 +520,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [testFile.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Verify size is approximately correct (accounting for filesystem overhead)
         XCTAssertGreaterThanOrEqual(result.freedBytes, 1024, "Should free at least 1KB")
@@ -383,7 +545,7 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [file1.path, file2.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Verify statistics
         XCTAssertGreaterThanOrEqual(result.freedBytes, 1000)
@@ -405,11 +567,10 @@ final class CleanerServiceIntegrationTests: XCTestCase {
             specificPaths: [testFile.path]
         )
 
-        let result = try await cleanerService.clean(with: config)
+        let result = try await cleanSafely(config)
 
         // Verify formatted string is not empty
         XCTAssertFalse(result.formattedFreedSpace.isEmpty, "Formatted space should not be empty")
         XCTAssertGreaterThan(result.freedBytes, 0)
     }
 }
-

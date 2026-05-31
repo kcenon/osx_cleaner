@@ -255,7 +255,13 @@ osxcleaner clean --target logs
 
 # Clean all targets
 osxcleaner clean --target all
+
+# Clean only explicit paths
+osxcleaner clean --level deep ~/Library/Containers/com.example.app
 ```
+
+When path arguments are provided, `clean` restricts execution to those
+canonicalized paths instead of adding broad category targets implicitly.
 
 ### Safety Options
 
@@ -263,10 +269,10 @@ osxcleaner clean --target all
 # Preview only (no actual deletion)
 osxcleaner clean --dry-run
 
-# Skip confirmation prompts
+# Run in automation; risky cleanup still needs --force
 osxcleaner clean --non-interactive
 
-# Force cleanup (skip some safety checks)
+# Explicitly approve warning/system cleanup without a prompt
 osxcleaner clean --force
 ```
 
@@ -1248,7 +1254,7 @@ jobs:
 
       - name: Run Cleanup
         run: |
-          osxcleaner clean --level deep --non-interactive --format json
+          osxcleaner clean --level deep --non-interactive --force --format json
 ```
 
 ### Jenkins Pipeline Example

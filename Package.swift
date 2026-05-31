@@ -41,10 +41,10 @@ let package = Package(
                 .process("Resources")
             ]
         ),
-        // Rust Core C Bridge
-        .systemLibrary(
+        // Rust Core C Bridge — universal XCFramework built by scripts/build-xcframework.sh
+        .binaryTarget(
             name: "COSXCore",
-            path: "Sources/COSXCore"
+            path: "Frameworks/COSXCore.xcframework"
         ),
         // Swift Library with Rust FFI Bridge
         .target(
@@ -57,8 +57,11 @@ let package = Package(
             ],
             path: "Sources/OSXCleanerKit",
             linkerSettings: [
-                .unsafeFlags(["-L", "rust-core/target/release"]),
-                .linkedLibrary("osxcore")
+                // sysinfo (>= 0.39) resolves macOS users via OpenDirectory.
+                // The static library is repackaged into COSXCore.xcframework,
+                // which drops the crate's `#[link]` directive, so the framework
+                // must be linked explicitly here for every downstream consumer.
+                .linkedFramework("OpenDirectory")
             ]
         ),
         // Tests
@@ -66,6 +69,11 @@ let package = Package(
             name: "OSXCleanerKitTests",
             dependencies: ["OSXCleanerKit"],
             path: "Tests/OSXCleanerKitTests"
+        ),
+        .testTarget(
+            name: "osxcleanerCLITests",
+            dependencies: [],
+            path: "Tests/osxcleanerCLITests"
         )
     ]
 )
