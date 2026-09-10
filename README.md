@@ -1,3 +1,5 @@
+> Status: archived 2026-09. No further maintenance; kept for reference.
+
 # OSX Cleaner
 
 > **macOS System Cleaning Tool** - Safely clean unnecessary files to free up disk space.
